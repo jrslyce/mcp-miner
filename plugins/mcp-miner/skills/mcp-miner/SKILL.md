@@ -21,6 +21,7 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 - `get_latest_report`: latest compact MCP Miner report.
 - `get_inventory`: current inventory with material names, categories, rarity, and value totals.
 - `get_active_orders`: current generated orders.
+- `fulfill_order`: consume available inventory and complete an active order for Space Bucks.
 - `get_settings`: report mode, cloud-sync preference, and privacy posture.
 - `get_milestone_status`: current asteroid milestone progress and claim support status.
 - `get_catalog_summary`: counts of loaded materials, recipes, machines, asteroids, upgrades, and hazards.

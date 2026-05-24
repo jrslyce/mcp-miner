@@ -84,6 +84,15 @@ class McpMinerServer
         inputSchema: object_schema({})
       },
       {
+        name: "fulfill_order",
+        description: "Fulfill an active MCP Miner order when required inventory is available.",
+        inputSchema: object_schema({
+          order_id: {
+            type: "string"
+          }
+        })
+      },
+      {
         name: "get_settings",
         description: "Return current MCP Miner report, privacy, and local sync settings.",
         inputSchema: object_schema({})
@@ -157,6 +166,8 @@ class McpMinerServer
         @engine.inventory_payload
       when "get_active_orders"
         @engine.active_orders_payload
+      when "fulfill_order"
+        @engine.fulfill_order_payload(args)
       when "get_settings"
         @engine.settings_payload
       when "get_milestone_status"

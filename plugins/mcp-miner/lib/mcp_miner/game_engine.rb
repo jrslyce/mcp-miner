@@ -120,6 +120,8 @@ module McpMiner
         "report_mode" => start.fetch("report_mode"),
         "cloud_sync" => false,
         "orders" => [],
+        "completed_orders" => [],
+        "order_generation_index" => 0,
         "suit_condition" => 100,
         "asteroid_progress" => {
           "asteroid_class_id" => start.fetch("current_asteroid_class_id"),
@@ -166,6 +168,8 @@ module McpMiner
       state["dedupe_keys"] ||= []
       state["current_turn"] = nil unless state["current_turn"].is_a?(Hash)
       state["orders"] ||= []
+      state["completed_orders"] ||= []
+      state["order_generation_index"] = state["order_generation_index"].to_i
       state["journal"] = default_journal_metadata.merge(state["journal"] || {})
       state["last_migration"] = nil unless state["last_migration"].nil? || state["last_migration"].is_a?(Hash)
       state["last_recovery"] = nil unless state["last_recovery"].nil? || state["last_recovery"].is_a?(Hash)
@@ -502,42 +506,79 @@ module McpMiner
 
     def active_orders_payload
       with_state do |current_state|
-        if current_state["orders"].nil? || current_state["orders"].empty?
-          current_state["orders"] = generate_orders
-          current_state["orders_generated_at"] = Time.now.utc.iso8601
-        end
+        refresh_orders!(current_state)
         {
-          orders: current_state["orders"],
+          orders: current_state["orders"].map { |order| order_payload(order, current_state) },
           generated_at: current_state["orders_generated_at"],
+          refresh_due_at: current_state["orders_refresh_due_at"],
+          refresh_cadence_hours: order_generator.fetch("refresh_cadence_hours"),
+          missed_order_penalty: order_generator.fetch("missed_order_penalty"),
           privacy: PRIVACY_NOTICE
         }
       end
     end
 
-    def generate_orders
-      slots = @data.fetch(:order_generator).fetch("active_order_slots")
-      recipes = recipe_list.select { |recipe| recipe["progression_tier"] <= 1 }
-      variants = variant_list
-      buyer = buyer_list.find { |b| b["unlock_tier"] == 1 } || buyer_list.first
+    def fulfill_order_payload(args)
+      order_id = safe_string(args["order_id"])
+      raise "order_id is required" if order_id.empty?
 
-      recipes.first(slots).each_with_index.map do |recipe, index|
-        variant = variants[index % variants.length]
-        quantity = 1
-        required = required_materials(recipe, variant, quantity)
-        payout = order_payout(required, recipe, variant, buyer, windfall: false)
+      with_state do |current_state|
+        refresh_orders!(current_state)
+        order = current_state["orders"].find { |candidate| candidate["order_id"] == order_id }
+        unless order
+          next {
+            ok: false,
+            status: "not_found",
+            order_id: order_id,
+            orders: current_state["orders"].map { |candidate| order_payload(candidate, current_state) },
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        missing = missing_materials(order, current_state)
+        unless missing.empty?
+          next {
+            ok: false,
+            status: "missing_materials",
+            order: order_payload(order, current_state),
+            missing_materials: missing,
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        required = order["required_materials"] || {}
+        required.each do |material_id, quantity|
+          current_state["inventory"][material_id] = current_state["inventory"][material_id].to_i - quantity.to_i
+        end
+        current_state["space_bucks"] = current_state["space_bucks"].to_i + order["payout_space_bucks"].to_i
+
+        fulfilled_at = Time.now.utc.iso8601
+        completed_order = order.merge(
+          "status" => "fulfilled",
+          "fulfilled_at" => fulfilled_at
+        )
+        current_state["completed_orders"] << completed_order
+        current_state["completed_orders"] = current_state["completed_orders"].last(50)
+        current_state["orders"].delete_if { |candidate| candidate["order_id"] == order_id }
+        replacement = replace_order_for_slot!(current_state, order["slot"].to_i)
+
         {
-          order_id: "order_seed_#{index + 1}",
-          recipe_id: recipe["id"],
-          product: "#{variant['display_name']} #{recipe['display_name']}",
-          variant_id: variant["id"],
-          buyer_id: buyer["id"],
-          buyer: buyer["display_name"],
-          quantity: quantity,
-          required_materials: required,
-          payout_space_bucks: payout,
-          is_windfall: false,
-          expires_in_days: 3
+          ok: true,
+          status: "fulfilled",
+          order: completed_order,
+          consumed_materials: required,
+          payout_space_bucks: order["payout_space_bucks"].to_i,
+          space_bucks: current_state["space_bucks"].to_i,
+          replacement_order: order_payload(replacement, current_state),
+          privacy: PRIVACY_NOTICE
         }
+      end
+    end
+
+    def generate_orders(state = initial_state, generated_at: Time.now.utc)
+      slots = order_generator.fetch("active_order_slots").to_i
+      slots.times.map do |slot|
+        generate_order_for_slot(state, slot, generated_at: generated_at)
       end
     end
 
@@ -560,7 +601,7 @@ module McpMiner
       required
     end
 
-    def order_payout(required, recipe, variant, buyer, windfall:)
+    def order_payout(required, recipe, variant, buyer, windfall: false, price_multiplier: nil)
       raw_value = required.sum do |material_id, quantity|
         lookup_id = material_id.sub(/^refined:/, "")
         material = material_by_id.fetch(lookup_id)
@@ -568,8 +609,8 @@ module McpMiner
         value.to_i * quantity.to_i
       end
       complexity = 1 + (0.08 * required.keys.length) + (0.18 * recipe["progression_tier"].to_i) + (0.10 * recipe["progression_tier"].to_i)
-      variation = windfall ? 2.25 : 1.0
-      nice_round(raw_value * complexity * buyer["reputation_multiplier"].to_f * variant["payout_multiplier"].to_f * variation)
+      multiplier = price_multiplier || (windfall ? order_generator.dig("windfall", "min_multiplier").to_f : 1.0)
+      nice_round(raw_value * complexity * buyer["reputation_multiplier"].to_f * variant["payout_multiplier"].to_f * multiplier)
     end
 
     def asteroid_summary(id)
@@ -605,6 +646,10 @@ module McpMiner
 
     def buyer_list
       @data.fetch(:buyers)
+    end
+
+    def order_generator
+      @data.fetch(:order_generator)
     end
 
     def asteroid_list
@@ -669,6 +714,158 @@ module McpMiner
         totals[category][:quantity] += item[:quantity].to_i
         totals[category][:total_raw_space_bucks] += item[:total_raw_space_bucks].to_i
       end
+    end
+
+    def refresh_orders!(state)
+      now = Time.now.utc
+      state["order_generation_index"] = state["order_generation_index"].to_i
+      state["orders"] = [] unless state["orders"].is_a?(Array)
+      refresh_due = parse_time(state["orders_refresh_due_at"])
+
+      if state["orders"].empty? || (refresh_due && refresh_due <= now)
+        state["order_generation_index"] += 1 unless state["orders"].empty?
+        state["orders"] = generate_orders(state, generated_at: now)
+        stamp_order_generation!(state, now)
+        return
+      end
+
+      expired_slots = state["orders"].select { |order| order_expired?(order, now) }.map { |order| order["slot"].to_i }
+      return if expired_slots.empty?
+
+      state["orders"].reject! { |order| expired_slots.include?(order["slot"].to_i) }
+      expired_slots.each { |slot| replace_order_for_slot!(state, slot, generated_at: now) }
+      stamp_order_generation!(state, now)
+    end
+
+    def replace_order_for_slot!(state, slot, generated_at: Time.now.utc)
+      state["order_generation_index"] = state["order_generation_index"].to_i + 1
+      replacement = generate_order_for_slot(state, slot, generated_at: generated_at)
+      state["orders"] << replacement
+      state["orders"].sort_by! { |order| order["slot"].to_i }
+      stamp_order_generation!(state, generated_at) unless state["orders_generated_at"]
+      replacement
+    end
+
+    def stamp_order_generation!(state, generated_at)
+      state["orders_generated_at"] = generated_at.iso8601
+      state["orders_refresh_due_at"] = (generated_at + (order_generator.fetch("refresh_cadence_hours").to_i * 3600)).iso8601
+    end
+
+    def generate_order_for_slot(state, slot, generated_at:)
+      tier = player_tier(state)
+      recipes = recipe_list.select { |recipe| recipe["progression_tier"].to_i <= tier && state["unlocked_machine_ids"].include?(recipe["machine_id"]) }
+      recipes = recipe_list.select { |recipe| recipe["progression_tier"].to_i <= tier } if recipes.empty?
+      raise "No valid recipes for player tier #{tier}" if recipes.empty?
+
+      buyers = buyer_list.select { |buyer| buyer["unlock_tier"].to_i <= tier }
+      buyers = [buyer_list.first].compact if buyers.empty?
+      raise "No valid buyers for player tier #{tier}" if buyers.empty?
+
+      generation = state["order_generation_index"].to_i
+      seed = "order:#{generation}:#{slot}"
+      recipe = deterministic_pick(recipes, "#{seed}:recipe")
+      variant = deterministic_pick(variant_list, "#{seed}:variant")
+      buyer = deterministic_pick(buyers, "#{seed}:buyer")
+      quantity = deterministic_range(order_generator.fetch("quantity_by_tier").fetch(recipe["progression_tier"].to_i), "#{seed}:quantity")
+      deadline_days = order_deadline_days(recipe, variant, "#{seed}:deadline")
+      required = required_materials(recipe, variant, quantity)
+      windfall = deterministic_unit("#{seed}:windfall") < order_generator.dig("windfall", "chance").to_f
+      price_multiplier = windfall ? windfall_multiplier("#{seed}:windfall_multiplier") : normal_price_multiplier("#{seed}:normal_price")
+      payout = order_payout(required, recipe, variant, buyer, price_multiplier: price_multiplier)
+      digest = Digest::SHA256.hexdigest("#{seed}:#{recipe['id']}:#{variant['id']}:#{buyer['id']}")[0, 10]
+
+      {
+        "order_id" => "order_#{generation}_#{slot + 1}_#{digest}",
+        "slot" => slot,
+        "status" => "active",
+        "recipe_id" => recipe["id"],
+        "product" => "#{variant['display_name']} #{recipe['display_name']}",
+        "variant_id" => variant["id"],
+        "buyer_id" => buyer["id"],
+        "buyer" => buyer["display_name"],
+        "quantity" => quantity,
+        "required_materials" => required,
+        "payout_space_bucks" => payout,
+        "price_multiplier" => price_multiplier.round(4),
+        "is_windfall" => windfall,
+        "windfall_label" => windfall ? deterministic_pick(order_generator.fetch("windfall_labels"), "#{seed}:windfall_label") : nil,
+        "deadline_days" => deadline_days,
+        "expires_in_days" => deadline_days,
+        "created_at" => generated_at.iso8601,
+        "expires_at" => (generated_at + (deadline_days * 86_400)).iso8601
+      }.compact
+    end
+
+    def order_payload(order, state)
+      missing = missing_materials(order, state)
+      order.merge(
+        "can_fulfill" => missing.empty?,
+        "missing_materials" => missing
+      )
+    end
+
+    def missing_materials(order, state)
+      inventory = state["inventory"] || {}
+      (order["required_materials"] || {}).each_with_object({}) do |(material_id, quantity), missing|
+        available = inventory[material_id].to_i
+        needed = quantity.to_i
+        missing[material_id] = needed - available if available < needed
+      end
+    end
+
+    def order_expired?(order, now)
+      expires_at = parse_time(order["expires_at"])
+      expires_at && expires_at <= now
+    end
+
+    def order_deadline_days(recipe, variant, seed)
+      config = order_generator.fetch("deadline_days_by_tier").fetch(recipe["progression_tier"].to_i)
+      base_days = deterministic_range(config, seed)
+      [(base_days * variant["deadline_multiplier"].to_f).ceil, 1].max
+    end
+
+    def normal_price_multiplier(seed)
+      config = order_generator.fetch("normal_price_variation")
+      low = config.fetch("min").to_f
+      mode = config.fetch("mode").to_f
+      high = config.fetch("max").to_f
+      first = low + ((mode - low) * deterministic_unit("#{seed}:a"))
+      second = mode + ((high - mode) * deterministic_unit("#{seed}:b"))
+      (first + second) / 2.0
+    end
+
+    def windfall_multiplier(seed)
+      config = order_generator.fetch("windfall")
+      min = config.fetch("min_multiplier").to_f
+      max = config.fetch("max_multiplier").to_f
+      min + ((max - min) * deterministic_unit(seed))
+    end
+
+    def deterministic_pick(items, seed)
+      items[(deterministic_unit(seed) * items.length).floor.clamp(0, items.length - 1)]
+    end
+
+    def deterministic_range(config, seed)
+      min = config.fetch("min").to_i
+      max = config.fetch("max").to_i
+      return min if min >= max
+
+      min + (deterministic_unit(seed) * (max - min + 1)).floor
+    end
+
+    def player_tier(state)
+      asteroid_tiers = (state["unlocked_asteroid_class_ids"] || []).map do |asteroid_id|
+        asteroid_by_id.dig(asteroid_id, "unlock_tier").to_i
+      end
+      [asteroid_tiers.max.to_i, 1].max
+    end
+
+    def parse_time(value)
+      return nil if value.to_s.empty?
+
+      Time.parse(value.to_s)
+    rescue ArgumentError
+      nil
     end
 
     def next_milestone_target(mined, depletion_size)
@@ -933,7 +1130,10 @@ module McpMiner
         report_mode
         cloud_sync
         orders
+        completed_orders
         orders_generated_at
+        orders_refresh_due_at
+        order_generation_index
         suit_condition
         asteroid_progress
         stats

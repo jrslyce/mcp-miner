@@ -893,15 +893,24 @@ Required runtime validation:
   "variantId": "order_variant_rush_batch",
   "buyerId": "buyer_patchy_freighter_union",
   "quantity": 2,
+  "slot": 0,
+  "status": "active",
   "requiredMaterials": {
     "mat_chonks": 42,
     "mat_element_fe": 14,
     "mat_element_ni": 6
   },
   "payoutSpaceBucks": 620,
+  "priceMultiplier": 1.08,
   "isWindfall": false,
+  "windfallLabel": null,
+  "deadlineDays": 2,
   "createdAt": "2026-05-24T00:00:00Z",
-  "expiresAt": "2026-05-26T00:00:00Z"
+  "expiresAt": "2026-05-26T00:00:00Z",
+  "canFulfill": false,
+  "missingMaterials": {
+    "mat_element_ni": 2
+  }
 }
 ```
 
@@ -909,7 +918,12 @@ Required runtime validation:
 
 - Recipe, variant, and buyer IDs exist.
 - Required materials are computed from recipe and variant data.
-- Payout is computed from formula, not hand-entered.
+- Payout is computed from formula and deterministic price variation, not hand-entered.
+- Windfall orders use the configured chance, multiplier range, and labels from `order_generator.yaml`.
+- Fulfillment consumes required inventory, adds Space Bucks, archives the completed order, and fills
+  the active slot with a replacement order.
+- Expired orders are replaced without inventory loss; `missed_order_penalty` remains
+  `lost_opportunity_only`.
 - Expiration is after creation.
 
 ## Validation Test Suite

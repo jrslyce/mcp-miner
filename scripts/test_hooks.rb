@@ -289,14 +289,15 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     end
 
     update_report_mode(report_state_path, "every_turn_compact")
-    run_mcp(report_state_path, [
+    orders_response = run_mcp(report_state_path, [
       { jsonrpc: "2.0", id: 3, method: "initialize", params: {} },
       { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_active_orders", arguments: {} } }
     ])
+    target_order = JSON.parse(orders_response.last.dig("result", "content", 0, "text")).fetch("orders").first
     McpMiner::GameEngine.new(root: ROOT, state_path: report_state_path).with_state do |mode_state|
-      mode_state["inventory"]["mat_chonks"] = 18
-      mode_state["inventory"]["mat_element_fe"] = 6
-      mode_state["inventory"]["mat_element_ni"] = 2
+      target_order.fetch("required_materials").each do |material_id, quantity|
+        mode_state["inventory"][material_id] = quantity.to_i
+      end
       mode_state["current_turn"] = nil
     end
     post_tool("turn-order", report_state_path,
@@ -308,7 +309,7 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     assert("compact reports should use order progress templates when orders are active") do
       order_stop["decision"] == "block" &&
         order_stop["reason"].include?("order +100%") &&
-        order_stop["reason"].include?("3 days left")
+        order_stop["reason"].include?("#{target_order.fetch('expires_in_days')} days left")
     end
   end
 
