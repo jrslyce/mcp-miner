@@ -1,2 +1,15 @@
-# mcp-miner
-MCP Miner
+# MCP Miner
+
+MCP Miner is a passive asteroid-mining game for Codex work.
+
+## Firebase Local Scaffold
+
+The V1 Firebase scaffold uses the demo project `demo-mcp-miner` and local emulators for Auth, Firestore, Functions, Hosting, and the Emulator UI.
+
+```sh
+npm install --prefix firebase/functions
+npm run firebase:emulators:start
+npm run firebase:emulators:smoke
+```
+
+See [docs/firebase-local.md](docs/firebase-local.md) for ports, privacy boundaries, App Check, Secret Manager, Cloud Logging, IAM, and Cloud Run notes.

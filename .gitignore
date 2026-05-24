@@ -1,0 +1,13 @@
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+*.local
+.env
+.env.*
+!.env.example
+
+firebase/functions/node_modules/
+firebase/functions/lib/
+firebase/functions/.runtimeconfig.json
