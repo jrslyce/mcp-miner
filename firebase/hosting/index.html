@@ -3,12 +3,52 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MCP Miner Firebase Local</title>
+    <title>MCP Miner Dashboard</title>
+    <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <main>
-      <h1>MCP Miner Firebase Local</h1>
-      <p>Firebase Hosting emulator placeholder for the V1 dashboard and store.</p>
+    <main class="shell">
+      <section class="auth-panel" aria-labelledby="auth-title">
+        <div>
+          <p class="eyebrow">Firebase Auth</p>
+          <h1 id="auth-title">MCP Miner</h1>
+        </div>
+
+        <form id="auth-form" class="auth-form">
+          <label>
+            Email
+            <input id="email" name="email" type="email" autocomplete="email" required>
+          </label>
+          <label>
+            Password
+            <input id="password" name="password" type="password" autocomplete="current-password" required minlength="6">
+          </label>
+          <div class="actions">
+            <button id="sign-in" type="submit">Sign In</button>
+            <button id="create-account" type="button">Create</button>
+            <button id="sign-out" type="button" disabled>Sign Out</button>
+          </div>
+        </form>
+
+        <dl class="status-grid">
+          <div>
+            <dt>Status</dt>
+            <dd id="auth-status">Signed out</dd>
+          </div>
+          <div>
+            <dt>UID</dt>
+            <dd id="auth-uid">-</dd>
+          </div>
+          <div>
+            <dt>Profile</dt>
+            <dd id="profile-status">Not linked</dd>
+          </div>
+        </dl>
+
+        <p id="auth-message" class="message" role="status" aria-live="polite"></p>
+      </section>
     </main>
+
+    <script type="module" src="/auth.js"></script>
   </body>
 </html>

@@ -37,6 +37,9 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 - `get_base_status`: inspect base modules, configured effects, and drone automation.
 - `purchase_base_module`: spend Space Bucks/materials to build or repair one base module level.
 - `get_settings`: report mode, cloud-sync preference, and privacy posture.
+- `get_account_link_status`: inspect optional Firebase Auth linking state.
+- `link_cloud_profile`: link local progress to a Firebase Auth UID without storing credentials.
+- `unlink_cloud_profile`: return to local-only play.
 - `get_reward_controls`: privacy-safe cooldown, soft-cap, dedupe, and diversity diagnostics for rewarded work.
 - `get_milestone_status`: current asteroid milestone progress and claim support status.
 - `get_catalog_summary`: counts of loaded materials, recipes, machines, asteroids, upgrades, and hazards.

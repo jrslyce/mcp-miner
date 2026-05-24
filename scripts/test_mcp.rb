@@ -111,6 +111,9 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     get_base_status
     purchase_base_module
     get_settings
+    get_account_link_status
+    link_cloud_profile
+    unlink_cloud_profile
     get_reward_controls
     get_milestone_status
     get_catalog_summary
@@ -148,8 +151,10 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
   end
   assert("get_settings should expose valid report modes and local sync state") do
     settings_payload.dig("settings", "valid_report_modes").include?("milestones_only") &&
-      settings_payload.dig("sync", "status") == "local_only" &&
-      settings_payload.dig("sync", "cloud_sync_enabled") == true
+      settings_payload.dig("settings", "valid_cloud_auth_statuses").include?("linked") &&
+      settings_payload.dig("sync", "status") == "unauthenticated" &&
+      settings_payload.dig("sync", "cloud_sync_enabled") == true &&
+      settings_payload.dig("account_link", "status") == "unauthenticated"
   end
   assert("get_player_status should keep existing top-level status fields") do
     status_payload.dig("player", "space_bucks") == 44 &&
@@ -177,10 +182,10 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
       milestone_payload.dig("milestones", "next_milestone", "target_mined") == 500 &&
       milestone_payload.dig("milestones", "claim_status") == "not_supported_in_local_mvp"
   end
-  assert("sync_progress should be an explicit local-only stub") do
+  assert("sync_progress should expose optional unauthenticated cloud state") do
     sync_payload["ok"] == true &&
       sync_payload.dig("sync", "available") == false &&
-      sync_payload.dig("sync", "status") == "local_only" &&
+      sync_payload.dig("sync", "status") == "unauthenticated" &&
       !sync_payload.dig("sync", "journal").key?("path")
   end
   assert("claim_milestone should be an explicit disabled stub") do

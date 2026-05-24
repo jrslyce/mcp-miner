@@ -11,6 +11,7 @@ npm install --prefix firebase/functions
 npm run firebase:emulators:start
 npm run firebase:emulators:smoke
 npm run firebase:rules:smoke
+npm run firebase:auth:smoke
 ```
 
-See [docs/firebase-local.md](docs/firebase-local.md) for ports, privacy boundaries, App Check, Secret Manager, Cloud Logging, IAM, and Cloud Run notes. See [docs/firestore-schema.md](docs/firestore-schema.md) for owner-scoped Firestore collections and security rule boundaries.
+See [docs/firebase-local.md](docs/firebase-local.md) for ports, privacy boundaries, App Check, Secret Manager, Cloud Logging, IAM, and Cloud Run notes. See [docs/firestore-schema.md](docs/firestore-schema.md) for owner-scoped Firestore collections and security rule boundaries, and [docs/auth-linking.md](docs/auth-linking.md) for optional Firebase Auth linking.

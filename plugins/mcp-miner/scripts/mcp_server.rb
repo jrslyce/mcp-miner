@@ -233,6 +233,28 @@ class McpMinerServer
         inputSchema: object_schema({})
       },
       {
+        name: "get_account_link_status",
+        description: "Return local Firebase Auth account-link status for optional cloud sync.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "link_cloud_profile",
+        description: "Link the local MCP Miner profile to a Firebase Auth UID without storing credentials.",
+        inputSchema: object_schema({
+          firebase_uid: {
+            type: "string"
+          },
+          display_name: {
+            type: "string"
+          }
+        })
+      },
+      {
+        name: "unlink_cloud_profile",
+        description: "Unlink the local MCP Miner profile from Firebase Auth and keep local-only progress enabled.",
+        inputSchema: object_schema({})
+      },
+      {
         name: "get_reward_controls",
         description: "Return privacy-safe MCP Miner reward-control diagnostics, cooldowns, soft caps, and diversity policy.",
         inputSchema: object_schema({})
@@ -338,6 +360,12 @@ class McpMinerServer
         @engine.purchase_base_module_payload(args)
       when "get_settings"
         @engine.settings_payload
+      when "get_account_link_status"
+        @engine.account_link_status_payload
+      when "link_cloud_profile"
+        @engine.link_cloud_profile_payload(args)
+      when "unlink_cloud_profile"
+        @engine.unlink_cloud_profile_payload(args)
       when "get_reward_controls"
         @engine.reward_controls_payload
       when "get_milestone_status"

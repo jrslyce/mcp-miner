@@ -25,6 +25,12 @@ module McpMiner
       session_summary_only
       milestones_only
     ].freeze
+    VALID_CLOUD_AUTH_STATUSES = %w[
+      off
+      unauthenticated
+      linked
+      sync_error
+    ].freeze
 
     DATA_FILES = {
       materials: ["materials.yaml", "materials"],
@@ -113,6 +119,7 @@ module McpMiner
       {
         "state_schema_version" => CURRENT_STATE_SCHEMA_VERSION,
         "profile" => default_profile,
+        "cloud_auth" => default_cloud_auth,
         "space_bucks" => start.fetch("space_bucks"),
         "reward_controls" => default_reward_controls,
         "inventory" => start.fetch("inventory").dup,
@@ -171,6 +178,10 @@ module McpMiner
       state["profile"] = default_profile.merge(state["profile"].is_a?(Hash) ? state["profile"] : {})
       state["profile"]["customization_unlocks"] ||= []
       state["profile"]["generated_assets"] ||= []
+      state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
+      state["cloud_auth"]["status"] = "off" unless VALID_CLOUD_AUTH_STATUSES.include?(state["cloud_auth"]["status"])
+      state["cloud_auth"]["uid"] = optional_string(state["cloud_auth"]["uid"])
+      state["cloud_auth"]["last_error"] = optional_string(state["cloud_auth"]["last_error"])
       state["reward_controls"] = default_reward_controls.merge(state["reward_controls"].is_a?(Hash) ? state["reward_controls"] : {})
       state["reward_controls"]["event_stats"] ||= {}
       state["reward_controls"]["daily_category_counts"] ||= {}
@@ -243,6 +254,17 @@ module McpMiner
         "generated_assets" => [],
         "customization_unlocks" => ["suit_patch_basic", "helmet_lamp_warm"],
         "cloud_sync" => false
+      }
+    end
+
+    def default_cloud_auth
+      {
+        "provider" => "firebase",
+        "status" => "off",
+        "uid" => nil,
+        "linked_at" => nil,
+        "last_error" => nil,
+        "updated_at" => nil
       }
     end
 
@@ -783,8 +805,10 @@ module McpMiner
         settings: {
           report_mode: current_state["report_mode"],
           cloud_sync: current_state["cloud_sync"],
-          valid_report_modes: VALID_REPORT_MODES
+          valid_report_modes: VALID_REPORT_MODES,
+          valid_cloud_auth_statuses: VALID_CLOUD_AUTH_STATUSES
         },
+        account_link: account_link_status_payload(current_state)[:account_link],
         sync: sync_progress_payload(current_state)[:sync],
         privacy: PRIVACY_NOTICE
       }
@@ -822,12 +846,24 @@ module McpMiner
     end
 
     def sync_progress_payload(current_state = state)
+      account_link = account_link_status_payload(current_state)[:account_link]
+      sync_status =
+        if !current_state["cloud_sync"]
+          "off"
+        elsif account_link[:status] == "linked"
+          "linked_sync_pending"
+        elsif account_link[:status] == "sync_error"
+          "sync_error"
+        else
+          "unauthenticated"
+        end
       {
         ok: true,
         sync: {
-          status: "local_only",
-          available: false,
+          status: sync_status,
+          available: account_link[:status] == "linked",
           cloud_sync_enabled: current_state["cloud_sync"],
+          account_link: account_link,
           materialized_state: "available",
           journal: {
             applied_event_count: current_state.dig("journal", "applied_event_count").to_i,
@@ -837,10 +873,95 @@ module McpMiner
           latest_state_schema_version: CURRENT_STATE_SCHEMA_VERSION,
           last_migration: current_state["last_migration"],
           last_recovery: current_state["last_recovery"],
-          note: "Cloud sync is not implemented in the local MVP; progress remains in local state and journal."
+          note: sync_status == "linked_sync_pending" ? "Firebase Auth is linked; cloud sync API reducers are not implemented yet." : "Cloud sync remains optional; local progression works without sign-in."
         },
         privacy: PRIVACY_NOTICE
       }
+    end
+
+    def account_link_status_payload(current_state = state)
+      auth = default_cloud_auth.merge(current_state["cloud_auth"].is_a?(Hash) ? current_state["cloud_auth"] : {})
+      status = if !current_state["cloud_sync"]
+                 "off"
+               elsif auth["status"] == "linked" && !safe_string(auth["uid"]).empty?
+                 "linked"
+               elsif auth["status"] == "sync_error"
+                 "sync_error"
+               else
+                 "unauthenticated"
+               end
+      {
+        account_link: {
+          provider: "firebase",
+          status: status,
+          uid: status == "linked" || status == "sync_error" ? optional_string(auth["uid"]) : nil,
+          linked_at: optional_string(auth["linked_at"]),
+          updated_at: optional_string(auth["updated_at"]),
+          last_error: status == "sync_error" ? optional_string(auth["last_error"]) : nil,
+          cloud_sync_enabled: !!current_state["cloud_sync"],
+          required_credentials: "Firebase Auth only; no OpenAI credentials or API keys are used for game auth.",
+          dashboard_url: "http://localhost:3317/dashboard",
+          privacy: "Stores Firebase Auth UID and MCP Miner profile metadata only."
+        },
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def link_cloud_profile_payload(args)
+      firebase_uid = safe_string(args["firebase_uid"]).strip
+      raise "firebase_uid is required" if firebase_uid.empty?
+      raise "firebase_uid must not contain path separators" if firebase_uid.include?("/")
+
+      now = Time.now.utc.iso8601
+      with_state do |current_state|
+        profile = default_profile.merge(current_state["profile"] || {})
+        profile["cloud_sync"] = true
+        profile["display_name"] = normalize_profile_value("display_name", args["display_name"]) if args.key?("display_name")
+        current_state["profile"] = profile
+        current_state["cloud_sync"] = true
+        current_state["cloud_auth"] = default_cloud_auth.merge(
+          "status" => "linked",
+          "uid" => firebase_uid,
+          "linked_at" => now,
+          "updated_at" => now,
+          "last_error" => nil
+        )
+
+        {
+          ok: true,
+          status: "linked",
+          account_link: account_link_status_payload(current_state)[:account_link],
+          firestore_paths: {
+            player: "players/#{firebase_uid}",
+            profile: "players/#{firebase_uid}/profile/current",
+            settings: "players/#{firebase_uid}/settings/current"
+          },
+          profile: profile_payload(current_state)[:profile],
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
+    def unlink_cloud_profile_payload(_args = {})
+      now = Time.now.utc.iso8601
+      with_state do |current_state|
+        previous_uid = optional_string(current_state.dig("cloud_auth", "uid"))
+        current_state["cloud_sync"] = false
+        current_state["cloud_auth"] = default_cloud_auth.merge(
+          "status" => "off",
+          "updated_at" => now
+        )
+        current_state["profile"] = default_profile.merge(current_state["profile"] || {})
+        current_state["profile"]["cloud_sync"] = false
+
+        {
+          ok: true,
+          status: "unlinked",
+          previous_uid: previous_uid,
+          account_link: account_link_status_payload(current_state)[:account_link],
+          privacy: PRIVACY_NOTICE
+        }
+      end
     end
 
     def reward_controls_payload(current_state = state)
@@ -896,13 +1017,14 @@ module McpMiner
 
           current_state["report_mode"] = mode
         end
-        current_state["cloud_sync"] = !!args["cloud_sync"] if args.key?("cloud_sync")
+        apply_cloud_sync_setting!(current_state, !!args["cloud_sync"]) if args.key?("cloud_sync")
         {
           ok: true,
           settings: {
             report_mode: current_state["report_mode"],
             cloud_sync: current_state["cloud_sync"]
           },
+          account_link: account_link_status_payload(current_state)[:account_link],
           sync: sync_progress_payload(current_state)[:sync],
           privacy: PRIVACY_NOTICE
         }
@@ -1385,6 +1507,24 @@ module McpMiner
           }
         end
       }
+    end
+
+    def apply_cloud_sync_setting!(state, enabled)
+      now = Time.now.utc.iso8601
+      state["cloud_sync"] = enabled
+      state["profile"] = default_profile.merge(state["profile"] || {})
+      state["profile"]["cloud_sync"] = enabled
+      state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
+      state["cloud_auth"]["updated_at"] = now
+
+      if enabled
+        state["cloud_auth"]["status"] = safe_string(state["cloud_auth"]["uid"]).empty? ? "unauthenticated" : "linked" unless state["cloud_auth"]["status"] == "sync_error"
+      else
+        state["cloud_auth"]["status"] = "off"
+        state["cloud_auth"]["uid"] = nil
+        state["cloud_auth"]["linked_at"] = nil
+        state["cloud_auth"]["last_error"] = nil
+      end
     end
 
     def load_data
@@ -2805,6 +2945,7 @@ module McpMiner
       keys = %w[
         state_schema_version
         profile
+        cloud_auth
         space_bucks
         reward_controls
         inventory
