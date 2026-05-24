@@ -1,0 +1,2 @@
+# mcp-miner
+MCP Miner
