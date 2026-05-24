@@ -667,6 +667,16 @@ Representative shape:
 ```json
 {
   "state_schema_version": 1,
+  "profile": {
+    "display_name": "Local Prospector",
+    "miner_name": "Prospector",
+    "pronouns": null,
+    "suit_style": "cozy sci-fi asteroid miner",
+    "avatar_concept_prompt": "A cozy sci-fi asteroid miner in a practical patched pressure suit.",
+    "generated_assets": [],
+    "customization_unlocks": ["suit_patch_basic", "helmet_lamp_warm"],
+    "cloud_sync": false
+  },
   "space_bucks": 0,
   "inventory": {
     "mat_chonks": 0
@@ -776,6 +786,8 @@ Required runtime validation and normalization:
 - `inventory` is a material ID to integer quantity map. Raw material IDs must exist in
   `materials.yaml`; refined inventory uses the stable `refined:<material_id>` key and must resolve
   to a refinable base material before it is displayed, sold, or consumed.
+- `profile` stores local-only miner persona fields for display name, miner name, optional pronouns,
+  suit style, avatar prompt, generated asset references, and customization unlocks.
 - `state_schema_version` is the local save schema version. It is separate from
   `data/schema_version.yaml`, which tracks gameplay data and economy revisions.
 - Legacy or missing local state schema versions are migrated to the current version after writing a
@@ -937,6 +949,32 @@ Required runtime validation:
 - Hazard results come from `hazards.yaml` and apply data-defined mitigation upgrades.
 - Depleted asteroids record a privacy-safe depletion entry, unlock the next eligible asteroid class,
   select it, and carry overflow mining progress forward.
+
+### Miner Profile And Avatar Workflow
+
+The local profile is a structured object in `state.json`. It does not require cloud sync or image
+generation.
+
+```json
+{
+  "displayName": "Local Prospector",
+  "minerName": "Prospector",
+  "pronouns": null,
+  "suitStyle": "cozy sci-fi asteroid miner",
+  "avatarConceptPrompt": "A cozy sci-fi asteroid miner in a practical patched pressure suit.",
+  "generatedAssets": [],
+  "customizationUnlocks": ["suit_patch_basic", "helmet_lamp_warm"]
+}
+```
+
+Required runtime validation:
+
+- `get_profile` exposes stable profile fields and avatar workflow metadata.
+- `update_profile` updates local profile fields, generated asset references, and customization
+  unlocks without requiring image generation.
+- Default suit/avatar style is cozy sci-fi asteroid miner.
+- Profile payloads do not include prompts, code, file paths, repo names, terminal output, browser
+  content, app content, or raw transcripts.
 
 ### Refining And Direct Market Sales
 

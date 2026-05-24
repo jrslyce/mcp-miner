@@ -112,6 +112,7 @@ module McpMiner
       start = @data.fetch(:player_start)
       {
         "state_schema_version" => CURRENT_STATE_SCHEMA_VERSION,
+        "profile" => default_profile,
         "space_bucks" => start.fetch("space_bucks"),
         "inventory" => start.fetch("inventory").dup,
         "unlocked_machine_ids" => start.fetch("unlocked_machine_ids").dup,
@@ -163,6 +164,9 @@ module McpMiner
     def normalize_state(state)
       start = @data.fetch(:player_start)
       state["state_schema_version"] = CURRENT_STATE_SCHEMA_VERSION unless state["state_schema_version"].to_i.positive?
+      state["profile"] = default_profile.merge(state["profile"].is_a?(Hash) ? state["profile"] : {})
+      state["profile"]["customization_unlocks"] ||= []
+      state["profile"]["generated_assets"] ||= []
       state["space_bucks"] = start.fetch("space_bucks") unless state.key?("space_bucks")
       state["inventory"] ||= start.fetch("inventory").dup
       state["unlocked_machine_ids"] ||= start.fetch("unlocked_machine_ids").dup
@@ -215,6 +219,19 @@ module McpMiner
         "materials_found_total" => 0,
         "reports_emitted" => 0,
         "work_events" => {}
+      }
+    end
+
+    def default_profile
+      {
+        "display_name" => "Local Prospector",
+        "miner_name" => "Prospector",
+        "pronouns" => nil,
+        "suit_style" => "cozy sci-fi asteroid miner",
+        "avatar_concept_prompt" => "A cozy sci-fi asteroid miner in a practical patched pressure suit, warm helmet lights, compact tool harness, friendly dashboard portrait style.",
+        "generated_assets" => [],
+        "customization_unlocks" => ["suit_patch_basic", "helmet_lamp_warm"],
+        "cloud_sync" => false
       }
     end
 
@@ -409,6 +426,7 @@ module McpMiner
           cloud_sync: current_state["cloud_sync"],
           suit_condition: current_state["suit_condition"] || 100
         },
+        profile: profile_payload(current_state)[:profile],
         inventory: current_state["inventory"],
         current_asteroid: asteroid_summary(current_state["current_asteroid_class_id"]),
         asteroid_progress: current_state["asteroid_progress"] || {},
@@ -554,6 +572,53 @@ module McpMiner
           space_bucks: current_state["space_bucks"].to_i,
           module: base_module_status(mod, current_state),
           effects: base_effects_payload(current_state),
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
+    def profile_payload(current_state = state)
+      {
+        profile: current_state["profile"] || default_profile,
+        avatar_workflow: {
+          image_generation_required: false,
+          prompt_ready: true,
+          default_style: "cozy sci-fi asteroid miner",
+          privacy: "Local profile fields only; no cloud sync is required."
+        },
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def update_profile_payload(args)
+      with_state do |current_state|
+        profile = default_profile.merge(current_state["profile"] || {})
+        updatable_profile_fields.each do |field|
+          next unless args.key?(field)
+
+          profile[field] = normalize_profile_value(field, args[field])
+        end
+        if args.key?("add_customization_unlock")
+          unlock = safe_string(args["add_customization_unlock"])
+          profile["customization_unlocks"] << unlock unless unlock.empty? || profile["customization_unlocks"].include?(unlock)
+        end
+        if args.key?("generated_asset_ref")
+          asset_ref = safe_string(args["generated_asset_ref"])
+          unless asset_ref.empty?
+            profile["generated_assets"] << {
+              "asset_ref" => asset_ref,
+              "created_at" => Time.now.utc.iso8601
+            }
+            profile["generated_assets"] = profile["generated_assets"].last(20)
+          end
+        end
+        current_state["profile"] = profile
+
+        {
+          ok: true,
+          status: "updated",
+          profile: profile,
+          avatar_workflow: profile_payload(current_state)[:avatar_workflow],
           privacy: PRIVACY_NOTICE
         }
       end
@@ -1772,6 +1837,23 @@ module McpMiner
       }
     end
 
+    def updatable_profile_fields
+      %w[
+        display_name
+        miner_name
+        pronouns
+        suit_style
+        avatar_concept_prompt
+      ]
+    end
+
+    def normalize_profile_value(field, value)
+      text = safe_string(value).strip
+      return nil if field == "pronouns" && text.empty?
+
+      text
+    end
+
     def upgrade_status(upgrade, state)
       level = state.dig("upgrades", upgrade.fetch("id")).to_i
       max_level = upgrade.fetch("max_level").to_i
@@ -2360,6 +2442,7 @@ module McpMiner
     def snapshot_state(state)
       keys = %w[
         state_schema_version
+        profile
         space_bucks
         inventory
         unlocked_machine_ids

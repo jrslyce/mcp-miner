@@ -19,6 +19,8 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 
 - `get_player_status`: current player state and settings.
 - `get_latest_report`: latest compact MCP Miner report.
+- `get_profile`: inspect local miner persona and avatar workflow fields.
+- `update_profile`: update local miner persona, suit style, avatar prompt, unlocks, or asset refs.
 - `get_inventory`: current inventory with material names, categories, rarity, and value totals.
 - `get_asteroid_status`: inspect unlocked asteroid classes, selection, depletion, hazards, and pity.
 - `select_asteroid`: switch mining to an unlocked asteroid class.

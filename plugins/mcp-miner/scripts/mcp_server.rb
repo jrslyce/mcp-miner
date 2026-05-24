@@ -74,6 +74,38 @@ class McpMinerServer
         inputSchema: object_schema({})
       },
       {
+        name: "get_profile",
+        description: "Return the local MCP Miner profile and avatar workflow metadata.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "update_profile",
+        description: "Update local MCP Miner profile and avatar customization fields.",
+        inputSchema: object_schema({
+          display_name: {
+            type: "string"
+          },
+          miner_name: {
+            type: "string"
+          },
+          pronouns: {
+            type: "string"
+          },
+          suit_style: {
+            type: "string"
+          },
+          avatar_concept_prompt: {
+            type: "string"
+          },
+          add_customization_unlock: {
+            type: "string"
+          },
+          generated_asset_ref: {
+            type: "string"
+          }
+        })
+      },
+      {
         name: "get_inventory",
         description: "Return the local MCP Miner inventory with material names, categories, rarity, and value totals.",
         inputSchema: object_schema({})
@@ -251,6 +283,10 @@ class McpMinerServer
         @engine.player_status
       when "get_latest_report"
         @engine.latest_report_payload
+      when "get_profile"
+        @engine.profile_payload
+      when "update_profile"
+        @engine.update_profile_payload(args)
       when "get_inventory"
         @engine.inventory_payload
       when "get_asteroid_status"

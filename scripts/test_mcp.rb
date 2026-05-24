@@ -92,6 +92,8 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
   expected_tools = %w[
     get_player_status
     get_latest_report
+    get_profile
+    update_profile
     get_inventory
     get_asteroid_status
     select_asteroid
