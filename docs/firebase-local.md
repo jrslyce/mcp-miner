@@ -4,7 +4,7 @@ MCP Miner V1 uses Firebase as the local-first cloud scaffold for optional accoun
 
 ## Local Commands
 
-Install the Firebase CLI and a Java runtime before running Firestore locally:
+Install function dependencies and a Java runtime before running Firestore locally. The npm scripts invoke Firebase CLI through `npx firebase-tools@latest`, so a global `firebase` binary is not required:
 
 ```sh
 npm install --prefix firebase/functions
@@ -36,12 +36,19 @@ Run Cloud Functions sync API smoke cases:
 npm run firebase:sync:smoke
 ```
 
+Run the Firebase Hosting dashboard smoke case:
+
+```sh
+npm run firebase:dashboard:smoke
+```
+
 Run the repo-level static Firebase scaffold checks:
 
 ```sh
 npm run test:firebase-config
 npm run test:firestore-schema
 npm run test:auth-linking
+npm run test:dashboard
 npm run test:cloud-sync-api
 ```
 

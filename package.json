@@ -3,15 +3,17 @@
     "validate:data": "ruby scripts/validate_data.rb",
     "test:validator": "ruby scripts/test_validate_data.rb",
     "validate:plugin": "python3 /Users/jared/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/mcp-miner",
-    "firebase:emulators:start": "firebase emulators:start --project demo-mcp-miner --import=.firebase/emulator-data --export-on-exit=.firebase/emulator-data",
-    "firebase:emulators:smoke": "firebase emulators:exec --project demo-mcp-miner --only auth,firestore,functions \"node scripts/firebase_emulator_smoke.js\"",
-    "firebase:rules:smoke": "firebase emulators:exec --project demo-mcp-miner --only auth,firestore \"node scripts/firebase_firestore_rules_smoke.js\"",
-    "firebase:auth:smoke": "firebase emulators:exec --project demo-mcp-miner --only auth,firestore \"node scripts/firebase_auth_linking_smoke.js\"",
-    "firebase:sync:smoke": "firebase emulators:exec --project demo-mcp-miner --only auth,firestore,functions \"node scripts/firebase_sync_api_smoke.js\"",
+    "firebase:emulators:start": "npx --yes firebase-tools@latest emulators:start --project demo-mcp-miner --import=.firebase/emulator-data --export-on-exit=.firebase/emulator-data",
+    "firebase:emulators:smoke": "npx --yes firebase-tools@latest emulators:exec --project demo-mcp-miner --only auth,firestore,functions \"node scripts/firebase_emulator_smoke.js\"",
+    "firebase:rules:smoke": "npx --yes firebase-tools@latest emulators:exec --project demo-mcp-miner --only auth,firestore \"node scripts/firebase_firestore_rules_smoke.js\"",
+    "firebase:auth:smoke": "npx --yes firebase-tools@latest emulators:exec --project demo-mcp-miner --only auth,firestore \"node scripts/firebase_auth_linking_smoke.js\"",
+    "firebase:sync:smoke": "npx --yes firebase-tools@latest emulators:exec --project demo-mcp-miner --only auth,firestore,functions \"node scripts/firebase_sync_api_smoke.js\"",
+    "firebase:dashboard:smoke": "npx --yes firebase-tools@latest emulators:exec --project demo-mcp-miner --only auth,firestore,functions,hosting \"node scripts/firebase_dashboard_smoke.js\"",
     "test:firebase-config": "ruby scripts/test_firebase_config.rb",
-    "test:firebase-js": "node --check scripts/firebase_emulator_smoke.js && node --check scripts/firebase_firestore_rules_smoke.js && node --check scripts/firebase_auth_linking_smoke.js && node --check scripts/firebase_sync_api_smoke.js && node --check firebase/functions/src/sync.js && node --check firebase/hosting/auth.js && npm --prefix firebase/functions run lint",
+    "test:firebase-js": "node --check scripts/firebase_emulator_smoke.js && node --check scripts/firebase_firestore_rules_smoke.js && node --check scripts/firebase_auth_linking_smoke.js && node --check scripts/firebase_sync_api_smoke.js && node --check scripts/firebase_dashboard_smoke.js && node --check firebase/functions/src/sync.js && node --check firebase/hosting/auth.js && npm --prefix firebase/functions run lint",
     "test:firestore-schema": "ruby scripts/test_firestore_schema.rb",
     "test:auth-linking": "ruby scripts/test_auth_linking.rb",
+    "test:dashboard": "ruby scripts/test_dashboard_static.rb",
     "test:cloud-sync-api": "node scripts/test_cloud_sync_api.js",
     "test:cloud-sync-client": "ruby scripts/test_cloud_sync_client.rb",
     "test:mcp": "ruby scripts/test_mcp.rb",
@@ -26,6 +28,6 @@
     "test:weekly": "ruby scripts/test_weekly_contracts.rb",
     "test:reward-controls": "ruby scripts/test_reward_controls.rb",
     "test:hooks": "ruby scripts/test_hooks.rb",
-    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:firebase-config && npm run test:firebase-js && npm run test:firestore-schema && npm run test:auth-linking && npm run test:cloud-sync-api && npm run test:cloud-sync-client && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:market && npm run test:upgrades && npm run test:asteroids && npm run test:fabrication && npm run test:base && npm run test:profile && npm run test:weekly && npm run test:reward-controls && npm run test:hooks"
+    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:firebase-config && npm run test:firebase-js && npm run test:firestore-schema && npm run test:auth-linking && npm run test:dashboard && npm run test:cloud-sync-api && npm run test:cloud-sync-client && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:market && npm run test:upgrades && npm run test:asteroids && npm run test:fabrication && npm run test:base && npm run test:profile && npm run test:weekly && npm run test:reward-controls && npm run test:hooks"
   }
 }

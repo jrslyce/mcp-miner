@@ -21,12 +21,13 @@ The local state stores only:
 
 ## Dashboard Flow
 
-`firebase/hosting/index.html` loads `auth.js`, which initializes Firebase Web SDK, connects to the Auth and Firestore emulators on localhost, and supports:
+`firebase/hosting/index.html` loads `auth.js`, which initializes Firebase Web SDK, connects to the Auth, Firestore, and Functions emulators on localhost, and supports:
 
 - email/password sign-in
 - email/password account creation
 - sign-out
 - create-or-load of `/players/{uid}`, `/players/{uid}/profile/current`, and `/players/{uid}/settings/current`
+- dashboard reads from `/players/{uid}` owner-scoped game documents and the `getSyncState` callable
 
 The dashboard writes only the owner-scoped profile/settings fields allowed by `firestore.rules`.
 

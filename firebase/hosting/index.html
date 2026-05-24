@@ -7,45 +7,201 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <main class="shell">
-      <section class="auth-panel" aria-labelledby="auth-title">
-        <div>
-          <p class="eyebrow">Firebase Auth</p>
-          <h1 id="auth-title">MCP Miner</h1>
+    <main class="dashboard-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <img class="brand-mark" src="/assets/asteroid-scan.svg" alt="">
+          <div>
+            <p class="eyebrow">Firebase dashboard</p>
+            <h1>MCP Miner</h1>
+          </div>
         </div>
+        <div class="topbar-actions">
+          <span id="connection-pill" class="pill">Demo mode</span>
+          <button id="refresh-dashboard" type="button" class="button-secondary">
+            <span aria-hidden="true">R</span>
+            <span>Refresh</span>
+          </button>
+        </div>
+      </header>
 
-        <form id="auth-form" class="auth-form">
-          <label>
-            Email
-            <input id="email" name="email" type="email" autocomplete="email" required>
-          </label>
-          <label>
-            Password
-            <input id="password" name="password" type="password" autocomplete="current-password" required minlength="6">
-          </label>
-          <div class="actions">
-            <button id="sign-in" type="submit">Sign In</button>
-            <button id="create-account" type="button">Create</button>
-            <button id="sign-out" type="button" disabled>Sign Out</button>
-          </div>
-        </form>
+      <section class="workspace-grid">
+        <aside class="side-rail" aria-label="Account and sync">
+          <section class="panel auth-panel" data-panel="auth" aria-labelledby="auth-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Firebase Auth</p>
+                <h2 id="auth-title">Account</h2>
+              </div>
+              <span id="auth-status" class="status-dot">Signed out</span>
+            </div>
 
-        <dl class="status-grid">
-          <div>
-            <dt>Status</dt>
-            <dd id="auth-status">Signed out</dd>
-          </div>
-          <div>
-            <dt>UID</dt>
-            <dd id="auth-uid">-</dd>
-          </div>
-          <div>
-            <dt>Profile</dt>
-            <dd id="profile-status">Not linked</dd>
-          </div>
-        </dl>
+            <form id="auth-form" class="auth-form">
+              <label>
+                Email
+                <input id="email" name="email" type="email" autocomplete="email" required>
+              </label>
+              <label>
+                Password
+                <input id="password" name="password" type="password" autocomplete="current-password" required minlength="6">
+              </label>
+              <div class="actions">
+                <button id="sign-in" type="submit">Sign In</button>
+                <button id="create-account" type="button" class="button-secondary">Create</button>
+                <button id="sign-out" type="button" class="button-secondary" disabled>Sign Out</button>
+              </div>
+            </form>
 
-        <p id="auth-message" class="message" role="status" aria-live="polite"></p>
+            <dl class="status-grid">
+              <div>
+                <dt>UID</dt>
+                <dd id="auth-uid">-</dd>
+              </div>
+              <div>
+                <dt>Profile</dt>
+                <dd id="profile-status">Demo preview</dd>
+              </div>
+              <div>
+                <dt>Source</dt>
+                <dd id="dashboard-source">Local demo snapshot</dd>
+              </div>
+            </dl>
+
+            <p id="auth-message" class="message" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="panel" data-panel="sync-privacy" aria-labelledby="sync-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Sync and privacy</p>
+                <h2 id="sync-title">Cloud State</h2>
+              </div>
+              <span id="sync-status" class="pill">Off</span>
+            </div>
+            <dl class="compact-list">
+              <div>
+                <dt>Events</dt>
+                <dd id="sync-events">0</dd>
+              </div>
+              <div>
+                <dt>Sequence</dt>
+                <dd id="sync-sequence">0</dd>
+              </div>
+              <div>
+                <dt>Conflicts</dt>
+                <dd id="sync-conflicts">None</dd>
+              </div>
+            </dl>
+            <ul id="privacy-list" class="privacy-list"></ul>
+          </section>
+        </aside>
+
+        <section class="main-board" aria-label="Miner dashboard">
+          <section class="mode-strip" aria-label="Dashboard mode">
+            <div>
+              <p class="eyebrow">Mode</p>
+              <strong id="dashboard-mode">Signed-out demo</strong>
+            </div>
+            <div>
+              <p class="eyebrow">Last updated</p>
+              <strong id="last-updated">Ready</strong>
+            </div>
+          </section>
+
+          <section class="metric-strip" aria-label="Miner status" data-panel="status">
+            <article class="metric-card">
+              <span>Space Bucks</span>
+              <strong id="metric-space-bucks">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Chonks</span>
+              <strong id="metric-chonks">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Suit</span>
+              <strong id="metric-suit">100%</strong>
+            </article>
+            <article class="metric-card">
+              <span>Cloud Events</span>
+              <strong id="metric-events">0</strong>
+            </article>
+          </section>
+
+          <section class="dashboard-grid">
+            <section class="panel panel-wide" data-panel="asteroid" aria-labelledby="asteroid-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Asteroid progress</p>
+                  <h2 id="asteroid-title">Current Rock</h2>
+                </div>
+                <span id="asteroid-name" class="pill">-</span>
+              </div>
+              <div class="scan-row">
+                <img class="scan-art" src="/assets/asteroid-scan.svg" alt="">
+                <div class="progress-stack">
+                  <div class="progress-meta">
+                    <strong id="asteroid-progress-label">0 / 0 mined</strong>
+                    <span id="asteroid-progress-percent">0%</span>
+                  </div>
+                  <div class="progress-track" role="progressbar" aria-label="Asteroid depletion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <span id="asteroid-progress-fill"></span>
+                  </div>
+                  <dl id="cloud-detail" class="inline-stats"></dl>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel" data-panel="inventory" aria-labelledby="inventory-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Inventory</p>
+                  <h2 id="inventory-title">Materials</h2>
+                </div>
+              </div>
+              <div id="inventory-list" class="data-list"></div>
+            </section>
+
+            <section class="panel" data-panel="orders" aria-labelledby="orders-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Orders</p>
+                  <h2 id="orders-title">Active Board</h2>
+                </div>
+              </div>
+              <div id="orders-list" class="data-list"></div>
+            </section>
+
+            <section class="panel" data-panel="upgrades" aria-labelledby="upgrades-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Upgrades</p>
+                  <h2 id="upgrades-title">Systems</h2>
+                </div>
+              </div>
+              <div id="upgrades-list" class="data-list"></div>
+            </section>
+
+            <section class="panel" data-panel="reports" aria-labelledby="reports-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Reports</p>
+                  <h2 id="reports-title">Recent Signals</h2>
+                </div>
+              </div>
+              <div id="reports-list" class="report-list"></div>
+            </section>
+
+            <section class="panel" data-panel="base" aria-labelledby="base-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Base</p>
+                  <h2 id="base-title">Modules</h2>
+                </div>
+              </div>
+              <dl id="base-detail" class="compact-list"></dl>
+            </section>
+          </section>
+        </section>
       </section>
     </main>
 
