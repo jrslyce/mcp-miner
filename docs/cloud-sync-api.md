@@ -61,3 +61,19 @@ Cloud Logging entries include operational metadata only: privacy class, UID pres
 ## Emulator Smoke
 
 `npm run firebase:sync:smoke` starts Auth, Firestore, and Functions emulators and covers authenticated sync, duplicate idempotency, invalid private fields, and state reduction. It requires the Firebase CLI and Java runtime because Firestore is Java-based.
+
+## Plugin Client
+
+The local plugin exposes `sync_cloud`, which converts local journal reward entries into the canonical abstract event format and posts them to `syncRewardEvents`.
+
+Local metadata records:
+
+- `last_pushed_sequence`
+- `pending_event_ids`
+- `duplicate_event_ids`
+- `rejected_events`
+- retry count and next retry timestamp
+- last sync error
+- configured Functions origin
+
+If sync is disabled, unauthenticated, offline, or missing a Firebase ID token, local events stay queued and gameplay progress remains local. Duplicate responses are treated as success because cloud event IDs are idempotent. Rejected stale/private events set local conflict metadata and leave local rewards untouched.

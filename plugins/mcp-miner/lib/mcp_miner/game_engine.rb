@@ -3,7 +3,9 @@
 require "digest"
 require "fileutils"
 require "json"
+require "net/http"
 require "time"
+require "uri"
 require "yaml"
 
 module McpMiner
@@ -120,6 +122,7 @@ module McpMiner
         "state_schema_version" => CURRENT_STATE_SCHEMA_VERSION,
         "profile" => default_profile,
         "cloud_auth" => default_cloud_auth,
+        "cloud_sync_metadata" => default_cloud_sync_metadata,
         "space_bucks" => start.fetch("space_bucks"),
         "reward_controls" => default_reward_controls,
         "inventory" => start.fetch("inventory").dup,
@@ -182,6 +185,12 @@ module McpMiner
       state["cloud_auth"]["status"] = "off" unless VALID_CLOUD_AUTH_STATUSES.include?(state["cloud_auth"]["status"])
       state["cloud_auth"]["uid"] = optional_string(state["cloud_auth"]["uid"])
       state["cloud_auth"]["last_error"] = optional_string(state["cloud_auth"]["last_error"])
+      state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+      state["cloud_sync_metadata"]["pending_event_ids"] ||= []
+      state["cloud_sync_metadata"]["duplicate_event_ids"] ||= []
+      state["cloud_sync_metadata"]["rejected_events"] ||= []
+      state["cloud_sync_metadata"]["last_pushed_sequence"] = state["cloud_sync_metadata"]["last_pushed_sequence"].to_i
+      state["cloud_sync_metadata"]["retry_count"] = state["cloud_sync_metadata"]["retry_count"].to_i
       state["reward_controls"] = default_reward_controls.merge(state["reward_controls"].is_a?(Hash) ? state["reward_controls"] : {})
       state["reward_controls"]["event_stats"] ||= {}
       state["reward_controls"]["daily_category_counts"] ||= {}
@@ -265,6 +274,24 @@ module McpMiner
         "linked_at" => nil,
         "last_error" => nil,
         "updated_at" => nil
+      }
+    end
+
+    def default_cloud_sync_metadata
+      {
+        "status" => "off",
+        "client_id" => "mcp-miner-local",
+        "last_pushed_sequence" => 0,
+        "last_pulled_version" => nil,
+        "last_attempt_at" => nil,
+        "last_success_at" => nil,
+        "next_retry_at" => nil,
+        "retry_count" => 0,
+        "pending_event_ids" => [],
+        "duplicate_event_ids" => [],
+        "rejected_events" => [],
+        "last_error" => nil,
+        "functions_origin" => nil
       }
     end
 
@@ -864,6 +891,7 @@ module McpMiner
           available: account_link[:status] == "linked",
           cloud_sync_enabled: current_state["cloud_sync"],
           account_link: account_link,
+          metadata: cloud_sync_metadata_payload(current_state),
           materialized_state: "available",
           journal: {
             applied_event_count: current_state.dig("journal", "applied_event_count").to_i,
@@ -873,10 +901,63 @@ module McpMiner
           latest_state_schema_version: CURRENT_STATE_SCHEMA_VERSION,
           last_migration: current_state["last_migration"],
           last_recovery: current_state["last_recovery"],
-          note: sync_status == "linked_sync_pending" ? "Firebase Auth is linked; cloud sync API reducers are not implemented yet." : "Cloud sync remains optional; local progression works without sign-in."
+          note: sync_status == "linked_sync_pending" ? "Firebase Auth is linked; run sync_cloud with a Firebase ID token to push queued abstract events." : "Cloud sync remains optional; local progression works without sign-in."
         },
         privacy: PRIVACY_NOTICE
       }
+    end
+
+    def sync_cloud_payload(args = {})
+      current_state = state
+      uid = optional_string(current_state.dig("cloud_auth", "uid"))
+      metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
+      entries = read_journal_entries
+      events = build_cloud_sync_events(entries, uid || "unlinked", last_sequence: metadata["last_pushed_sequence"].to_i)
+      token = optional_string(args["id_token"]) || optional_string(ENV["MCP_MINER_FIREBASE_ID_TOKEN"])
+      functions_origin = optional_string(args["functions_origin"]) || optional_string(ENV["MCP_MINER_FIREBASE_FUNCTIONS_ORIGIN"]) || metadata["functions_origin"] || "http://127.0.0.1:5001/demo-mcp-miner/us-central1"
+
+      if !current_state["cloud_sync"]
+        update_cloud_sync_metadata("off", events, functions_origin: functions_origin)
+        return {
+          ok: true,
+          status: "off",
+          queued_event_count: events.length,
+          message: "Cloud sync is disabled; local progress remains queued only on this machine.",
+          sync: sync_progress_payload[:sync],
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      unless uid
+        update_cloud_sync_metadata("queued_unauthenticated", events, functions_origin: functions_origin)
+        return {
+          ok: false,
+          status: "unauthenticated",
+          queued_event_count: events.length,
+          message: "Cloud sync is enabled but no Firebase Auth UID is linked.",
+          sync: sync_progress_payload[:sync],
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      unless token
+        update_cloud_sync_metadata("queued_auth_required", events, functions_origin: functions_origin)
+        return {
+          ok: false,
+          status: "auth_required",
+          queued_event_count: events.length,
+          message: "Queued abstract events locally. Provide a Firebase ID token for this process to push them.",
+          sync: sync_progress_payload[:sync],
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      begin
+        result = call_cloud_function(functions_origin, "syncRewardEvents", token, { events: events })
+        apply_cloud_sync_result(result, events, functions_origin)
+      rescue StandardError => e
+        record_cloud_sync_error(e, events, functions_origin)
+      end
     end
 
     def account_link_status_payload(current_state = state)
@@ -1516,14 +1597,204 @@ module McpMiner
       state["profile"]["cloud_sync"] = enabled
       state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
       state["cloud_auth"]["updated_at"] = now
+      state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+      state["cloud_sync_metadata"]["updated_at"] = now
 
       if enabled
         state["cloud_auth"]["status"] = safe_string(state["cloud_auth"]["uid"]).empty? ? "unauthenticated" : "linked" unless state["cloud_auth"]["status"] == "sync_error"
+        state["cloud_sync_metadata"]["status"] = safe_string(state["cloud_auth"]["uid"]).empty? ? "queued_unauthenticated" : "queued"
       else
         state["cloud_auth"]["status"] = "off"
         state["cloud_auth"]["uid"] = nil
         state["cloud_auth"]["linked_at"] = nil
         state["cloud_auth"]["last_error"] = nil
+        state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(
+          "status" => "off",
+          "updated_at" => now
+        )
+      end
+    end
+
+    def cloud_sync_metadata_payload(current_state = state)
+      metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
+      {
+        status: metadata["status"],
+        client_id: metadata["client_id"],
+        last_pushed_sequence: metadata["last_pushed_sequence"].to_i,
+        last_pulled_version: optional_string(metadata["last_pulled_version"]),
+        last_attempt_at: optional_string(metadata["last_attempt_at"]),
+        last_success_at: optional_string(metadata["last_success_at"]),
+        next_retry_at: optional_string(metadata["next_retry_at"]),
+        retry_count: metadata["retry_count"].to_i,
+        pending_event_count: Array(metadata["pending_event_ids"]).length,
+        pending_event_ids: Array(metadata["pending_event_ids"]).last(25),
+        duplicate_event_ids: Array(metadata["duplicate_event_ids"]).last(25),
+        rejected_events: Array(metadata["rejected_events"]).last(25),
+        last_error: optional_string(metadata["last_error"]),
+        functions_origin: optional_string(metadata["functions_origin"])
+      }
+    end
+
+    def update_cloud_sync_metadata(status, events, functions_origin:)
+      now = Time.now.utc.iso8601
+      with_state do |state|
+        state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+        state["cloud_sync_metadata"]["status"] = status
+        state["cloud_sync_metadata"]["last_attempt_at"] = now
+        state["cloud_sync_metadata"]["pending_event_ids"] = events.map { |event| event["eventId"] }.last(200)
+        state["cloud_sync_metadata"]["functions_origin"] = functions_origin
+      end
+    end
+
+    def apply_cloud_sync_result(result, events, functions_origin)
+      payload = result["result"].is_a?(Hash) ? result["result"] : result
+      accepted_ids = Array(payload["accepted"])
+      duplicates = Array(payload["duplicates"])
+      rejected = Array(payload["rejected"])
+      sequence_by_id = events.to_h { |event| [event["eventId"], event["sequence"].to_i] }
+      duplicate_ids = duplicates.map { |item| safe_string(item["eventId"]) }.reject(&:empty?)
+      synced_ids = accepted_ids + duplicate_ids
+      synced_sequences = synced_ids.map { |event_id| sequence_by_id[event_id].to_i }
+      duplicate_sequences = duplicates.map { |item| item["sequence"].to_i }
+      max_synced_sequence = (synced_sequences + duplicate_sequences + [0]).max
+      now = Time.now.utc.iso8601
+
+      with_state do |state|
+        state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+        previous_sequence = state["cloud_sync_metadata"]["last_pushed_sequence"].to_i
+        next_sequence = [previous_sequence, max_synced_sequence].max
+        state["cloud_sync_metadata"]["status"] = rejected.empty? ? "synced" : "conflict"
+        state["cloud_sync_metadata"]["last_pushed_sequence"] = next_sequence
+        state["cloud_sync_metadata"]["last_attempt_at"] = now
+        state["cloud_sync_metadata"]["last_success_at"] = now if rejected.empty?
+        state["cloud_sync_metadata"]["next_retry_at"] = nil if rejected.empty?
+        state["cloud_sync_metadata"]["retry_count"] = rejected.empty? ? 0 : state["cloud_sync_metadata"]["retry_count"].to_i
+        state["cloud_sync_metadata"]["duplicate_event_ids"] = (Array(state["cloud_sync_metadata"]["duplicate_event_ids"]) + duplicate_ids).last(100)
+        state["cloud_sync_metadata"]["rejected_events"] = rejected.last(100)
+        state["cloud_sync_metadata"]["pending_event_ids"] = events.select { |event| event["sequence"].to_i > next_sequence }.map { |event| event["eventId"] }.last(200)
+        state["cloud_sync_metadata"]["last_error"] = rejected.empty? ? nil : "Cloud rejected #{rejected.length} event(s); inspect rejected_events."
+        state["cloud_sync_metadata"]["functions_origin"] = functions_origin
+        state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
+        state["cloud_auth"]["status"] = rejected.empty? ? "linked" : "sync_error"
+        state["cloud_auth"]["last_error"] = rejected.empty? ? nil : state["cloud_sync_metadata"]["last_error"]
+      end
+
+      {
+        ok: rejected.empty?,
+        status: rejected.empty? ? "synced" : "conflict",
+        accepted_event_ids: accepted_ids,
+        duplicate_event_ids: duplicate_ids,
+        rejected_events: rejected,
+        synced_sequence: max_synced_sequence,
+        sync: sync_progress_payload[:sync],
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def record_cloud_sync_error(error, events, functions_origin)
+      now = Time.now.utc.iso8601
+      with_state do |state|
+        state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+        retry_count = state["cloud_sync_metadata"]["retry_count"].to_i + 1
+        state["cloud_sync_metadata"]["status"] = "sync_error"
+        state["cloud_sync_metadata"]["last_attempt_at"] = now
+        state["cloud_sync_metadata"]["retry_count"] = retry_count
+        state["cloud_sync_metadata"]["next_retry_at"] = (Time.now.utc + [[60 * (2**[retry_count - 1, 0].max), 3600].min, 60].max).iso8601
+        state["cloud_sync_metadata"]["pending_event_ids"] = events.map { |event| event["eventId"] }.last(200)
+        state["cloud_sync_metadata"]["last_error"] = safe_string(error.message)[0, 240]
+        state["cloud_sync_metadata"]["functions_origin"] = functions_origin
+        state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
+        state["cloud_auth"]["status"] = "sync_error"
+        state["cloud_auth"]["last_error"] = state["cloud_sync_metadata"]["last_error"]
+        state["cloud_auth"]["updated_at"] = now
+      end
+
+      {
+        ok: false,
+        status: "sync_error",
+        queued_event_count: events.length,
+        error: safe_string(error.message)[0, 240],
+        sync: sync_progress_payload[:sync],
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def call_cloud_function(functions_origin, function_name, id_token, payload)
+      uri = URI("#{functions_origin.sub(%r{/+$}, '')}/#{function_name}")
+      request = Net::HTTP::Post.new(uri)
+      request["Content-Type"] = "application/json"
+      request["Authorization"] = "Bearer #{id_token}"
+      request.body = JSON.generate({ data: payload })
+
+      response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https", read_timeout: 10, open_timeout: 5) do |http|
+        http.request(request)
+      end
+      body = response.body.to_s.empty? ? {} : JSON.parse(response.body)
+      raise "Cloud sync HTTP #{response.code}: #{body.dig('error', 'message') || response.message}" unless response.is_a?(Net::HTTPSuccess)
+      raise "Cloud sync rejected: #{body.dig('error', 'message')}" if body["error"]
+
+      body
+    end
+
+    def build_cloud_sync_events(entries, uid, last_sequence:)
+      entries.each_with_index.each_with_object([]) do |(entry, index), events|
+        sequence = index + 1
+        next if sequence <= last_sequence.to_i
+        next unless work_event_by_id.key?(safe_string(entry["event_type"]))
+
+        event = cloud_sync_event_for_entry(entry, uid, sequence)
+        events << event
+      end
+    end
+
+    def cloud_sync_event_for_entry(entry, uid, sequence)
+      control = entry["reward_control"].is_a?(Hash) ? entry["reward_control"] : {}
+      observed_fields = {
+        "score" => entry["score"].to_f.round(2),
+        "category" => optional_string(control["category"]),
+        "rewardControlReasons" => Array(control["reasons"]).map { |reason| safe_string(reason) }.reject(&:empty?)
+      }.compact
+      event = {
+        "ownerUid" => uid,
+        "eventId" => safe_string(entry["event_id"]),
+        "eventType" => safe_string(entry["event_type"]),
+        "schemaVersion" => 1,
+        "sequence" => sequence,
+        "timestamp" => safe_string(entry["timestamp"]),
+        "sessionId" => optional_string(entry["session_id"]),
+        "turnId" => optional_string(entry["turn_id"]),
+        "observedFields" => observed_fields,
+        "privacyClass" => "abstract",
+        "source" => "codex_hook",
+        "signature" => "v1.local.#{Digest::SHA256.hexdigest("#{uid}:#{entry['event_id']}")[0, 16]}"
+      }.compact
+      event["checksum"] = cloud_sync_event_checksum(event)
+      event
+    end
+
+    def cloud_sync_event_checksum(event)
+      payload = {
+        "eventId" => event["eventId"],
+        "eventType" => event["eventType"],
+        "observedFields" => event["observedFields"] || {},
+        "privacyClass" => event["privacyClass"],
+        "schemaVersion" => event["schemaVersion"],
+        "sequence" => event["sequence"],
+        "source" => event["source"],
+        "timestamp" => event["timestamp"],
+        "turnId" => event["turnId"]
+      }
+      Digest::SHA256.hexdigest(stable_json(payload))
+    end
+
+    def stable_json(value)
+      case value
+      when Hash
+        "{#{value.keys.sort.map { |key| "#{JSON.generate(key)}:#{stable_json(value[key])}" }.join(',')}}"
+      when Array
+        "[#{value.map { |item| stable_json(item) }.join(',')}]"
+      else
+        JSON.generate(value)
       end
     end
 
@@ -2946,6 +3217,7 @@ module McpMiner
         state_schema_version
         profile
         cloud_auth
+        cloud_sync_metadata
         space_bucks
         reward_controls
         inventory

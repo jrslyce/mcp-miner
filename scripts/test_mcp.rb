@@ -119,6 +119,7 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     get_catalog_summary
     update_settings
     sync_progress
+    sync_cloud
     claim_milestone
     open_dashboard
     open_store
@@ -186,6 +187,7 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     sync_payload["ok"] == true &&
       sync_payload.dig("sync", "available") == false &&
       sync_payload.dig("sync", "status") == "unauthenticated" &&
+      sync_payload.dig("sync", "metadata", "pending_event_count").is_a?(Integer) &&
       !sync_payload.dig("sync", "journal").key?("path")
   end
   assert("claim_milestone should be an explicit disabled stub") do

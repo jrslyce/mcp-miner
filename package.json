@@ -13,6 +13,7 @@
     "test:firestore-schema": "ruby scripts/test_firestore_schema.rb",
     "test:auth-linking": "ruby scripts/test_auth_linking.rb",
     "test:cloud-sync-api": "node scripts/test_cloud_sync_api.js",
+    "test:cloud-sync-client": "ruby scripts/test_cloud_sync_client.rb",
     "test:mcp": "ruby scripts/test_mcp.rb",
     "test:migrations": "ruby scripts/test_state_migration.rb",
     "test:orders": "ruby scripts/test_orders.rb",
@@ -25,6 +26,6 @@
     "test:weekly": "ruby scripts/test_weekly_contracts.rb",
     "test:reward-controls": "ruby scripts/test_reward_controls.rb",
     "test:hooks": "ruby scripts/test_hooks.rb",
-    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:firebase-config && npm run test:firebase-js && npm run test:firestore-schema && npm run test:auth-linking && npm run test:cloud-sync-api && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:market && npm run test:upgrades && npm run test:asteroids && npm run test:fabrication && npm run test:base && npm run test:profile && npm run test:weekly && npm run test:reward-controls && npm run test:hooks"
+    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:firebase-config && npm run test:firebase-js && npm run test:firestore-schema && npm run test:auth-linking && npm run test:cloud-sync-api && npm run test:cloud-sync-client && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:market && npm run test:upgrades && npm run test:asteroids && npm run test:fabrication && npm run test:base && npm run test:profile && npm run test:weekly && npm run test:reward-controls && npm run test:hooks"
   }
 }

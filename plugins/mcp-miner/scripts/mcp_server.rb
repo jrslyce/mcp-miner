@@ -284,8 +284,20 @@ class McpMinerServer
       },
       {
         name: "sync_progress",
-        description: "Report local/offline sync state. Cloud sync is disabled in the local MVP stub.",
+        description: "Report local/offline sync state, queued event counts, and account-link status.",
         inputSchema: object_schema({})
+      },
+      {
+        name: "sync_cloud",
+        description: "Push queued privacy-safe MCP Miner journal events to the configured Cloud Functions sync API.",
+        inputSchema: object_schema({
+          id_token: {
+            type: "string"
+          },
+          functions_origin: {
+            type: "string"
+          }
+        })
       },
       {
         name: "claim_milestone",
@@ -376,6 +388,8 @@ class McpMinerServer
         @engine.update_settings(args)
       when "sync_progress"
         @engine.sync_progress_payload
+      when "sync_cloud"
+        @engine.sync_cloud_payload(args)
       when "claim_milestone"
         @engine.claim_milestone_payload(args)
       when "open_dashboard"
