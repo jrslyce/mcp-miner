@@ -168,6 +168,20 @@ class McpMinerServer
         })
       },
       {
+        name: "get_base_status",
+        description: "Return MCP Miner base modules, configured effects, and drone automation state.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "purchase_base_module",
+        description: "Purchase or repair one level of an MCP Miner base module when prerequisites and costs are met.",
+        inputSchema: object_schema({
+          module_id: {
+            type: "string"
+          }
+        })
+      },
+      {
         name: "get_settings",
         description: "Return current MCP Miner report, privacy, and local sync settings.",
         inputSchema: object_schema({})
@@ -259,6 +273,10 @@ class McpMinerServer
         @engine.upgrade_status_payload
       when "purchase_upgrade"
         @engine.purchase_upgrade_payload(args)
+      when "get_base_status"
+        @engine.base_status_payload
+      when "purchase_base_module"
+        @engine.purchase_base_module_payload(args)
       when "get_settings"
         @engine.settings_payload
       when "get_milestone_status"

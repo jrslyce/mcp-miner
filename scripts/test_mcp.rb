@@ -103,6 +103,8 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     sell_material
     get_upgrade_status
     purchase_upgrade
+    get_base_status
+    purchase_base_module
     get_settings
     get_milestone_status
     get_catalog_summary

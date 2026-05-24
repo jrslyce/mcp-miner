@@ -1026,6 +1026,42 @@ Required runtime validation:
 - Completed products can satisfy matching fabricated product orders before raw material fulfillment
   is attempted.
 
+### Base Modules And Drones
+
+Base module levels are stored in the top-level `base_modules` map as module ID to integer level.
+
+```json
+{
+  "moduleId": "base_order_terminal",
+  "level": 1,
+  "costToNext": {
+    "spaceBucks": 500,
+    "materials": {
+      "mat_element_si": 16,
+      "mat_element_cu": 8
+    }
+  },
+  "effects": [
+    {
+      "target": "active_order_slots",
+      "value": 4
+    }
+  ]
+}
+```
+
+Required runtime validation:
+
+- `get_base_status` exposes module levels, prerequisites, next costs, configured effects, and drone
+  automation support.
+- `purchase_base_module` rejects unknown modules, missing prerequisites, max-level modules,
+  insufficient Space Bucks, and insufficient materials before mutating state.
+- Successful purchases consume Space Bucks and material costs, then increment exactly one level.
+- Effects are applied only to systems that exist locally: order slots, fabrication queue slots, and
+  upgrade discounts.
+- Drone automation exposes current and max passive support from the upgrade formula and remains
+  bounded by the defined upgrade max level.
+
 ### Order Instance
 
 ```json

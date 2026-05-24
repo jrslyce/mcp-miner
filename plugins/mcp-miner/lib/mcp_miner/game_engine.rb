@@ -36,6 +36,7 @@ module McpMiner
       asteroids: ["asteroid_classes.yaml", "asteroid_classes"],
       upgrades: ["upgrades.yaml", "upgrades"],
       hazards: ["hazards.yaml", "hazards"],
+      base_modules: ["base_modules.yaml", "base_modules"],
       player_start: ["player_start.yaml", "player_start"],
       balance: ["balance_constants.yaml", "balance"],
       reports: ["report_templates.yaml", "report_templates"],
@@ -413,6 +414,11 @@ module McpMiner
         asteroid_progress: current_state["asteroid_progress"] || {},
         unlocked_machines: current_state["unlocked_machine_ids"].map { |machine_id| machine_name(machine_id) },
         upgrades: current_state["upgrades"],
+        base: {
+          modules: base_module_list.map { |mod| base_module_status(mod, current_state) },
+          effects: base_effects_payload(current_state),
+          drone_automation: drone_automation_payload(current_state)
+        },
         stats: current_state["stats"] || {},
         project_stats: current_state["project_stats"] || {},
         agent_stats: current_state["agent_stats"] || {},
@@ -483,6 +489,76 @@ module McpMiner
       }
     end
 
+    def base_status_payload(current_state = state)
+      {
+        modules: base_module_list.map { |mod| base_module_status(mod, current_state) },
+        effects: base_effects_payload(current_state),
+        drone_automation: drone_automation_payload(current_state),
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def purchase_base_module_payload(args)
+      module_id = safe_string(args["module_id"])
+      mod = base_module_by_id[module_id]
+      return unknown_base_module_payload(module_id) unless mod
+
+      with_state do |current_state|
+        status = base_module_status(mod, current_state)
+        if status[:is_maxed]
+          next {
+            ok: false,
+            status: "max_level",
+            module: status,
+            privacy: PRIVACY_NOTICE
+          }
+        end
+        unless status[:prerequisites_met]
+          next {
+            ok: false,
+            status: "missing_prerequisites",
+            missing_required_modules: status[:missing_required_modules],
+            module: status,
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        missing_space_bucks = status[:missing_space_bucks].to_i
+        missing_materials = status[:missing_materials] || {}
+        if missing_space_bucks.positive? || !missing_materials.empty?
+          next {
+            ok: false,
+            status: missing_space_bucks.positive? && !missing_materials.empty? ? "insufficient_resources" : (missing_space_bucks.positive? ? "insufficient_space_bucks" : "insufficient_materials"),
+            missing_space_bucks: missing_space_bucks,
+            missing_materials: missing_materials,
+            module: status,
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        cost = status.fetch(:cost_to_next)
+        current_state["space_bucks"] = current_state["space_bucks"].to_i - cost.fetch(:space_bucks).to_i
+        cost.fetch(:materials).each do |material_id, quantity|
+          current_state["inventory"][material_id] = current_state["inventory"][material_id].to_i - quantity.to_i
+        end
+        current_state["base_modules"][module_id] = status.fetch(:level).to_i + 1
+
+        {
+          ok: true,
+          status: "purchased",
+          module_id: module_id,
+          display_name: mod["display_name"],
+          previous_level: status.fetch(:level),
+          new_level: current_state["base_modules"][module_id],
+          spent: cost,
+          space_bucks: current_state["space_bucks"].to_i,
+          module: base_module_status(mod, current_state),
+          effects: base_effects_payload(current_state),
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
     def queue_fabrication_payload(args)
       recipe_id = safe_string(args["recipe_id"])
       variant_id = safe_string(args["variant_id"])
@@ -507,7 +583,7 @@ module McpMiner
         end
 
         queued_for_machine = current_state["fabrication_queue"].count { |item| item["machine_id"] == machine["id"] }
-        if queued_for_machine >= machine.dig("throughput", "max_queue_size").to_i
+        if queued_for_machine >= machine_queue_size(machine, current_state)
           next {
             ok: false,
             status: "queue_full",
@@ -660,6 +736,7 @@ module McpMiner
         order_variants: variant_list.length,
         asteroid_classes: asteroid_list.length,
         upgrades: upgrade_list.length,
+        base_modules: base_module_list.length,
         hazards: hazard_list.length
       }
     end
@@ -693,6 +770,7 @@ module McpMiner
           generated_at: current_state["orders_generated_at"],
           refresh_due_at: current_state["orders_refresh_due_at"],
           refresh_cadence_hours: order_generator.fetch("refresh_cadence_hours"),
+          active_order_slots: active_order_slots_for(current_state),
           missed_order_penalty: order_generator.fetch("missed_order_penalty"),
           privacy: PRIVACY_NOTICE
         }
@@ -963,7 +1041,7 @@ module McpMiner
     end
 
     def generate_orders(state = initial_state, generated_at: Time.now.utc)
-      slots = order_generator.fetch("active_order_slots").to_i
+      slots = active_order_slots_for(state)
       slots.times.map do |slot|
         generate_order_for_slot(state, slot, generated_at: generated_at)
       end
@@ -1053,6 +1131,10 @@ module McpMiner
 
     def hazard_list
       @data.fetch(:hazards)
+    end
+
+    def base_module_list
+      @data.fetch(:base_modules)
     end
 
     def safe_string(value)
@@ -1418,7 +1500,8 @@ module McpMiner
         throughput: {
           base_progress_per_turn: machine.dig("throughput", "base_progress_per_turn").to_i,
           effective_progress_per_turn: (machine.dig("throughput", "base_progress_per_turn").to_f * upgrade_effect_by_id("upgrade_fabricator_throughput", state.dig("upgrades", "upgrade_fabricator_throughput").to_i)).round(2),
-          max_queue_size: machine.dig("throughput", "max_queue_size").to_i,
+          max_queue_size: machine_queue_size(machine, state),
+          base_max_queue_size: machine.dig("throughput", "max_queue_size").to_i,
           queued: queue_items.length
         },
         quality: machine["quality"],
@@ -1431,7 +1514,12 @@ module McpMiner
       return true if machine["starts_unlocked"]
       return true if (state["unlocked_machine_ids"] || []).include?(machine["id"])
 
-      false
+      unlock = machine["unlock"] || {}
+      modules_met = Array(unlock["required_base_modules"]).all? { |module_id| state.dig("base_modules", module_id).to_i.positive? }
+      upgrades_met = Array(unlock["required_upgrades"]).all? do |requirement|
+        requirement.all? { |upgrade_id, level| state.dig("upgrades", upgrade_id).to_i >= level.to_i }
+      end
+      modules_met && upgrades_met && state["space_bucks"].to_i >= unlock["space_bucks"].to_i
     end
 
     def build_fabrication_item(sequence, recipe, variant, machine, quantity, required)
@@ -1571,10 +1659,123 @@ module McpMiner
       }
     end
 
+    def base_module_status(mod, state)
+      level = state.dig("base_modules", mod.fetch("id")).to_i
+      max_level = mod.fetch("max_level").to_i
+      cost = level >= max_level ? nil : base_module_next_cost(mod, level)
+      missing_space_bucks = cost ? [cost[:space_bucks].to_i - state["space_bucks"].to_i, 0].max : 0
+      missing_materials = cost ? missing_materials_for_cost(cost[:materials], state) : {}
+      missing_required_modules = Array(mod.dig("unlock", "required_modules")).reject do |module_id|
+        state.dig("base_modules", module_id).to_i.positive?
+      end
+
+      {
+        module_id: mod.fetch("id"),
+        display_name: mod.fetch("display_name"),
+        level: level,
+        max_level: max_level,
+        is_maxed: level >= max_level,
+        prerequisites_met: missing_required_modules.empty?,
+        missing_required_modules: missing_required_modules,
+        cost_to_next: cost,
+        can_purchase: cost && missing_space_bucks.zero? && missing_materials.empty? && missing_required_modules.empty?,
+        missing_space_bucks: missing_space_bucks,
+        missing_materials: missing_materials,
+        effects: Array(mod["effects"]).map { |effect| base_module_effect_payload(effect, level) },
+        next_effects: level >= max_level ? [] : Array(mod["effects"]).map { |effect| base_module_effect_payload(effect, level + 1) }
+      }
+    end
+
+    def base_module_next_cost(mod, level)
+      multiplier = level.to_i + 1
+      {
+        space_bucks: mod.dig("unlock", "space_bucks").to_i * multiplier,
+        materials: Array(mod["material_costs"]).each_with_object({}) do |cost, materials|
+          quantity = cost.fetch("base_quantity").to_i * multiplier
+          materials[cost.fetch("material_id")] = quantity if quantity.positive?
+        end
+      }
+    end
+
+    def base_module_effect_payload(effect, level)
+      value = evaluate_base_module_formula(effect.fetch("formula"), level)
+      {
+        target: effect.fetch("target"),
+        formula: effect.fetch("formula"),
+        value: value.round(4)
+      }
+    end
+
+    def base_effects_payload(state)
+      targets = base_module_list.flat_map { |mod| Array(mod["effects"]).map { |effect| effect["target"] } }.uniq
+      targets.to_h { |target| [target, base_module_effect_value(target, state).round(4)] }
+    end
+
+    def base_module_effect_value(target, state)
+      base_module_list.sum do |mod|
+        level = state.dig("base_modules", mod["id"]).to_i
+        next 0.0 if level <= 0
+
+        Array(mod["effects"]).select { |effect| effect["target"] == target }.sum do |effect|
+          evaluate_base_module_formula(effect.fetch("formula"), level)
+        end
+      end
+    end
+
+    def evaluate_base_module_formula(formula, level)
+      l = level.to_f
+      case formula
+      when "1 + L"
+        1 + l
+      when "0.02 * L"
+        0.02 * l
+      when "3 + L"
+        3 + l
+      when "L"
+        l
+      else
+        raise "Unsupported base module effect formula: #{formula}"
+      end
+    end
+
+    def active_order_slots_for(state)
+      [order_generator.fetch("active_order_slots").to_i, base_module_effect_value("active_order_slots", state).to_i].max
+    end
+
+    def machine_queue_size(machine, state)
+      base = machine.dig("throughput", "max_queue_size").to_i
+      bonus = [base_module_effect_value("fabrication_queue_slots", state).to_i - 1, 0].max
+      base + bonus
+    end
+
+    def drone_automation_payload(state)
+      level = state.dig("upgrades", "upgrade_drone_automation").to_i
+      upgrade = upgrade_by_id.fetch("upgrade_drone_automation")
+      max_level = upgrade.fetch("max_level").to_i
+      {
+        upgrade_id: "upgrade_drone_automation",
+        level: level,
+        max_level: max_level,
+        passive_support_multiplier: upgrade_effect_by_id("upgrade_drone_automation", level),
+        max_passive_support_multiplier: upgrade_effect_by_id("upgrade_drone_automation", max_level),
+        bounded: true
+      }
+    end
+
+    def unknown_base_module_payload(module_id)
+      {
+        ok: false,
+        status: "unknown_base_module",
+        module_id: module_id,
+        reason: "Base module is not defined in base_modules.yaml.",
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
     def upgrade_status(upgrade, state)
       level = state.dig("upgrades", upgrade.fetch("id")).to_i
       max_level = upgrade.fetch("max_level").to_i
-      cost = level >= max_level ? nil : upgrade_next_cost(upgrade, level)
+      cost = level >= max_level ? nil : upgrade_next_cost(upgrade, level, state)
       missing_space_bucks = cost ? [cost[:space_bucks].to_i - state["space_bucks"].to_i, 0].max : 0
       missing_materials = cost ? missing_materials_for_cost(cost[:materials], state) : {}
       current_effect = upgrade_effect(upgrade, level)
@@ -1599,19 +1800,23 @@ module McpMiner
       }
     end
 
-    def upgrade_next_cost(upgrade, level)
+    def upgrade_next_cost(upgrade, level, state = nil)
       {
-        space_bucks: upgrade_space_bucks_cost(upgrade, level),
+        space_bucks: upgrade_space_bucks_cost(upgrade, level, state),
         materials: upgrade_material_costs(upgrade, level)
       }
     end
 
-    def upgrade_space_bucks_cost(upgrade, level)
+    def upgrade_space_bucks_cost(upgrade, level, state = nil)
       cost = upgrade.fetch("cost")
       raw = cost.fetch("base_space_bucks").to_f *
             (cost.fetch("growth_rate").to_f**level.to_i) *
             upgrade_phase_multiplier(level) *
             upgrade_rarity_pressure(upgrade, level)
+      if state
+        discount = [base_module_effect_value("upgrade_discount_percent", state), 0.5].min
+        raw *= (1 - discount)
+      end
       nice_round(raw).ceil
     end
 
@@ -2461,6 +2666,10 @@ module McpMiner
 
     def upgrade_by_id
       @upgrade_by_id ||= upgrade_list.to_h { |upgrade| [upgrade.fetch("id"), upgrade] }
+    end
+
+    def base_module_by_id
+      @base_module_by_id ||= base_module_list.to_h { |mod| [mod.fetch("id"), mod] }
     end
 
     def work_event_by_id
