@@ -666,6 +666,7 @@ Representative shape:
 
 ```json
 {
+  "state_schema_version": 1,
   "space_bucks": 0,
   "inventory": {
     "mat_chonks": 0
@@ -740,6 +741,13 @@ Representative shape:
     "applied_event_count": 1,
     "last_event_id": "evt_123"
   },
+  "last_migration": {
+    "from_state_schema_version": 0,
+    "to_state_schema_version": 1,
+    "backup_file": "state.json.backup-v0-to-v1-20260524000000-12345",
+    "created_at": "2026-05-24T00:00:00Z"
+  },
+  "last_recovery": null,
   "last_session_id": "session_abc",
   "last_seen_at": "2026-05-24T00:00:00Z",
   "created_at": "2026-05-24T00:00:00Z"
@@ -750,6 +758,10 @@ Required runtime validation and normalization:
 
 - `inventory` is a material ID to integer quantity map. Material IDs must exist in `materials.yaml`
   before they are displayed or consumed.
+- `state_schema_version` is the local save schema version. It is separate from
+  `data/schema_version.yaml`, which tracks gameplay data and economy revisions.
+- Legacy or missing local state schema versions are migrated to the current version after writing a
+  timestamped `.backup-*` copy of the previous `state.json`.
 - `stats` always contains `turns_seen`, `tool_events_seen`, `work_score_total`,
   `chonks_mined_total`, `materials_found_total`, `reports_emitted`, and `work_events`.
 - `project_stats` keys are anonymous `project_` fingerprints derived from hook working directories.
@@ -765,6 +777,8 @@ Required runtime validation and normalization:
 - `suit_condition` is an integer condition percentage, defaulting to 100.
 - `report_mode` is one of `off`, `every_turn_compact`, `every_turn_full`,
   `meaningful_turns_only`, `session_summary_only`, or `milestones_only`.
+- `last_migration` and `last_recovery` contain only privacy-safe local maintenance metadata such as
+  schema version numbers, backup file basenames, and timestamps.
 - No prompt text, assistant reply text, source code, terminal output, file path, repo name, browser
   content, app content, or raw transcript is stored by default.
 

@@ -11,6 +11,7 @@ module McpMiner
     STATE_DIR = File.join(Dir.home, ".mcp-miner")
     DEFAULT_STATE_PATH = File.join(STATE_DIR, "state.json")
     DEFAULT_JOURNAL_FILENAME = "journal.jsonl"
+    CURRENT_STATE_SCHEMA_VERSION = 1
     MAX_DEDUPE_KEYS = 300
     REPORT_PREFIX = "MCP Miner:"
     MEANINGFUL_SCORE = 3.0
@@ -108,6 +109,7 @@ module McpMiner
     def initial_state
       start = @data.fetch(:player_start)
       {
+        "state_schema_version" => CURRENT_STATE_SCHEMA_VERSION,
         "space_bucks" => start.fetch("space_bucks"),
         "inventory" => start.fetch("inventory").dup,
         "unlocked_machine_ids" => start.fetch("unlocked_machine_ids").dup,
@@ -134,12 +136,15 @@ module McpMiner
           "applied_event_count" => 0,
           "last_event_id" => nil
         },
+        "last_migration" => nil,
+        "last_recovery" => nil,
         "created_at" => Time.now.utc.iso8601
       }
     end
 
     def normalize_state(state)
       start = @data.fetch(:player_start)
+      state["state_schema_version"] = CURRENT_STATE_SCHEMA_VERSION unless state["state_schema_version"].to_i.positive?
       state["space_bucks"] = start.fetch("space_bucks") unless state.key?("space_bucks")
       state["inventory"] ||= start.fetch("inventory").dup
       state["unlocked_machine_ids"] ||= start.fetch("unlocked_machine_ids").dup
@@ -162,6 +167,8 @@ module McpMiner
       state["current_turn"] = nil unless state["current_turn"].is_a?(Hash)
       state["orders"] ||= []
       state["journal"] = default_journal_metadata.merge(state["journal"] || {})
+      state["last_migration"] = nil unless state["last_migration"].nil? || state["last_migration"].is_a?(Hash)
+      state["last_recovery"] = nil unless state["last_recovery"].nil? || state["last_recovery"].is_a?(Hash)
       state
     end
 
@@ -438,6 +445,10 @@ module McpMiner
             applied_event_count: current_state.dig("journal", "applied_event_count").to_i,
             last_event_id: current_state.dig("journal", "last_event_id")
           },
+          state_schema_version: current_state["state_schema_version"].to_i,
+          latest_state_schema_version: CURRENT_STATE_SCHEMA_VERSION,
+          last_migration: current_state["last_migration"],
+          last_recovery: current_state["last_recovery"],
           note: "Cloud sync is not implemented in the local MVP; progress remains in local state and journal."
         },
         privacy: PRIVACY_NOTICE
@@ -671,9 +682,10 @@ module McpMiner
     def load_materialized_state
       state_payload, state_existed, state_was_corrupt = read_state_file
       had_journal_metadata = state_payload.is_a?(Hash) && state_payload["journal"].is_a?(Hash)
-      current_state = state_payload ? normalize_state(state_payload) : initial_state
+      migrated_state_payload, state_was_migrated = state_payload ? migrate_state_payload(state_payload) : [nil, false]
+      current_state = migrated_state_payload ? normalize_state(migrated_state_payload) : initial_state
       entries = read_journal_entries
-      materialized_changed = state_was_corrupt || (state_existed && !had_journal_metadata)
+      materialized_changed = state_was_corrupt || state_was_migrated || (state_existed && !had_journal_metadata)
 
       if state_existed && entries.empty? && (!had_journal_metadata || !File.exist?(journal_path))
         snapshot = migration_snapshot_entry(current_state)
@@ -696,9 +708,39 @@ module McpMiner
         end
       end
 
+      if @last_recovery
+        current_state["last_recovery"] = @last_recovery
+        materialized_changed = true
+      end
+
       sync_journal_metadata(current_state, entries)
       atomic_write_state(current_state) if materialized_changed
       current_state
+    end
+
+    def migrate_state_payload(state_payload)
+      from_version = state_payload["state_schema_version"].to_i
+      return [state_payload, false] if from_version >= CURRENT_STATE_SCHEMA_VERSION
+
+      backup_path = backup_state_for_migration(from_version)
+      migrated = deep_copy(state_payload)
+      migrated["state_schema_version"] = CURRENT_STATE_SCHEMA_VERSION
+      migrated["last_migration"] = {
+        "from_state_schema_version" => from_version,
+        "to_state_schema_version" => CURRENT_STATE_SCHEMA_VERSION,
+        "backup_file" => backup_path && File.basename(backup_path),
+        "created_at" => Time.now.utc.iso8601
+      }
+      [migrated, true]
+    end
+
+    def backup_state_for_migration(from_version)
+      return nil unless File.exist?(state_path)
+
+      backup_path = "#{state_path}.backup-v#{from_version}-to-v#{CURRENT_STATE_SCHEMA_VERSION}-#{Time.now.utc.strftime('%Y%m%d%H%M%S')}-#{Process.pid}"
+      FileUtils.cp(state_path, backup_path)
+      warn "MCP Miner state file backed up before migration to schema #{CURRENT_STATE_SCHEMA_VERSION}: #{backup_path}"
+      backup_path
     end
 
     def read_state_file
@@ -880,6 +922,7 @@ module McpMiner
 
     def snapshot_state(state)
       keys = %w[
+        state_schema_version
         space_bucks
         inventory
         unlocked_machine_ids
@@ -899,6 +942,8 @@ module McpMiner
         dedupe_keys
         current_turn
         latest_report
+        last_migration
+        last_recovery
         last_session_id
         last_seen_at
         created_at
@@ -928,9 +973,17 @@ module McpMiner
     def backup_corrupt_file(path, label, error)
       return unless File.exist?(path)
 
+      timestamp = Time.now.utc.iso8601
       backup_path = "#{path}.corrupt-#{Time.now.utc.strftime('%Y%m%d%H%M%S')}-#{Process.pid}"
       FileUtils.mv(path, backup_path)
+      @last_recovery = {
+        "type" => "#{label}_corrupt_backup",
+        "backup_file" => File.basename(backup_path),
+        "message" => "MCP Miner #{label} file was corrupt; a backup was written and local state was recovered or reset.",
+        "created_at" => timestamp
+      }
       warn "MCP Miner #{label} file was corrupt; backed up to #{backup_path}: #{error.message}"
+      backup_path
     end
 
     def optional_string(value)
