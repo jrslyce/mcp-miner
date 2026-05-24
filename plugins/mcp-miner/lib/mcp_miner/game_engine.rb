@@ -37,6 +37,7 @@ module McpMiner
       upgrades: ["upgrades.yaml", "upgrades"],
       hazards: ["hazards.yaml", "hazards"],
       player_start: ["player_start.yaml", "player_start"],
+      balance: ["balance_constants.yaml", "balance"],
       reports: ["report_templates.yaml", "report_templates"],
       work_scoring: ["work_scoring.yaml", "work_events"]
     }.freeze
@@ -122,6 +123,8 @@ module McpMiner
         "orders" => [],
         "completed_orders" => [],
         "order_generation_index" => 0,
+        "market_sale_index" => 0,
+        "market_transactions" => [],
         "suit_condition" => 100,
         "asteroid_progress" => {
           "asteroid_class_id" => start.fetch("current_asteroid_class_id"),
@@ -170,6 +173,8 @@ module McpMiner
       state["orders"] ||= []
       state["completed_orders"] ||= []
       state["order_generation_index"] = state["order_generation_index"].to_i
+      state["market_sale_index"] = state["market_sale_index"].to_i
+      state["market_transactions"] ||= []
       state["journal"] = default_journal_metadata.merge(state["journal"] || {})
       state["last_migration"] = nil unless state["last_migration"].nil? || state["last_migration"].is_a?(Hash)
       state["last_recovery"] = nil unless state["last_recovery"].nil? || state["last_recovery"].is_a?(Hash)
@@ -575,6 +580,120 @@ module McpMiner
       end
     end
 
+    def refine_material_payload(args)
+      material_id = safe_string(args["material_id"])
+      quantity = args["quantity"].to_i
+      return invalid_quantity_payload(quantity) if quantity <= 0
+
+      material = material_by_id[material_id]
+      return unknown_material_payload(material_id) unless material
+
+      unless material["can_refine"] && material["refined_space_bucks"].to_i.positive?
+        return {
+          ok: false,
+          status: "not_refinable",
+          material_id: material_id,
+          material: material_payload(material_id),
+          reason: "#{material['display_name']} cannot be refined.",
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      refined_id = refined_material_id(material_id)
+      with_state do |current_state|
+        available = current_state["inventory"][material_id].to_i
+        if available < quantity
+          next insufficient_inventory_payload(material_id, quantity, available)
+        end
+
+        current_state["inventory"][material_id] = available - quantity
+        current_state["inventory"][refined_id] = current_state["inventory"][refined_id].to_i + quantity
+
+        {
+          ok: true,
+          status: "refined",
+          material: material_payload(material_id),
+          raw_material_id: material_id,
+          refined_material_id: refined_id,
+          quantity: quantity,
+          consumed: {
+            material_id => quantity
+          },
+          produced: {
+            refined_id => quantity
+          },
+          inventory: {
+            material_id => current_state["inventory"][material_id].to_i,
+            refined_id => current_state["inventory"][refined_id].to_i
+          },
+          raw_space_bucks_each: material["raw_space_bucks"].to_i,
+          refined_space_bucks_each: material["refined_space_bucks"].to_i,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
+    def sell_material_payload(args)
+      material_id = safe_string(args["material_id"])
+      quantity = args["quantity"].to_i
+      return invalid_quantity_payload(quantity) if quantity <= 0
+
+      inventory_material = inventory_material_info(material_id)
+      return unknown_material_payload(material_id) unless inventory_material[:material]
+      unless inventory_material[:space_bucks_each].positive?
+        return {
+          ok: false,
+          status: "not_sellable",
+          material_id: material_id,
+          reason: "#{inventory_material[:display_name]} has no market value.",
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      with_state do |current_state|
+        available = current_state["inventory"][material_id].to_i
+        if available < quantity
+          next insufficient_inventory_payload(material_id, quantity, available)
+        end
+
+        sale_index = current_state["market_sale_index"].to_i
+        multiplier = direct_market_multiplier("market:#{sale_index}:#{material_id}:#{quantity}")
+        payout = direct_market_payout(inventory_material[:space_bucks_each], quantity, multiplier)
+        sold_at = Time.now.utc.iso8601
+
+        current_state["inventory"][material_id] = available - quantity
+        current_state["space_bucks"] = current_state["space_bucks"].to_i + payout
+        current_state["market_sale_index"] = sale_index + 1
+        transaction = {
+          "type" => "direct_market_sale",
+          "material_id" => material_id,
+          "quantity" => quantity,
+          "space_bucks_each" => inventory_material[:space_bucks_each],
+          "market_multiplier" => multiplier.round(4),
+          "payout_space_bucks" => payout,
+          "sold_at" => sold_at
+        }
+        current_state["market_transactions"] << transaction
+        current_state["market_transactions"] = current_state["market_transactions"].last(50)
+
+        {
+          ok: true,
+          status: "sold",
+          sale: transaction,
+          material: material_payload(inventory_material[:base_material_id], refined: inventory_material[:refined]),
+          consumed: {
+            material_id => quantity
+          },
+          inventory: {
+            material_id => current_state["inventory"][material_id].to_i
+          },
+          space_bucks: current_state["space_bucks"].to_i,
+          direct_market: direct_market_config,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
     def generate_orders(state = initial_state, generated_at: Time.now.utc)
       slots = order_generator.fetch("active_order_slots").to_i
       slots.times.map do |slot|
@@ -652,6 +771,10 @@ module McpMiner
       @data.fetch(:order_generator)
     end
 
+    def balance_config
+      @data.fetch(:balance)
+    end
+
     def asteroid_list
       @data.fetch(:asteroids)
     end
@@ -684,18 +807,24 @@ module McpMiner
         quantity = quantity.to_i
         next unless quantity.positive?
 
-        material = material_by_id[material_id] || {}
-        raw_space_bucks = material["raw_space_bucks"].to_i
+        inventory_material = inventory_material_info(material_id)
+        material = inventory_material[:material] || {}
+        space_bucks_each = inventory_material[:space_bucks_each].to_i
         payload << {
           material_id: material_id,
-          display_name: material["display_name"] || material_id,
+          base_material_id: inventory_material[:base_material_id],
+          display_name: inventory_material[:display_name],
           category: material["category"] || "unknown",
           rarity: material["rarity"] || "unknown",
           state_group: material["state_group"] || "unknown",
+          refinement_state: inventory_material[:refined] ? "refined" : "raw",
           quantity: quantity,
-          raw_space_bucks_each: raw_space_bucks,
-          total_raw_space_bucks: raw_space_bucks * quantity,
-          can_refine: !!material["can_refine"]
+          raw_space_bucks_each: material["raw_space_bucks"].to_i,
+          refined_space_bucks_each: material["refined_space_bucks"]&.to_i,
+          space_bucks_each: space_bucks_each,
+          total_raw_space_bucks: space_bucks_each * quantity,
+          total_space_bucks: space_bucks_each * quantity,
+          can_refine: !inventory_material[:refined] && !!material["can_refine"]
         }
       end
 
@@ -714,6 +843,100 @@ module McpMiner
         totals[category][:quantity] += item[:quantity].to_i
         totals[category][:total_raw_space_bucks] += item[:total_raw_space_bucks].to_i
       end
+    end
+
+    def inventory_material_info(material_id)
+      refined = material_id.start_with?("refined:")
+      base_material_id = refined ? material_id.sub(/^refined:/, "") : material_id
+      material = material_by_id[base_material_id]
+      space_bucks_each = if refined
+                           material && material["refined_space_bucks"].to_i
+                         else
+                           material && material["raw_space_bucks"].to_i
+                         end
+      {
+        material: material,
+        base_material_id: base_material_id,
+        refined: refined,
+        display_name: material_display_name(base_material_id, refined: refined),
+        space_bucks_each: space_bucks_each.to_i
+      }
+    end
+
+    def material_payload(material_id, refined: false)
+      material = material_by_id[material_id]
+      return nil unless material
+
+      {
+        material_id: refined ? refined_material_id(material_id) : material_id,
+        base_material_id: material_id,
+        display_name: material_display_name(material_id, refined: refined),
+        category: material["category"],
+        rarity: material["rarity"],
+        can_refine: !refined && !!material["can_refine"],
+        raw_space_bucks_each: material["raw_space_bucks"].to_i,
+        refined_space_bucks_each: material["refined_space_bucks"]&.to_i,
+        space_bucks_each: refined ? material["refined_space_bucks"].to_i : material["raw_space_bucks"].to_i,
+        refinement_state: refined ? "refined" : "raw"
+      }
+    end
+
+    def material_display_name(material_id, refined:)
+      material = material_by_id[material_id]
+      name = material ? material["display_name"] : material_id
+      refined ? "Refined #{name}" : name
+    end
+
+    def refined_material_id(material_id)
+      "refined:#{material_id}"
+    end
+
+    def direct_market_config
+      balance_config.fetch("direct_market")
+    end
+
+    def direct_market_multiplier(seed)
+      config = direct_market_config
+      min = config.fetch("min_multiplier").to_f
+      max = config.fetch("max_multiplier").to_f
+      min + ((max - min) * deterministic_unit(seed))
+    end
+
+    def direct_market_payout(space_bucks_each, quantity, multiplier)
+      gross = space_bucks_each.to_i * quantity.to_i * multiplier.to_f
+      [nice_round(gross).ceil, 1].max
+    end
+
+    def invalid_quantity_payload(quantity)
+      {
+        ok: false,
+        status: "invalid_quantity",
+        quantity: quantity,
+        reason: "Quantity must be a positive integer.",
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def unknown_material_payload(material_id)
+      {
+        ok: false,
+        status: "unknown_material",
+        material_id: material_id,
+        reason: "Material is not defined in materials.yaml.",
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def insufficient_inventory_payload(material_id, needed, available)
+      {
+        ok: false,
+        status: "insufficient_inventory",
+        material_id: material_id,
+        needed: needed.to_i,
+        available: available.to_i,
+        missing: [needed.to_i - available.to_i, 0].max,
+        privacy: PRIVACY_NOTICE
+      }
     end
 
     def refresh_orders!(state)
@@ -1134,6 +1357,8 @@ module McpMiner
         orders_generated_at
         orders_refresh_due_at
         order_generation_index
+        market_sale_index
+        market_transactions
         suit_condition
         asteroid_progress
         stats

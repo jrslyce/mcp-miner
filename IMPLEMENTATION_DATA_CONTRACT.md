@@ -681,7 +681,12 @@ Representative shape:
   "report_mode": "meaningful_turns_only",
   "cloud_sync": false,
   "orders": [],
+  "completed_orders": [],
   "orders_generated_at": "2026-05-24T00:00:00Z",
+  "orders_refresh_due_at": "2026-05-25T00:00:00Z",
+  "order_generation_index": 0,
+  "market_sale_index": 0,
+  "market_transactions": [],
   "suit_condition": 100,
   "asteroid_progress": {
     "asteroid_class_id": "asteroid_starter_field",
@@ -756,8 +761,9 @@ Representative shape:
 
 Required runtime validation and normalization:
 
-- `inventory` is a material ID to integer quantity map. Material IDs must exist in `materials.yaml`
-  before they are displayed or consumed.
+- `inventory` is a material ID to integer quantity map. Raw material IDs must exist in
+  `materials.yaml`; refined inventory uses the stable `refined:<material_id>` key and must resolve
+  to a refinable base material before it is displayed, sold, or consumed.
 - `state_schema_version` is the local save schema version. It is separate from
   `data/schema_version.yaml`, which tracks gameplay data and economy revisions.
 - Legacy or missing local state schema versions are migrated to the current version after writing a
@@ -883,6 +889,31 @@ Required runtime validation:
 - Reward materials exist.
 - Work event IDs are known in `work_scoring.yaml`.
 - Report templates are from `report_templates.yaml`.
+
+### Refining And Direct Market Sales
+
+Refined inventory is represented as `refined:<material_id>` in the local inventory map.
+
+```json
+{
+  "action": "sell_material",
+  "materialId": "refined:mat_ore",
+  "quantity": 2,
+  "spaceBucksEach": 7,
+  "marketMultiplier": 0.84,
+  "payoutSpaceBucks": 12
+}
+```
+
+Required runtime validation:
+
+- `refine_material` only accepts base materials with `can_refine: true` and positive
+  `refined_space_bucks`.
+- Refining consumes raw inventory and adds the same quantity to `refined:<material_id>`.
+- `sell_material` accepts raw IDs or `refined:<material_id>` IDs, validates available inventory,
+  consumes sold inventory, and adds Space Bucks.
+- Direct market sales use `balance.direct_market.min_multiplier` and
+  `balance.direct_market.max_multiplier`; they remain a lower-value pressure release than orders.
 
 ### Order Instance
 

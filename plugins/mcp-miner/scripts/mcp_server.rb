@@ -93,6 +93,32 @@ class McpMinerServer
         })
       },
       {
+        name: "refine_material",
+        description: "Convert eligible raw inventory into refined MCP Miner materials.",
+        inputSchema: object_schema({
+          material_id: {
+            type: "string"
+          },
+          quantity: {
+            type: "integer",
+            minimum: 1
+          }
+        })
+      },
+      {
+        name: "sell_material",
+        description: "Sell raw or refined MCP Miner inventory directly to the market for Space Bucks.",
+        inputSchema: object_schema({
+          material_id: {
+            type: "string"
+          },
+          quantity: {
+            type: "integer",
+            minimum: 1
+          }
+        })
+      },
+      {
         name: "get_settings",
         description: "Return current MCP Miner report, privacy, and local sync settings.",
         inputSchema: object_schema({})
@@ -168,6 +194,10 @@ class McpMinerServer
         @engine.active_orders_payload
       when "fulfill_order"
         @engine.fulfill_order_payload(args)
+      when "refine_material"
+        @engine.refine_material_payload(args)
+      when "sell_material"
+        @engine.sell_material_payload(args)
       when "get_settings"
         @engine.settings_payload
       when "get_milestone_status"

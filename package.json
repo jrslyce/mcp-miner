@@ -6,7 +6,8 @@
     "test:mcp": "ruby scripts/test_mcp.rb",
     "test:migrations": "ruby scripts/test_state_migration.rb",
     "test:orders": "ruby scripts/test_orders.rb",
+    "test:market": "ruby scripts/test_market.rb",
     "test:hooks": "ruby scripts/test_hooks.rb",
-    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:hooks"
+    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:market && npm run test:hooks"
   }
 }
