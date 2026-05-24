@@ -2,8 +2,270 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function privateKeys() {
+      return [
+        "prompt",
+        "prompts",
+        "assistantReply",
+        "assistantReplies",
+        "code",
+        "sourceCode",
+        "terminalOutput",
+        "command",
+        "commands",
+        "filePath",
+        "filePaths",
+        "path",
+        "paths",
+        "cwd",
+        "repoName",
+        "repository",
+        "repositoryName",
+        "browserContent",
+        "appContent",
+        "transcript",
+        "rawTranscript"
+      ];
+    }
+
+    function noPrivateTopLevel(data) {
+      return !data.keys().hasAny(privateKeys());
+    }
+
+    function noPrivateObservedFields(data) {
+      return !("observedFields" in data) ||
+        (data.observedFields is map && noPrivateTopLevel(data.observedFields));
+    }
+
+    function abstractOwned(uid, data) {
+      return data.ownerUid == uid &&
+        data.privacyClass == "abstract" &&
+        noPrivateTopLevel(data);
+    }
+
+    function timestampLike(data, field) {
+      return !(field in data) || data[field] is timestamp || data[field] is string;
+    }
+
+    function optionalString(data, field) {
+      return !(field in data) || data[field] is string;
+    }
+
+    function optionalBool(data, field) {
+      return !(field in data) || data[field] is bool;
+    }
+
+    function optionalMap(data, field) {
+      return !(field in data) || data[field] is map;
+    }
+
+    function optionalList(data, field) {
+      return !(field in data) || data[field] is list;
+    }
+
+    function validPlayer(uid, data) {
+      return abstractOwned(uid, data) &&
+        data.keys().hasOnly([
+          "ownerUid",
+          "schemaVersion",
+          "createdAt",
+          "updatedAt",
+          "privacyClass",
+          "displayName",
+          "minerName",
+          "cloudSyncEnabled",
+          "accountLinkedAt"
+        ]) &&
+        data.keys().hasAll(["ownerUid", "schemaVersion", "createdAt", "updatedAt", "privacyClass"]) &&
+        data.schemaVersion is int &&
+        timestampLike(data, "createdAt") &&
+        timestampLike(data, "updatedAt") &&
+        timestampLike(data, "accountLinkedAt") &&
+        optionalString(data, "displayName") &&
+        optionalString(data, "minerName") &&
+        optionalBool(data, "cloudSyncEnabled");
+    }
+
+    function validProfile(uid, data) {
+      return abstractOwned(uid, data) &&
+        data.keys().hasOnly([
+          "ownerUid",
+          "schemaVersion",
+          "updatedAt",
+          "privacyClass",
+          "displayName",
+          "minerName",
+          "pronouns",
+          "suitStyle",
+          "avatarConceptPrompt",
+          "customizationUnlocks",
+          "generatedAssetRefs"
+        ]) &&
+        data.keys().hasAll(["ownerUid", "schemaVersion", "updatedAt", "privacyClass"]) &&
+        data.schemaVersion is int &&
+        timestampLike(data, "updatedAt") &&
+        optionalString(data, "displayName") &&
+        optionalString(data, "minerName") &&
+        optionalString(data, "pronouns") &&
+        optionalString(data, "suitStyle") &&
+        optionalString(data, "avatarConceptPrompt") &&
+        optionalList(data, "customizationUnlocks") &&
+        optionalList(data, "generatedAssetRefs");
+    }
+
+    function validSettings(uid, data) {
+      return abstractOwned(uid, data) &&
+        data.keys().hasOnly([
+          "ownerUid",
+          "schemaVersion",
+          "updatedAt",
+          "privacyClass",
+          "reportMode",
+          "cloudSyncEnabled",
+          "dashboardTheme",
+          "appCheckDebugEnabled"
+        ]) &&
+        data.keys().hasAll(["ownerUid", "schemaVersion", "updatedAt", "privacyClass"]) &&
+        data.schemaVersion is int &&
+        timestampLike(data, "updatedAt") &&
+        optionalString(data, "reportMode") &&
+        optionalString(data, "dashboardTheme") &&
+        optionalBool(data, "cloudSyncEnabled") &&
+        optionalBool(data, "appCheckDebugEnabled");
+    }
+
+    function validSyncMetadata(uid, data) {
+      return abstractOwned(uid, data) &&
+        data.keys().hasOnly([
+          "ownerUid",
+          "schemaVersion",
+          "updatedAt",
+          "privacyClass",
+          "clientId",
+          "clientVersion",
+          "lastLocalEventId",
+          "lastCloudEventId",
+          "lastPulledAt",
+          "lastPushedAt",
+          "conflictState"
+        ]) &&
+        data.keys().hasAll(["ownerUid", "schemaVersion", "updatedAt", "privacyClass"]) &&
+        data.schemaVersion is int &&
+        timestampLike(data, "updatedAt") &&
+        timestampLike(data, "lastPulledAt") &&
+        timestampLike(data, "lastPushedAt") &&
+        optionalString(data, "clientId") &&
+        optionalString(data, "clientVersion") &&
+        optionalString(data, "lastLocalEventId") &&
+        optionalString(data, "lastCloudEventId") &&
+        optionalString(data, "conflictState");
+    }
+
+    function validRewardEvent(uid, eventId, data) {
+      return abstractOwned(uid, data) &&
+        noPrivateObservedFields(data) &&
+        data.keys().hasOnly([
+          "ownerUid",
+          "eventId",
+          "eventType",
+          "timestamp",
+          "sessionId",
+          "turnId",
+          "observedFields",
+          "privacyClass",
+          "source",
+          "signature",
+          "clientCreatedAt",
+          "rewardControl"
+        ]) &&
+        data.keys().hasAll(["ownerUid", "eventId", "eventType", "timestamp", "privacyClass", "source"]) &&
+        data.eventId == eventId &&
+        data.eventType is string &&
+        data.eventType.matches("^work_[a-z_]+$") &&
+        data.source == "codex_hook" &&
+        timestampLike(data, "timestamp") &&
+        timestampLike(data, "clientCreatedAt") &&
+        optionalString(data, "sessionId") &&
+        optionalString(data, "turnId") &&
+        optionalString(data, "signature") &&
+        optionalMap(data, "observedFields") &&
+        optionalMap(data, "rewardControl");
+    }
+
     match /_emulatorSmoke/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /players/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validPlayer(uid, request.resource.data);
+      allow update: if isOwner(uid) &&
+        validPlayer(uid, request.resource.data) &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+
+      match /profile/{docId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) &&
+          docId == "current" &&
+          validProfile(uid, request.resource.data);
+        allow delete: if false;
+      }
+
+      match /settings/{docId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) &&
+          docId == "current" &&
+          validSettings(uid, request.resource.data);
+        allow delete: if false;
+      }
+
+      match /syncMetadata/{docId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid) &&
+          validSyncMetadata(uid, request.resource.data);
+        allow delete: if false;
+      }
+
+      match /rewardEvents/{eventId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && validRewardEvent(uid, eventId, request.resource.data);
+        allow update, delete: if false;
+      }
+
+      match /gameState/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /inventory/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /upgrades/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /orders/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /base/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
     }
 
     match /{document=**} {

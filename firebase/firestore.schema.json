@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "ownerBoundary": "Firebase Auth UID; all player documents live under /players/{uid}",
+  "clientWritePolicy": "Clients may write profile/settings/sync metadata and append abstract reward events only. Aggregate game state is Cloud Functions/Admin SDK owned.",
+  "privateFieldDenylist": [
+    "prompt",
+    "prompts",
+    "assistantReply",
+    "assistantReplies",
+    "code",
+    "sourceCode",
+    "terminalOutput",
+    "command",
+    "commands",
+    "filePath",
+    "filePaths",
+    "path",
+    "paths",
+    "cwd",
+    "repoName",
+    "repository",
+    "repositoryName",
+    "browserContent",
+    "appContent",
+    "transcript",
+    "rawTranscript"
+  ],
+  "collections": {
+    "players/{uid}": {
+      "owner": "uid",
+      "clientAccess": ["read", "create", "update"],
+      "fields": ["ownerUid", "schemaVersion", "createdAt", "updatedAt", "privacyClass", "displayName", "minerName", "cloudSyncEnabled", "accountLinkedAt"]
+    },
+    "players/{uid}/profile/current": {
+      "owner": "uid",
+      "clientAccess": ["read", "create", "update"],
+      "fields": ["ownerUid", "schemaVersion", "updatedAt", "privacyClass", "displayName", "minerName", "pronouns", "suitStyle", "avatarConceptPrompt", "customizationUnlocks", "generatedAssetRefs"]
+    },
+    "players/{uid}/settings/current": {
+      "owner": "uid",
+      "clientAccess": ["read", "create", "update"],
+      "fields": ["ownerUid", "schemaVersion", "updatedAt", "privacyClass", "reportMode", "cloudSyncEnabled", "dashboardTheme", "appCheckDebugEnabled"]
+    },
+    "players/{uid}/syncMetadata/{clientId}": {
+      "owner": "uid",
+      "clientAccess": ["read", "create", "update"],
+      "fields": ["ownerUid", "schemaVersion", "updatedAt", "privacyClass", "clientId", "clientVersion", "lastLocalEventId", "lastCloudEventId", "lastPulledAt", "lastPushedAt", "conflictState"]
+    },
+    "players/{uid}/rewardEvents/{eventId}": {
+      "owner": "uid",
+      "clientAccess": ["read", "create"],
+      "appendOnly": true,
+      "fields": ["ownerUid", "eventId", "eventType", "timestamp", "sessionId", "turnId", "observedFields", "privacyClass", "source", "signature", "clientCreatedAt", "rewardControl"]
+    },
+    "players/{uid}/gameState/current": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true
+    },
+    "players/{uid}/inventory/{bucket}": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true
+    },
+    "players/{uid}/upgrades/current": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true
+    },
+    "players/{uid}/orders/{orderId}": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true
+    },
+    "players/{uid}/base/current": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true
+    }
+  }
+}

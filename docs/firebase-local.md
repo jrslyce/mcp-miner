@@ -18,10 +18,17 @@ npm install --prefix firebase/functions
 npm run firebase:emulators:smoke
 ```
 
+Run Firestore rule allow/deny smoke cases:
+
+```sh
+npm run firebase:rules:smoke
+```
+
 Run the repo-level static Firebase scaffold checks:
 
 ```sh
 npm run test:firebase-config
+npm run test:firestore-schema
 ```
 
 The emulator UI runs at `http://127.0.0.1:4000`, Hosting at `http://127.0.0.1:5000`, Functions at `http://127.0.0.1:5001`, Firestore at `127.0.0.1:8080`, and Auth at `127.0.0.1:9099`.
