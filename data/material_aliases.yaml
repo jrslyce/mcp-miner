@@ -1,0 +1,25 @@
+aliases:
+  hydrogen_ice:
+    display_name: Hydrogen Ice
+    material_id: mat_cryo_hydrogen_ice
+    canonical_material_id: mat_element_h
+    state_group_override: cryo_volatile
+    price_multiplier: 1.0
+  oxygen_ice:
+    display_name: Oxygen Ice
+    material_id: mat_cryo_oxygen_ice
+    canonical_material_id: mat_element_o
+    state_group_override: cryo_volatile
+    price_multiplier: 1.0
+  nitrogen_ice:
+    display_name: Nitrogen Ice
+    material_id: mat_cryo_nitrogen_ice
+    canonical_material_id: mat_element_n
+    state_group_override: cryo_volatile
+    price_multiplier: 1.0
+  chlorine_salts:
+    display_name: Chlorine Salts
+    material_id: mat_compound_chlorine_salts
+    canonical_material_id: mat_element_cl
+    state_group_override: compound
+    price_multiplier: 1.15

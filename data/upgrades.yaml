@@ -1,0 +1,225 @@
+upgrades:
+  - id: upgrade_drill_power
+    display_name: Drill Power
+    max_level: 50
+    cost:
+      base_space_bucks: 120
+      growth_rate: 1.19
+      phase_formula: phase_multiplier
+      rarity_pressure_formula: rarity_pressure
+    effect:
+      type: multiplier
+      target: chonk_output
+      formula: "1 + 2.6*(1-e^(-0.045L)) + 0.05*floor(L/10)"
+    material_basket:
+      base_quantities:
+        - material_id: mat_element_fe
+          quantity: 4
+        - material_id: mat_element_ni
+          quantity: 2
+      gates:
+        - min_level: 5
+          add_material_id: mat_element_ti
+          base_quantity: 1
+        - min_level: 20
+          add_material_id: mat_element_w
+          base_quantity: 1
+        - min_level: 35
+          add_material_id: mat_gem_ruby
+          base_quantity: 1
+  - id: upgrade_scanner_range
+    display_name: Scanner Range
+    max_level: 50
+    cost:
+      base_space_bucks: 100
+      growth_rate: 1.16
+      phase_formula: phase_multiplier
+      rarity_pressure_formula: rarity_pressure
+    effect:
+      type: multiplier
+      target: discovery_output
+      formula: "1 + 1.8*(1-e^(-0.05L))"
+    material_basket:
+      base_quantities:
+        - material_id: mat_element_si
+          quantity: 4
+        - material_id: mat_gem_quartz
+          quantity: 1
+      gates:
+        - min_level: 8
+          add_material_id: mat_fictional_sparkglass
+          base_quantity: 1
+        - min_level: 24
+          add_material_id: mat_element_ge
+          base_quantity: 1
+        - min_level: 40
+          add_material_id: mat_gem_amethyst
+          base_quantity: 1
+  - id: upgrade_scanner_precision
+    display_name: Scanner Precision
+    max_level: 50
+    cost:
+      base_space_bucks: 130
+      growth_rate: 1.17
+      phase_formula: phase_multiplier
+      rarity_pressure_formula: rarity_pressure
+    effect:
+      type: multiplier
+      target: rare_find_weighting
+      formula: "1 + 1.2*(1-e^(-0.04L))"
+    material_basket:
+      base_quantities:
+        - material_id: mat_element_si
+          quantity: 3
+        - material_id: mat_element_cu
+          quantity: 2
+      gates:
+        - min_level: 8
+          add_material_id: mat_gem_sapphire
+          base_quantity: 1
+        - min_level: 22
+          add_material_id: mat_element_ga
+          base_quantity: 1
+        - min_level: 36
+          add_material_id: mat_fictional_chatterium
+          base_quantity: 1
+  - id: upgrade_suit_plating
+    display_name: Suit Plating
+    max_level: 50
+    cost:
+      base_space_bucks: 140
+      growth_rate: 1.17
+      phase_formula: phase_multiplier
+      rarity_pressure_formula: rarity_pressure
+    effect:
+      type: reduction
+      target: hazard_damage
+      formula: "0.72*(1-e^(-0.045L))"
+    material_basket:
+      base_quantities:
+        - material_id: mat_element_fe
+          quantity: 4
+        - material_id: mat_element_al
+          quantity: 2
+      gates:
+        - min_level: 6
+          add_material_id: mat_element_ti
+          base_quantity: 1
+        - min_level: 20
+          add_material_id: mat_element_hf
+          base_quantity: 1
+        - min_level: 38
+          add_material_id: mat_element_u
+          base_quantity: 1
+  - id: upgrade_refinery_purity
+    display_name: Refinery Purity
+    max_level: 50
+    cost:
+      base_space_bucks: 180
+      growth_rate: 1.18
+      phase_formula: phase_multiplier
+      rarity_pressure_formula: rarity_pressure
+    effect:
+      type: multiplier
+      target: refined_yield
+      formula: "1 + 1.6*(1-e^(-0.04L))"
+    material_basket:
+      base_quantities:
+        - material_id: mat_element_si
+          quantity: 5
+        - material_id: mat_element_c
+          quantity: 3
+      gates:
+        - min_level: 8
+          add_material_id: mat_gem_sapphire
+          base_quantity: 1
+        - min_level: 24
+          add_material_id: mat_element_pt
+          base_quantity: 1
+        - min_level: 40
+          add_material_id: mat_fictional_glitchsalt
+          base_quantity: 1
+  - id: upgrade_fabricator_throughput
+    display_name: Fabricator Throughput
+    max_level: 30
+    cost:
+      base_space_bucks: 300
+      growth_rate: 1.21
+      phase_formula: phase_multiplier
+      rarity_pressure_formula: rarity_pressure
+    effect:
+      type: multiplier
+      target: product_progress
+      formula: "1 + 1.4*(1-e^(-0.06L))"
+    material_basket:
+      base_quantities:
+        - material_id: mat_element_fe
+          quantity: 6
+        - material_id: mat_element_cu
+          quantity: 2
+      gates:
+        - min_level: 5
+          add_material_id: mat_element_ti
+          base_quantity: 1
+        - min_level: 16
+          add_material_id: mat_element_ta
+          base_quantity: 1
+        - min_level: 26
+          add_material_id: mat_fictional_nebulite
+          base_quantity: 1
+  - id: upgrade_vault_storage
+    display_name: Vault Storage
+    max_level: 60
+    cost:
+      base_space_bucks: 80
+      growth_rate: 1.14
+      phase_formula: phase_multiplier
+      rarity_pressure_formula: rarity_pressure
+    effect:
+      type: multiplier
+      target: storage_capacity
+      formula: "base_storage * 1.08^L"
+    material_basket:
+      base_quantities:
+        - material_id: mat_chonks
+          quantity: 30
+        - material_id: mat_element_fe
+          quantity: 2
+      gates:
+        - min_level: 12
+          add_material_id: mat_element_al
+          base_quantity: 2
+        - min_level: 30
+          add_material_id: mat_element_ti
+          base_quantity: 1
+        - min_level: 48
+          add_material_id: mat_element_ir
+          base_quantity: 1
+  - id: upgrade_drone_automation
+    display_name: Drone Automation
+    max_level: 25
+    cost:
+      base_space_bucks: 450
+      growth_rate: 1.24
+      phase_formula: phase_multiplier
+      rarity_pressure_formula: rarity_pressure
+    effect:
+      type: multiplier
+      target: passive_support
+      formula: "1 + 0.06L + 0.005*L^1.35"
+    material_basket:
+      base_quantities:
+        - material_id: mat_element_si
+          quantity: 6
+        - material_id: mat_element_cu
+          quantity: 4
+      gates:
+        - min_level: 5
+          add_material_id: mat_element_li
+          base_quantity: 2
+        - min_level: 14
+          add_material_id: mat_element_co
+          base_quantity: 2
+        - min_level: 22
+          add_material_id: mat_fictional_chatterium
+          base_quantity: 1

@@ -1,0 +1,28 @@
+{
+  "name": "mcp-miner",
+  "version": "0.1.0",
+  "description": "Passive asteroid-mining progression for Codex work, powered by validated MCP Miner gameplay data.",
+  "author": {
+    "name": "Jared"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "MCP Miner",
+    "shortDescription": "Mine Chonks and fulfill space orders while using Codex.",
+    "longDescription": "MCP Miner is a cozy sci-fi asteroid-mining progression game for Codex. It uses validated local gameplay data for materials, recipes, orders, upgrades, asteroids, and reports. The MVP MCP server exposes status, order, inventory, settings, and catalog tools while the passive hook loop is developed.",
+    "developerName": "Jared",
+    "category": "Entertainment",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Show my MCP Miner status",
+      "Show my active MCP Miner orders",
+      "Open the MCP Miner dashboard"
+    ],
+    "brandColor": "#2F7D6D"
+  },
+  "mcpServers": "./.mcp.json"
+}

@@ -1,0 +1,2253 @@
+recipes:
+  - id: recipe_hull_patch_clips
+    display_name: Hull Patch Clips
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 20
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_chonks
+        quantity: 18
+      - material_id: mat_element_fe
+        quantity: 6
+      - material_id: mat_element_ni
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_quartz
+      quantity: 1
+  - id: recipe_cable_brackets
+    display_name: Cable Brackets
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 16
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_chonks
+        quantity: 12
+      - material_id: mat_element_c
+        quantity: 4
+      - material_id: mat_element_si
+        quantity: 2
+      - material_id: mat_element_cu
+        quantity: 1
+    collector_accent:
+      material_id: mat_element_al
+      quantity: 1
+  - id: recipe_conduit_saddles
+    display_name: Conduit Saddles
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 16
+    quality_allowed: true
+    primary_material_id: mat_element_al
+    inputs:
+      - material_id: mat_chonks
+        quantity: 14
+      - material_id: mat_element_al
+        quantity: 4
+      - material_id: mat_element_si
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_quartz
+      quantity: 1
+  - id: recipe_panel_spacers
+    display_name: Panel Spacers
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 14
+    quality_allowed: true
+    primary_material_id: mat_element_mg
+    inputs:
+      - material_id: mat_chonks
+        quantity: 10
+      - material_id: mat_element_mg
+        quantity: 3
+      - material_id: mat_element_c
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_si
+      quantity: 1
+  - id: recipe_tool_caddies
+    display_name: Tool Caddies
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 22
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_chonks
+        quantity: 22
+      - material_id: mat_element_fe
+        quantity: 4
+      - material_id: mat_element_c
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_ni
+      quantity: 1
+  - id: recipe_storage_bin_inserts
+    display_name: Storage Bin Inserts
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 18
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_chonks
+        quantity: 16
+      - material_id: mat_element_c
+        quantity: 5
+      - material_id: mat_element_al
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_quartz
+      quantity: 1
+  - id: recipe_helmet_visor_frames
+    display_name: Helmet Visor Frames
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 18
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_chonks
+        quantity: 14
+      - material_id: mat_element_si
+        quantity: 4
+      - material_id: mat_element_al
+        quantity: 3
+    collector_accent:
+      material_id: mat_gem_quartz
+      quantity: 1
+  - id: recipe_airlock_label_plates
+    display_name: Airlock Label Plates
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 10
+    quality_allowed: true
+    primary_material_id: mat_element_al
+    inputs:
+      - material_id: mat_chonks
+        quantity: 8
+      - material_id: mat_element_al
+        quantity: 2
+      - material_id: mat_element_c
+        quantity: 1
+    collector_accent:
+      material_id: mat_element_si
+      quantity: 1
+  - id: recipe_drone_shell_halves
+    display_name: Drone Shell Halves
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 22
+    quality_allowed: true
+    primary_material_id: mat_element_mg
+    inputs:
+      - material_id: mat_chonks
+        quantity: 20
+      - material_id: mat_element_mg
+        quantity: 5
+      - material_id: mat_element_si
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_ni
+      quantity: 1
+  - id: recipe_sensor_mount_blocks
+    display_name: Sensor Mount Blocks
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 15
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_chonks
+        quantity: 12
+      - material_id: mat_element_si
+        quantity: 3
+      - material_id: mat_element_fe
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_quartz
+      quantity: 1
+  - id: recipe_valve_handle_replacements
+    display_name: Valve Handle Replacements
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 20
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_chonks
+        quantity: 18
+      - material_id: mat_element_fe
+        quantity: 5
+      - material_id: mat_element_ni
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_al
+      quantity: 1
+  - id: recipe_filter_cartridge_housings
+    display_name: Filter Cartridge Housings
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 18
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_chonks
+        quantity: 15
+      - material_id: mat_element_c
+        quantity: 6
+      - material_id: mat_element_si
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_ca
+      quantity: 1
+  - id: recipe_battery_cradle_trays
+    display_name: Battery Cradle Trays
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 17
+    quality_allowed: true
+    primary_material_id: mat_element_al
+    inputs:
+      - material_id: mat_chonks
+        quantity: 14
+      - material_id: mat_element_al
+        quantity: 4
+      - material_id: mat_element_na
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_mg
+      quantity: 1
+  - id: recipe_docking_bumper_pads
+    display_name: Docking Bumper Pads
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 24
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_chonks
+        quantity: 24
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_element_ca
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_quartz
+      quantity: 1
+  - id: recipe_pipe_clamp_sets
+    display_name: Pipe Clamp Sets
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 18
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_chonks
+        quantity: 16
+      - material_id: mat_element_fe
+        quantity: 4
+      - material_id: mat_element_ni
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_mg
+      quantity: 1
+  - id: recipe_workbench_organizer_rails
+    display_name: Workbench Organizer Rails
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 19
+    quality_allowed: true
+    primary_material_id: mat_element_al
+    inputs:
+      - material_id: mat_chonks
+        quantity: 18
+      - material_id: mat_element_al
+        quantity: 5
+      - material_id: mat_element_c
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_si
+      quantity: 1
+  - id: recipe_emergency_wedge_kits
+    display_name: Emergency Wedge Kits
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 21
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_chonks
+        quantity: 20
+      - material_id: mat_element_fe
+        quantity: 3
+      - material_id: mat_element_mg
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_quartz
+      quantity: 1
+  - id: recipe_mini_antenna_stands
+    display_name: Mini Antenna Stands
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 15
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_chonks
+        quantity: 10
+      - material_id: mat_element_si
+        quantity: 5
+      - material_id: mat_element_al
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_cu
+      quantity: 1
+  - id: recipe_thermal_tile_holders
+    display_name: Thermal Tile Holders
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 17
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_chonks
+        quantity: 12
+      - material_id: mat_element_c
+        quantity: 4
+      - material_id: mat_element_si
+        quantity: 4
+    collector_accent:
+      material_id: mat_element_ca
+      quantity: 1
+  - id: recipe_bulkhead_corner_caps
+    display_name: Bulkhead Corner Caps
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 24
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_chonks
+        quantity: 22
+      - material_id: mat_element_fe
+        quantity: 6
+      - material_id: mat_element_ni
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_al
+      quantity: 1
+  - id: recipe_sample_tube_racks
+    display_name: Sample Tube Racks
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 14
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_chonks
+        quantity: 10
+      - material_id: mat_element_si
+        quantity: 4
+      - material_id: mat_element_c
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_quartz
+      quantity: 1
+  - id: recipe_handrail_connector_sets
+    display_name: Handrail Connector Sets
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 22
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_chonks
+        quantity: 20
+      - material_id: mat_element_fe
+        quantity: 5
+      - material_id: mat_element_al
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_ni
+      quantity: 1
+  - id: recipe_console_button_bezels
+    display_name: Console Button Bezels
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 12
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_chonks
+        quantity: 8
+      - material_id: mat_element_si
+        quantity: 3
+      - material_id: mat_element_c
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_quartz
+      quantity: 1
+  - id: recipe_chonk_sorter_trays
+    display_name: Chonk Sorter Trays
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 18
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_chonks
+        quantity: 18
+      - material_id: mat_element_c
+        quantity: 4
+      - material_id: mat_element_k
+        quantity: 1
+    collector_accent:
+      material_id: mat_element_si
+      quantity: 1
+  - id: recipe_utility_drawer_dividers
+    display_name: Utility Drawer Dividers
+    machine_id: machine_basic_3d_printer
+    progression_tier: 1
+    output_quantity: 1
+    base_craft_progress: 17
+    quality_allowed: true
+    primary_material_id: mat_element_al
+    inputs:
+      - material_id: mat_chonks
+        quantity: 16
+      - material_id: mat_element_al
+        quantity: 3
+      - material_id: mat_element_c
+        quantity: 4
+    collector_accent:
+      material_id: mat_element_mg
+      quantity: 1
+  - id: recipe_ram_stick_packs
+    display_name: RAM Stick Packs
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 12
+      - material_id: mat_element_cu
+        quantity: 4
+      - material_id: mat_element_sn
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_au
+      quantity: 1
+  - id: recipe_navigation_sensor_boards
+    display_name: Navigation Sensor Boards
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 36
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 10
+      - material_id: mat_element_cu
+        quantity: 5
+      - material_id: mat_gem_quartz
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_oxygen_controller_cards
+    display_name: Oxygen Controller Cards
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 8
+      - material_id: mat_element_cu
+        quantity: 4
+      - material_id: mat_element_li
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_sapphire
+      quantity: 1
+  - id: recipe_drone_logic_cores
+    display_name: Drone Logic Cores
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 40
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 12
+      - material_id: mat_element_cu
+        quantity: 6
+      - material_id: mat_element_co
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_au
+      quantity: 1
+  - id: recipe_scanner_signal_filters
+    display_name: Scanner Signal Filters
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 38
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 10
+      - material_id: mat_element_ge
+        quantity: 2
+      - material_id: mat_gem_quartz
+        quantity: 3
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_airlock_timing_modules
+    display_name: Airlock Timing Modules
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 33
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 8
+      - material_id: mat_element_cu
+        quantity: 4
+      - material_id: mat_element_ag
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_sapphire
+      quantity: 1
+  - id: recipe_refinery_regulator_boards
+    display_name: Refinery Regulator Boards
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 38
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 10
+      - material_id: mat_element_ga
+        quantity: 2
+      - material_id: mat_element_cu
+        quantity: 5
+    collector_accent:
+      material_id: mat_gem_sapphire
+      quantity: 1
+  - id: recipe_fabricator_control_chips
+    display_name: Fabricator Control Chips
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 42
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 12
+      - material_id: mat_element_ge
+        quantity: 3
+      - material_id: mat_element_cu
+        quantity: 4
+    collector_accent:
+      material_id: mat_element_au
+      quantity: 1
+  - id: recipe_suit_hud_flex_ribbons
+    display_name: Suit HUD Flex Ribbons
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 36
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 8
+      - material_id: mat_element_in
+        quantity: 2
+      - material_id: mat_element_ag
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_battery_management_boards
+    display_name: Battery Management Boards
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 36
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 9
+      - material_id: mat_element_li
+        quantity: 4
+      - material_id: mat_element_co
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_ag
+      quantity: 1
+  - id: recipe_thruster_ignition_cards
+    display_name: Thruster Ignition Cards
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 39
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 10
+      - material_id: mat_element_co
+        quantity: 3
+      - material_id: mat_element_cu
+        quantity: 5
+    collector_accent:
+      material_id: mat_gem_sapphire
+      quantity: 1
+  - id: recipe_emergency_beacon_boards
+    display_name: Emergency Beacon Boards
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 35
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 8
+      - material_id: mat_element_cu
+        quantity: 4
+      - material_id: mat_element_ag
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_au
+      quantity: 1
+  - id: recipe_mineral_assay_chips
+    display_name: Mineral Assay Chips
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 37
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 10
+      - material_id: mat_element_ga
+        quantity: 2
+      - material_id: mat_gem_quartz
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_temperature_probe_arrays
+    display_name: Temperature Probe Arrays
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 8
+      - material_id: mat_element_sb
+        quantity: 2
+      - material_id: mat_element_cu
+        quantity: 3
+    collector_accent:
+      material_id: mat_gem_sapphire
+      quantity: 1
+  - id: recipe_vault_keypad_matrices
+    display_name: Vault Keypad Matrices
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 9
+      - material_id: mat_element_cu
+        quantity: 4
+      - material_id: mat_element_al
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_ag
+      quantity: 1
+  - id: recipe_lighting_driver_strips
+    display_name: Lighting Driver Strips
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 33
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 7
+      - material_id: mat_element_cu
+        quantity: 5
+      - material_id: mat_element_ga
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_router_backplane_panels
+    display_name: Router Backplane Panels
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 44
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 12
+      - material_id: mat_element_cu
+        quantity: 8
+      - material_id: mat_element_sn
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_au
+      quantity: 1
+  - id: recipe_autopilot_buffer_cards
+    display_name: Autopilot Buffer Cards
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 45
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 14
+      - material_id: mat_element_ge
+        quantity: 3
+      - material_id: mat_element_li
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_sapphire
+      quantity: 1
+  - id: recipe_ore_sorter_logic_boards
+    display_name: Ore Sorter Logic Boards
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 37
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 10
+      - material_id: mat_element_cu
+        quantity: 5
+      - material_id: mat_gem_quartz
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_solar_charge_controllers
+    display_name: Solar Charge Controllers
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 41
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 12
+      - material_id: mat_element_ag
+        quantity: 3
+      - material_id: mat_element_cu
+        quantity: 5
+    collector_accent:
+      material_id: mat_element_au
+      quantity: 1
+  - id: recipe_shield_phase_timers
+    display_name: Shield Phase Timers
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 39
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 10
+      - material_id: mat_element_co
+        quantity: 2
+      - material_id: mat_element_ge
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_sapphire
+      quantity: 1
+  - id: recipe_docking_lidar_boards
+    display_name: Docking Lidar Boards
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 40
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 11
+      - material_id: mat_element_ga
+        quantity: 3
+      - material_id: mat_gem_quartz
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_vending_machine_brains
+    display_name: Vending Machine Brains
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 32
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 8
+      - material_id: mat_element_cu
+        quantity: 4
+      - material_id: mat_element_sn
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_ag
+      quantity: 1
+  - id: recipe_cargo_scale_circuits
+    display_name: Cargo Scale Circuits
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 9
+      - material_id: mat_element_cu
+        quantity: 5
+      - material_id: mat_element_co
+        quantity: 1
+    collector_accent:
+      material_id: mat_gem_sapphire
+      quantity: 1
+  - id: recipe_signal_cleanup_tiles
+    display_name: Signal Cleanup Tiles
+    machine_id: machine_circuit_loom
+    progression_tier: 2
+    output_quantity: 1
+    base_craft_progress: 36
+    quality_allowed: true
+    primary_material_id: mat_element_si
+    inputs:
+      - material_id: mat_element_si
+        quantity: 10
+      - material_id: mat_element_ge
+        quantity: 2
+      - material_id: mat_element_ag
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_thruster_nozzle_liners
+    display_name: Thruster Nozzle Liners
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 56
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 8
+      - material_id: mat_element_w
+        quantity: 2
+      - material_id: mat_element_ni
+        quantity: 4
+    collector_accent:
+      material_id: mat_element_pt
+      quantity: 1
+  - id: recipe_docking_clamp_jaws
+    display_name: Docking Clamp Jaws
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 48
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_element_fe
+        quantity: 10
+      - material_id: mat_element_ni
+        quantity: 6
+      - material_id: mat_element_cr
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_ti
+      quantity: 1
+  - id: recipe_drill_bit_teeth
+    display_name: Drill Bit Teeth
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 58
+    quality_allowed: true
+    primary_material_id: mat_element_w
+    inputs:
+      - material_id: mat_element_w
+        quantity: 4
+      - material_id: mat_element_co
+        quantity: 4
+      - material_id: mat_element_ti
+        quantity: 5
+    collector_accent:
+      material_id: mat_gem_ruby
+      quantity: 1
+  - id: recipe_pump_impeller_cores
+    display_name: Pump Impeller Cores
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 52
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 6
+      - material_id: mat_element_v
+        quantity: 3
+      - material_id: mat_element_ni
+        quantity: 5
+    collector_accent:
+      material_id: mat_element_pt
+      quantity: 1
+  - id: recipe_pressure_valve_bodies
+    display_name: Pressure Valve Bodies
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 50
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_element_fe
+        quantity: 8
+      - material_id: mat_element_cr
+        quantity: 4
+      - material_id: mat_element_mo
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_ir
+      quantity: 1
+  - id: recipe_reactor_bracket_arms
+    display_name: Reactor Bracket Arms
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 56
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 8
+      - material_id: mat_element_hf
+        quantity: 2
+      - material_id: mat_element_ni
+        quantity: 4
+    collector_accent:
+      material_id: mat_element_pt
+      quantity: 1
+  - id: recipe_gyro_stabilizer_rings
+    display_name: Gyro Stabilizer Rings
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 52
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 6
+      - material_id: mat_element_zr
+        quantity: 3
+      - material_id: mat_element_co
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_ruby
+      quantity: 1
+  - id: recipe_heat_sink_blocks
+    display_name: Heat Sink Blocks
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 44
+    quality_allowed: true
+    primary_material_id: mat_element_al
+    inputs:
+      - material_id: mat_element_al
+        quantity: 6
+      - material_id: mat_element_cu
+        quantity: 4
+      - material_id: mat_element_mo
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_w
+      quantity: 1
+  - id: recipe_landing_skid_shoes
+    display_name: Landing Skid Shoes
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 52
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 8
+      - material_id: mat_element_fe
+        quantity: 8
+      - material_id: mat_element_cr
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_ni
+      quantity: 1
+  - id: recipe_antenna_mast_collars
+    display_name: Antenna Mast Collars
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 45
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 5
+      - material_id: mat_element_al
+        quantity: 5
+      - material_id: mat_element_v
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_ruby
+      quantity: 1
+  - id: recipe_airlock_hinge_pins
+    display_name: Airlock Hinge Pins
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 43
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_element_fe
+        quantity: 8
+      - material_id: mat_element_ni
+        quantity: 4
+      - material_id: mat_element_cr
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_ti
+      quantity: 1
+  - id: recipe_cargo_winch_drums
+    display_name: Cargo Winch Drums
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 48
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_element_fe
+        quantity: 10
+      - material_id: mat_element_mn
+        quantity: 4
+      - material_id: mat_element_ni
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_co
+      quantity: 1
+  - id: recipe_fuel_injector_tips
+    display_name: Fuel Injector Tips
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 55
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 5
+      - material_id: mat_element_ta
+        quantity: 2
+      - material_id: mat_element_co
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_pt
+      quantity: 1
+  - id: recipe_hull_rib_segments
+    display_name: Hull Rib Segments
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 54
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_element_fe
+        quantity: 12
+      - material_id: mat_element_ti
+        quantity: 6
+      - material_id: mat_element_v
+        quantity: 3
+    collector_accent:
+      material_id: mat_gem_ruby
+      quantity: 1
+  - id: recipe_micro_gear_trains
+    display_name: Micro Gear Trains
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 52
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 4
+      - material_id: mat_element_co
+        quantity: 3
+      - material_id: mat_element_mo
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_ir
+      quantity: 1
+  - id: recipe_bolt_head_assortments
+    display_name: Bolt Head Assortments
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 42
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_element_fe
+        quantity: 8
+      - material_id: mat_element_cr
+        quantity: 3
+      - material_id: mat_element_mn
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_ti
+      quantity: 1
+  - id: recipe_bearing_race_sets
+    display_name: Bearing Race Sets
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 50
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 5
+      - material_id: mat_element_co
+        quantity: 4
+      - material_id: mat_element_ni
+        quantity: 4
+    collector_accent:
+      material_id: mat_element_pt
+      quantity: 1
+  - id: recipe_magnetic_coupler_plates
+    display_name: Magnetic Coupler Plates
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 50
+    quality_allowed: true
+    primary_material_id: mat_element_co
+    inputs:
+      - material_id: mat_element_co
+        quantity: 5
+      - material_id: mat_element_ni
+        quantity: 6
+      - material_id: mat_element_fe
+        quantity: 6
+    collector_accent:
+      material_id: mat_gem_ruby
+      quantity: 1
+  - id: recipe_shield_emitter_brackets
+    display_name: Shield Emitter Brackets
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 56
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 6
+      - material_id: mat_element_hf
+        quantity: 2
+      - material_id: mat_element_w
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_ir
+      quantity: 1
+  - id: recipe_refinery_crucible_inserts
+    display_name: Refinery Crucible Inserts
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 58
+    quality_allowed: true
+    primary_material_id: mat_element_w
+    inputs:
+      - material_id: mat_element_w
+        quantity: 5
+      - material_id: mat_element_ta
+        quantity: 2
+      - material_id: mat_element_zr
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_pt
+      quantity: 1
+  - id: recipe_printer_rail_carriages
+    display_name: Printer Rail Carriages
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 48
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 5
+      - material_id: mat_element_cr
+        quantity: 3
+      - material_id: mat_element_ni
+        quantity: 4
+    collector_accent:
+      material_id: mat_gem_ruby
+      quantity: 1
+  - id: recipe_suit_knee_actuators
+    display_name: Suit Knee Actuators
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 52
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 6
+      - material_id: mat_element_co
+        quantity: 3
+      - material_id: mat_element_v
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_ir
+      quantity: 1
+  - id: recipe_drone_rotor_hubs
+    display_name: Drone Rotor Hubs
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 48
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 5
+      - material_id: mat_element_al
+        quantity: 5
+      - material_id: mat_element_co
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_ruby
+      quantity: 1
+  - id: recipe_mining_cart_axles
+    display_name: Mining Cart Axles
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 46
+    quality_allowed: true
+    primary_material_id: mat_element_fe
+    inputs:
+      - material_id: mat_element_fe
+        quantity: 12
+      - material_id: mat_element_mn
+        quantity: 4
+      - material_id: mat_element_ni
+        quantity: 4
+    collector_accent:
+      material_id: mat_element_ti
+      quantity: 1
+  - id: recipe_compressor_pistons
+    display_name: Compressor Pistons
+    machine_id: machine_microforge
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 52
+    quality_allowed: true
+    primary_material_id: mat_element_ti
+    inputs:
+      - material_id: mat_element_ti
+        quantity: 6
+      - material_id: mat_element_mo
+        quantity: 2
+      - material_id: mat_element_cr
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_pt
+      quantity: 1
+  - id: recipe_suit_seal_foam_packs
+    display_name: Suit Seal Foam Packs
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 36
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_cryo_hydrogen_ice
+        quantity: 4
+      - material_id: mat_element_si
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_air_filter_slabs
+    display_name: Air Filter Slabs
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 35
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 10
+      - material_id: mat_cryo_oxygen_ice
+        quantity: 3
+      - material_id: mat_element_ca
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_i
+      quantity: 1
+  - id: recipe_med_gel_pouches
+    display_name: Med-Gel Pouches
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_cryo_hydrogen_ice
+    inputs:
+      - material_id: mat_cryo_hydrogen_ice
+        quantity: 6
+      - material_id: mat_cryo_oxygen_ice
+        quantity: 4
+      - material_id: mat_element_na
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_vibration_dampener_pads
+    display_name: Vibration Dampener Pads
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 36
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_element_s
+        quantity: 2
+      - material_id: mat_element_si
+        quantity: 3
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_thermal_blanket_rolls
+    display_name: Thermal Blanket Rolls
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 36
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 10
+      - material_id: mat_element_mg
+        quantity: 3
+      - material_id: mat_element_si
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_emergency_cushion_blocks
+    display_name: Emergency Cushion Blocks
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 38
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 12
+      - material_id: mat_cryo_nitrogen_ice
+        quantity: 3
+      - material_id: mat_element_ca
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_i
+      quantity: 1
+  - id: recipe_hydroponic_root_mats
+    display_name: Hydroponic Root Mats
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 35
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_element_p
+        quantity: 3
+      - material_id: mat_element_k
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_water_reclaimer_sponges
+    display_name: Water Reclaimer Sponges
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 36
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_cryo_oxygen_ice
+        quantity: 5
+      - material_id: mat_element_na
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_i
+      quantity: 1
+  - id: recipe_impact_absorber_rings
+    display_name: Impact Absorber Rings
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 37
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 10
+      - material_id: mat_element_si
+        quantity: 3
+      - material_id: mat_element_s
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_cable_insulation_sleeves
+    display_name: Cable Insulation Sleeves
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_compound_chlorine_salts
+        quantity: 2
+      - material_id: mat_element_si
+        quantity: 3
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_pressure_bladder_liners
+    display_name: Pressure Bladder Liners
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 37
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 10
+      - material_id: mat_cryo_hydrogen_ice
+        quantity: 4
+      - material_id: mat_cryo_nitrogen_ice
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_i
+      quantity: 1
+  - id: recipe_reactor_noise_mufflers
+    display_name: Reactor Noise Mufflers
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 40
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 12
+      - material_id: mat_element_s
+        quantity: 3
+      - material_id: mat_element_mg
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_helmet_comfort_pads
+    display_name: Helmet Comfort Pads
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 30
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 6
+      - material_id: mat_cryo_hydrogen_ice
+        quantity: 3
+      - material_id: mat_element_ca
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_cold_sleep_neck_rolls
+    display_name: Cold-Sleep Neck Rolls
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 38
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_cryo_nitrogen_ice
+        quantity: 4
+      - material_id: mat_cryo_oxygen_ice
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_i
+      quantity: 1
+  - id: recipe_anti_dust_gaskets
+    display_name: Anti-Dust Gaskets
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_element_si
+        quantity: 3
+      - material_id: mat_element_na
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_soft_grip_tool_wraps
+    display_name: Soft Grip Tool Wraps
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 32
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 7
+      - material_id: mat_cryo_hydrogen_ice
+        quantity: 3
+      - material_id: mat_element_s
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_repair_putty_tubes
+    display_name: Repair Putty Tubes
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_element_si
+        quantity: 2
+      - material_id: mat_element_ca
+        quantity: 3
+    collector_accent:
+      material_id: mat_element_i
+      quantity: 1
+  - id: recipe_firebreak_foam_sheets
+    display_name: Firebreak Foam Sheets
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 38
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 10
+      - material_id: mat_element_p
+        quantity: 3
+      - material_id: mat_element_mg
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_nutrient_bar_blanks
+    display_name: Nutrient Bar Blanks
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 30
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 6
+      - material_id: mat_cryo_nitrogen_ice
+        quantity: 2
+      - material_id: mat_element_k
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_biofoam_packaging_bricks
+    display_name: Biofoam Packaging Bricks
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 38
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 12
+      - material_id: mat_cryo_hydrogen_ice
+        quantity: 4
+      - material_id: mat_element_ca
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_i
+      quantity: 1
+  - id: recipe_sterile_docking_wipes
+    display_name: Sterile Docking Wipes
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 34
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 6
+      - material_id: mat_compound_chlorine_salts
+        quantity: 3
+      - material_id: mat_cryo_oxygen_ice
+        quantity: 3
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_decon_curtain_strips
+    display_name: Decon Curtain Strips
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 36
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 8
+      - material_id: mat_compound_chlorine_salts
+        quantity: 3
+      - material_id: mat_element_si
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_oxygen_mask_cushions
+    display_name: Oxygen Mask Cushions
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 32
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 7
+      - material_id: mat_cryo_oxygen_ice
+        quantity: 4
+      - material_id: mat_element_ca
+        quantity: 2
+    collector_accent:
+      material_id: mat_element_i
+      quantity: 1
+  - id: recipe_habitat_wall_plugs
+    display_name: Habitat Wall Plugs
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 35
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 9
+      - material_id: mat_element_si
+        quantity: 3
+      - material_id: mat_element_mg
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_snaccite
+      quantity: 1
+  - id: recipe_morale_pillow_cores
+    display_name: Morale Pillow Cores
+    machine_id: machine_biofoam_extruder
+    progression_tier: 3
+    output_quantity: 1
+    base_craft_progress: 32
+    quality_allowed: true
+    primary_material_id: mat_element_c
+    inputs:
+      - material_id: mat_element_c
+        quantity: 6
+      - material_id: mat_cryo_hydrogen_ice
+        quantity: 4
+      - material_id: mat_fictional_snaccite
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_nebulite_mood_lamps
+    display_name: Nebulite Mood Lamps
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 90
+    quality_allowed: true
+    primary_material_id: mat_fictional_nebulite
+    inputs:
+      - material_id: mat_fictional_nebulite
+        quantity: 3
+      - material_id: mat_fictional_sparkglass
+        quantity: 4
+      - material_id: mat_element_au
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_diamond
+      quantity: 1
+  - id: recipe_glitchsalt_regulators
+    display_name: Glitchsalt Regulators
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 94
+    quality_allowed: true
+    primary_material_id: mat_fictional_glitchsalt
+    inputs:
+      - material_id: mat_fictional_glitchsalt
+        quantity: 3
+      - material_id: mat_element_ir
+        quantity: 2
+      - material_id: mat_element_si
+        quantity: 4
+    collector_accent:
+      material_id: mat_fictional_aetherium
+      quantity: 1
+  - id: recipe_chatterium_guild_beacons
+    display_name: Chatterium Guild Beacons
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 96
+    quality_allowed: true
+    primary_material_id: mat_fictional_chatterium
+    inputs:
+      - material_id: mat_fictional_chatterium
+        quantity: 4
+      - material_id: mat_element_pt
+        quantity: 2
+      - material_id: mat_fictional_sparkglass
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_diamond
+      quantity: 1
+  - id: recipe_sparkglass_dream_windows
+    display_name: Sparkglass Dream Windows
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 84
+    quality_allowed: true
+    primary_material_id: mat_fictional_sparkglass
+    inputs:
+      - material_id: mat_fictional_sparkglass
+        quantity: 8
+      - material_id: mat_element_ti
+        quantity: 2
+      - material_id: mat_element_au
+        quantity: 1
+    collector_accent:
+      material_id: mat_fictional_nebulite
+      quantity: 1
+  - id: recipe_aetherium_lock_keys
+    display_name: Aetherium Lock Keys
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 110
+    quality_allowed: true
+    primary_material_id: mat_fictional_aetherium
+    inputs:
+      - material_id: mat_fictional_aetherium
+        quantity: 2
+      - material_id: mat_element_ir
+        quantity: 2
+      - material_id: mat_gem_diamond
+        quantity: 1
+    collector_accent:
+      material_id: mat_fictional_glitchsalt
+      quantity: 1
+  - id: recipe_snaccite_flavor_chonks
+    display_name: Snaccite Flavor Chonks
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 74
+    quality_allowed: true
+    primary_material_id: mat_fictional_snaccite
+    inputs:
+      - material_id: mat_fictional_snaccite
+        quantity: 5
+      - material_id: mat_element_c
+        quantity: 4
+      - material_id: mat_fictional_nebulite
+        quantity: 1
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_probability_washers
+    display_name: Probability Washers
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 92
+    quality_allowed: true
+    primary_material_id: mat_fictional_glitchsalt
+    inputs:
+      - material_id: mat_fictional_glitchsalt
+        quantity: 2
+      - material_id: mat_element_ta
+        quantity: 2
+      - material_id: mat_element_pt
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_aetherium
+      quantity: 1
+  - id: recipe_quantum_cup_holders
+    display_name: Quantum Cup Holders
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 88
+    quality_allowed: true
+    primary_material_id: mat_fictional_chatterium
+    inputs:
+      - material_id: mat_fictional_chatterium
+        quantity: 3
+      - material_id: mat_element_hf
+        quantity: 2
+      - material_id: mat_fictional_sparkglass
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_nebulite
+      quantity: 1
+  - id: recipe_anti_boredom_coils
+    display_name: Anti-Boredom Coils
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 86
+    quality_allowed: true
+    primary_material_id: mat_fictional_chatterium
+    inputs:
+      - material_id: mat_fictional_chatterium
+        quantity: 4
+      - material_id: mat_element_cu
+        quantity: 4
+      - material_id: mat_fictional_nebulite
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_diamond
+      quantity: 1
+  - id: recipe_whisperproof_door_plates
+    display_name: Whisperproof Door Plates
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 89
+    quality_allowed: true
+    primary_material_id: mat_fictional_sparkglass
+    inputs:
+      - material_id: mat_fictional_sparkglass
+        quantity: 5
+      - material_id: mat_element_os
+        quantity: 1
+      - material_id: mat_fictional_chatterium
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_glitchsalt
+      quantity: 1
+  - id: recipe_impossible_screw_sets
+    display_name: Impossible Screw Sets
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 95
+    quality_allowed: true
+    primary_material_id: mat_fictional_glitchsalt
+    inputs:
+      - material_id: mat_fictional_glitchsalt
+        quantity: 2
+      - material_id: mat_element_w
+        quantity: 3
+      - material_id: mat_element_ir
+        quantity: 1
+    collector_accent:
+      material_id: mat_fictional_aetherium
+      quantity: 1
+  - id: recipe_pocket_gravity_anchors
+    display_name: Pocket Gravity Anchors
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 108
+    quality_allowed: true
+    primary_material_id: mat_fictional_aetherium
+    inputs:
+      - material_id: mat_fictional_aetherium
+        quantity: 1
+      - material_id: mat_element_w
+        quantity: 3
+      - material_id: mat_element_re
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_diamond
+      quantity: 1
+  - id: recipe_time_safe_lunch_seals
+    display_name: Time-Safe Lunch Seals
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 84
+    quality_allowed: true
+    primary_material_id: mat_fictional_snaccite
+    inputs:
+      - material_id: mat_fictional_snaccite
+        quantity: 3
+      - material_id: mat_element_hf
+        quantity: 2
+      - material_id: mat_fictional_nebulite
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_glitchsalt
+      quantity: 1
+  - id: recipe_vibe_calibrated_antennas
+    display_name: Vibe-Calibrated Antennas
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 88
+    quality_allowed: true
+    primary_material_id: mat_fictional_chatterium
+    inputs:
+      - material_id: mat_fictional_chatterium
+        quantity: 4
+      - material_id: mat_element_au
+        quantity: 2
+      - material_id: mat_fictional_sparkglass
+        quantity: 3
+    collector_accent:
+      material_id: mat_gem_diamond
+      quantity: 1
+  - id: recipe_cosmic_receipt_printers
+    display_name: Cosmic Receipt Printers
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 86
+    quality_allowed: true
+    primary_material_id: mat_fictional_glitchsalt
+    inputs:
+      - material_id: mat_fictional_glitchsalt
+        quantity: 2
+      - material_id: mat_element_si
+        quantity: 6
+      - material_id: mat_element_pt
+        quantity: 1
+    collector_accent:
+      material_id: mat_fictional_nebulite
+      quantity: 1
+  - id: recipe_memory_fog_condensers
+    display_name: Memory Fog Condensers
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 96
+    quality_allowed: true
+    primary_material_id: mat_fictional_nebulite
+    inputs:
+      - material_id: mat_fictional_nebulite
+        quantity: 4
+      - material_id: mat_element_os
+        quantity: 1
+      - material_id: mat_fictional_chatterium
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_aetherium
+      quantity: 1
+  - id: recipe_phase_shift_name_badges
+    display_name: Phase-Shift Name Badges
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 88
+    quality_allowed: true
+    primary_material_id: mat_fictional_sparkglass
+    inputs:
+      - material_id: mat_fictional_sparkglass
+        quantity: 4
+      - material_id: mat_element_ir
+        quantity: 1
+      - material_id: mat_fictional_glitchsalt
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_diamond
+      quantity: 1
+  - id: recipe_luck_compliant_bolts
+    display_name: Luck-Compliant Bolts
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 92
+    quality_allowed: true
+    primary_material_id: mat_fictional_glitchsalt
+    inputs:
+      - material_id: mat_fictional_glitchsalt
+        quantity: 3
+      - material_id: mat_element_ta
+        quantity: 2
+      - material_id: mat_element_w
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_aetherium
+      quantity: 1
+  - id: recipe_mood_stabilizer_discs
+    display_name: Mood Stabilizer Discs
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 82
+    quality_allowed: true
+    primary_material_id: mat_fictional_nebulite
+    inputs:
+      - material_id: mat_fictional_nebulite
+        quantity: 3
+      - material_id: mat_fictional_snaccite
+        quantity: 3
+      - material_id: mat_element_au
+        quantity: 1
+    collector_accent:
+      material_id: mat_fictional_sparkglass
+      quantity: 1
+  - id: recipe_stardust_complaint_filters
+    display_name: Stardust Complaint Filters
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 90
+    quality_allowed: true
+    primary_material_id: mat_fictional_sparkglass
+    inputs:
+      - material_id: mat_fictional_sparkglass
+        quantity: 4
+      - material_id: mat_element_u
+        quantity: 1
+      - material_id: mat_fictional_chatterium
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_glitchsalt
+      quantity: 1
+  - id: recipe_joke_powered_switches
+    display_name: Joke-Powered Switches
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 80
+    quality_allowed: true
+    primary_material_id: mat_fictional_chatterium
+    inputs:
+      - material_id: mat_fictional_chatterium
+        quantity: 3
+      - material_id: mat_element_cu
+        quantity: 3
+      - material_id: mat_fictional_snaccite
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_nebulite
+      quantity: 1
+  - id: recipe_reality_alignment_shims
+    display_name: Reality Alignment Shims
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 108
+    quality_allowed: true
+    primary_material_id: mat_fictional_aetherium
+    inputs:
+      - material_id: mat_fictional_aetherium
+        quantity: 1
+      - material_id: mat_element_ir
+        quantity: 2
+      - material_id: mat_fictional_glitchsalt
+        quantity: 3
+    collector_accent:
+      material_id: mat_gem_diamond
+      quantity: 1
+  - id: recipe_bureaucracy_deflectors
+    display_name: Bureaucracy Deflectors
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 98
+    quality_allowed: true
+    primary_material_id: mat_fictional_chatterium
+    inputs:
+      - material_id: mat_fictional_chatterium
+        quantity: 4
+      - material_id: mat_element_pt
+        quantity: 2
+      - material_id: mat_fictional_nebulite
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_aetherium
+      quantity: 1
+  - id: recipe_apology_amplifier_plates
+    display_name: Apology Amplifier Plates
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 88
+    quality_allowed: true
+    primary_material_id: mat_fictional_sparkglass
+    inputs:
+      - material_id: mat_fictional_sparkglass
+        quantity: 5
+      - material_id: mat_element_au
+        quantity: 2
+      - material_id: mat_fictional_chatterium
+        quantity: 2
+    collector_accent:
+      material_id: mat_gem_diamond
+      quantity: 1
+  - id: recipe_suspiciously_normal_chonks
+    display_name: Suspiciously Normal Chonks
+    machine_id: machine_weird_matter_press
+    progression_tier: 5
+    output_quantity: 1
+    base_craft_progress: 100
+    quality_allowed: true
+    primary_material_id: mat_fictional_aetherium
+    inputs:
+      - material_id: mat_chonks
+        quantity: 50
+      - material_id: mat_fictional_aetherium
+        quantity: 1
+      - material_id: mat_fictional_glitchsalt
+        quantity: 2
+    collector_accent:
+      material_id: mat_fictional_nebulite
+      quantity: 1

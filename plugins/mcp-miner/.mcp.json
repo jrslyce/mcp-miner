@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mcp-miner": {
+      "command": "ruby",
+      "args": [
+        "./scripts/mcp_server.rb"
+      ],
+      "cwd": "."
+    }
+  }
+}

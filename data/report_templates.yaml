@@ -1,0 +1,12 @@
+report_templates:
+  compact:
+    - "MCP Miner: +{chonks} Chonks, {highlight}, suit {suit_condition}%, {order_summary}."
+    - "MCP Miner: +{chonks} Chonks, {material_summary}, {order_summary}."
+  full:
+    - "MCP Miner Expedition Report\nMined: {chonks} Chonks\nFound: {material_summary}\nSuit: {suit_condition}%\nOrder: {order_summary}\nAsteroid: {asteroid_name}"
+  no_progress:
+    - "MCP Miner: systems humming. No new Chonks this turn."
+  order_progress:
+    - "MCP Miner: +{chonks} Chonks, order +{order_percent}%, {time_remaining} left."
+  milestone:
+    - "MCP Miner milestone: {milestone_summary}. Space Bucks balance: {space_bucks}."

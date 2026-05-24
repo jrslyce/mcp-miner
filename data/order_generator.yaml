@@ -1,0 +1,54 @@
+order_generation:
+  active_order_slots: 3
+  refresh_cadence_hours: 24
+  manual_accept: true
+  missed_order_penalty: lost_opportunity_only
+  direct_market_sales_enabled: true
+  quantity_by_tier:
+    1:
+      min: 1
+      max: 3
+    2:
+      min: 1
+      max: 4
+    3:
+      min: 1
+      max: 5
+    4:
+      min: 1
+      max: 6
+    5:
+      min: 1
+      max: 8
+  deadline_days_by_tier:
+    1:
+      min: 1
+      max: 4
+    2:
+      min: 2
+      max: 5
+    3:
+      min: 2
+      max: 7
+    4:
+      min: 3
+      max: 9
+    5:
+      min: 3
+      max: 10
+  windfall:
+    chance: 0.10
+    min_multiplier: 2.25
+    max_multiplier: 4.00
+  normal_price_variation:
+    distribution: triangular
+    min: 0.85
+    mode: 1.00
+    max: 1.18
+  windfall_labels:
+    - Hot Buyer
+    - Panic Budget
+    - Collector Overpay
+    - No Questions Asked
+    - Executive Shortcut
+    - The Invoice Is Already Approved

@@ -1,0 +1,22 @@
+player_start:
+  space_bucks: 0
+  inventory:
+    mat_chonks: 0
+    mat_scrap: 0
+  unlocked_machine_ids:
+    - machine_basic_3d_printer
+  unlocked_asteroid_class_ids:
+    - asteroid_starter_rubble
+  current_asteroid_class_id: asteroid_starter_rubble
+  upgrades:
+    upgrade_drill_power: 0
+    upgrade_scanner_range: 0
+    upgrade_scanner_precision: 0
+    upgrade_suit_plating: 0
+    upgrade_refinery_purity: 0
+    upgrade_fabricator_throughput: 0
+    upgrade_vault_storage: 0
+    upgrade_drone_automation: 0
+  base_modules:
+    base_command_center: 1
+  report_mode: meaningful_turns_only
