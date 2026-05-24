@@ -209,6 +209,10 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
   assert("project stats should aggregate anonymous per-project activity") do
     state(state_path)["project_stats"].length >= 2
   end
+  assert("state should not persist raw prompts or project paths") do
+    serialized_state = JSON.generate(state(state_path))
+    !serialized_state.include?("please implement the thing") && !serialized_state.include?(ROOT)
+  end
 
   concurrent_ids = Array.new(12) { |index| "tool-concurrent-#{index}" }
   concurrent_ids.map do |tool_id|
@@ -235,13 +239,19 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
   assert("MCP server did not expose hook latest_report") do
     latest_payload["report"] == concurrent_state.dig("latest_report", "text")
   end
+  assert("MCP latest report should identify hook state as source") do
+    latest_payload["source"] == "local_hook_state"
+  end
   assert("MCP status should expose player stats") do
     status_payload.dig("stats", "work_events", "work_apply_patch").to_i >= concurrent_ids.length
+  end
+  assert("MCP status should use the same hook-produced latest report") do
+    status_payload["latest_report"] == concurrent_state.dig("latest_report", "text")
   end
 
   puts JSON.pretty_generate({
     ok: true,
-    checks: 14,
+    checks: 19,
     chonks: concurrent_state.dig("inventory", "mat_chonks"),
     suit_condition: concurrent_state["suit_condition"],
     projects_seen: concurrent_state["project_stats"].length,
