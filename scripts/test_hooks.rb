@@ -5,14 +5,18 @@ require "fileutils"
 require "json"
 require "open3"
 require "tmpdir"
+require_relative "../plugins/mcp-miner/lib/mcp_miner/game_engine"
 
 ROOT = File.expand_path("..", __dir__)
 PLUGIN_ROOT = File.join(ROOT, "plugins", "mcp-miner")
 HOOK = File.join(PLUGIN_ROOT, "hooks", "mcp_miner_hook.rb")
 MCP_SERVER = File.join(PLUGIN_ROOT, "scripts", "mcp_server.rb")
+$checks = 0
 
 def assert(message)
   raise message unless yield
+
+  $checks += 1
 end
 
 def run_hook(mode, payload, state_path)
@@ -39,6 +43,14 @@ end
 
 def state(state_path)
   JSON.parse(File.read(state_path))
+end
+
+def journal_path(state_path)
+  File.join(File.dirname(state_path), "journal.jsonl")
+end
+
+def journal_entries(state_path)
+  File.readlines(journal_path(state_path), chomp: true).reject(&:empty?).map { |line| JSON.parse(line) }
 end
 
 def user_prompt(turn_id, state_path, cwd: ROOT)
@@ -146,6 +158,42 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     after_work.dig("latest_report", "text").to_s.start_with?("MCP Miner:")
   end
 
+  entries_after_work = journal_entries(state_path)
+  reward_entries_after_work = entries_after_work.select { |entry| entry["event_type"].to_s.start_with?("work_") }
+  patch_entries_after_work = reward_entries_after_work.select { |entry| entry["event_type"] == "work_apply_patch" }
+  assert("journal should track applied event metadata") do
+    File.exist?(journal_path(state_path)) &&
+      after_work.dig("journal", "applied_event_count") == entries_after_work.length &&
+      after_work.dig("journal", "last_event_id") == entries_after_work.last["event_id"]
+  end
+  assert("duplicate PostToolUse should append only one reward event") do
+    patch_entries_after_work.length == 1
+  end
+  assert("journal reward events should use the privacy-safe abstract shape") do
+    reward_entries_after_work.all? do |entry|
+      entry["event_id"].to_s.start_with?("evt_") &&
+        entry["event_type"].to_s.start_with?("work_") &&
+        !entry["timestamp"].to_s.empty? &&
+        !entry["turn_id"].to_s.empty? &&
+        entry["privacy_class"] == "abstract" &&
+        entry["score"].is_a?(Numeric) &&
+        entry["rewards"].is_a?(Hash) &&
+        !entry.key?("journal_type") &&
+        !entry.key?("source") &&
+        !entry.key?("dedupe_key") &&
+        !entry.key?("cwd") &&
+        !entry.key?("prompt") &&
+        !entry.key?("command")
+    end
+  end
+  assert("journal should not persist raw prompts, commands, project paths, or patch paths") do
+    serialized_journal = File.read(journal_path(state_path))
+    !serialized_journal.include?("please implement the thing") &&
+      !serialized_journal.include?("rg -n MCP Miner") &&
+      !serialized_journal.include?("example.rb") &&
+      !serialized_journal.include?(ROOT)
+  end
+
   stats_before_self_mcp = after_work.dig("stats", "tool_events_seen")
   post_tool("turn-self-mcp", state_path,
             tool_name: "mcp__mcp-miner__get_player_status",
@@ -228,6 +276,17 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
   assert("concurrent writes should keep every unique tool event") do
     concurrent_state.dig("current_turn", "events", "work_apply_patch") == concurrent_ids.length
   end
+  replayed_state = McpMiner::GameEngine.new(root: ROOT, state_path: state_path).replay_journal_state(journal_entries(state_path))
+  assert("journal replay should rebuild mined Chonks") do
+    replayed_state.dig("inventory", "mat_chonks") == concurrent_state.dig("inventory", "mat_chonks")
+  end
+  assert("journal replay should rebuild current turn work events") do
+    replayed_state.dig("current_turn", "events", "work_apply_patch") == concurrent_ids.length
+  end
+  assert("journal replay should rebuild supported aggregate stats") do
+    replayed_state.dig("stats", "tool_events_seen") == concurrent_state.dig("stats", "tool_events_seen") &&
+      replayed_state.dig("stats", "chonks_mined_total") == concurrent_state.dig("stats", "chonks_mined_total")
+  end
 
   latest_response = run_mcp(state_path, [
     { jsonrpc: "2.0", id: 5, method: "initialize", params: {} },
@@ -249,9 +308,98 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     status_payload["latest_report"] == concurrent_state.dig("latest_report", "text")
   end
 
+  File.write(state_path, "{not-json")
+  recovered_state = McpMiner::GameEngine.new(root: ROOT, state_path: state_path).state
+  assert("corrupt state should be backed up") do
+    Dir.glob("#{state_path}.corrupt-*").any?
+  end
+  assert("corrupt state should recover from journal replay") do
+    recovered_state.dig("inventory", "mat_chonks") == replayed_state.dig("inventory", "mat_chonks") &&
+      recovered_state.dig("current_turn", "events", "work_apply_patch") == concurrent_ids.length
+  end
+
+  Dir.mktmpdir("mcp-miner-stale-state") do |stale_dir|
+    stale_state_path = File.join(stale_dir, "state.json")
+    user_prompt("turn-stale", stale_state_path)
+    post_tool("turn-stale", stale_state_path,
+              tool_name: "apply_patch",
+              tool_use_id: "tool-stale",
+              command: patch_command(path: "stale.rb"),
+              response: { "status" => "success" })
+    latest_state = state(stale_state_path)
+    stale_state = latest_state.dup
+    stale_state["inventory"] = latest_state["inventory"].merge("mat_chonks" => 0)
+    stale_state["stats"] = latest_state["stats"].merge(
+      "tool_events_seen" => 0,
+      "work_score_total" => 0.0,
+      "chonks_mined_total" => 0,
+      "materials_found_total" => 0,
+      "work_events" => {}
+    )
+    stale_state["dedupe_keys"] = []
+    stale_state["current_turn"] = nil
+    stale_state["asteroid_progress"] = latest_state["asteroid_progress"].merge("mined" => 0)
+    stale_state["journal"] = latest_state["journal"].merge("applied_event_count" => 0, "last_event_id" => nil)
+    File.write(stale_state_path, JSON.pretty_generate(stale_state))
+
+    caught_up_state = McpMiner::GameEngine.new(root: ROOT, state_path: stale_state_path).state
+    assert("pending journal entries should replay after a stale state write") do
+      caught_up_state.dig("inventory", "mat_chonks") == latest_state.dig("inventory", "mat_chonks") &&
+        caught_up_state.dig("current_turn", "events", "work_apply_patch") == 1
+    end
+  end
+
+  Dir.mktmpdir("mcp-miner-legacy-state") do |legacy_dir|
+    legacy_state_path = File.join(legacy_dir, "state.json")
+    legacy_engine = McpMiner::GameEngine.new(root: ROOT, state_path: legacy_state_path)
+    legacy_state = legacy_engine.initial_state
+    legacy_state.delete("journal")
+    legacy_state["inventory"]["mat_chonks"] = 42
+    legacy_state["dedupe_keys"] = ["legacy-turn:PostToolUse:work_search:tool_legacy"]
+    File.write(legacy_state_path, JSON.pretty_generate(legacy_state))
+
+    migrated_state = McpMiner::GameEngine.new(root: ROOT, state_path: legacy_state_path).state
+    migrated_entries = journal_entries(legacy_state_path)
+    assert("legacy state should migrate to an abstract journal snapshot on first load") do
+      migrated_state.dig("inventory", "mat_chonks") == 42 &&
+        migrated_state.dig("journal", "applied_event_count") == 1 &&
+        migrated_entries.first["event_type"] == "state_snapshot"
+    end
+    assert("legacy migration snapshot should preserve supported abstract fields") do
+      migrated_entries.first.dig("state", "inventory", "mat_chonks") == 42 &&
+        migrated_entries.first.dig("state", "dedupe_keys").include?("legacy-turn:PostToolUse:work_search:tool_legacy")
+    end
+  end
+
+  Dir.mktmpdir("mcp-miner-corrupt-journal") do |journal_dir|
+    corrupt_state_path = File.join(journal_dir, "state.json")
+    user_prompt("turn-journal", corrupt_state_path)
+    post_tool("turn-journal", corrupt_state_path,
+              tool_name: "apply_patch",
+              tool_use_id: "tool-journal",
+              command: patch_command(path: "journal.rb"),
+              response: { "status" => "success" })
+    state_before_corruption = state(corrupt_state_path)
+    File.write(journal_path(corrupt_state_path), "{not-json")
+
+    recovered_from_corrupt_journal = McpMiner::GameEngine.new(root: ROOT, state_path: corrupt_state_path).state
+    new_journal_entries = journal_entries(corrupt_state_path)
+    assert("corrupt journal should be backed up") do
+      Dir.glob("#{journal_path(corrupt_state_path)}.corrupt-*").any?
+    end
+    assert("corrupt journal should preserve materialized state with an abstract migration snapshot") do
+      recovered_from_corrupt_journal.dig("inventory", "mat_chonks") == state_before_corruption.dig("inventory", "mat_chonks") &&
+        new_journal_entries.first["event_type"] == "state_snapshot" &&
+        new_journal_entries.first["privacy_class"] == "abstract"
+    end
+    assert("migration snapshots should not write local file paths into the journal") do
+      !JSON.generate(new_journal_entries.first).include?(corrupt_state_path)
+    end
+  end
+
   puts JSON.pretty_generate({
     ok: true,
-    checks: 19,
+    checks: $checks,
     chonks: concurrent_state.dig("inventory", "mat_chonks"),
     suit_condition: concurrent_state["suit_condition"],
     projects_seen: concurrent_state["project_stats"].length,

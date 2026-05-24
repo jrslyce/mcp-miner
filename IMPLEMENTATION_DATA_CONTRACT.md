@@ -716,7 +716,7 @@ Representative shape:
       "last_seen_at": "2026-05-24T00:00:00Z"
     }
   },
-  "dedupe_keys": ["turn_def:PostToolUse:work_search:tool_123"],
+  "dedupe_keys": ["evt_123"],
   "current_turn": {
     "turn_id": "turn_def",
     "score": 3.0,
@@ -734,6 +734,11 @@ Representative shape:
     "text": "MCP Miner: +4 Chonks, scanner swept fresh veins, suit 100%, orders waiting.",
     "turn_id": "turn_def",
     "created_at": "2026-05-24T00:00:00Z"
+  },
+  "journal": {
+    "path": "~/.mcp-miner/journal.jsonl",
+    "applied_event_count": 1,
+    "last_event_id": "evt_123"
   },
   "last_session_id": "session_abc",
   "last_seen_at": "2026-05-24T00:00:00Z",
@@ -754,7 +759,8 @@ Required runtime validation and normalization:
 - `current_turn` is either `null` or the active turn ledger with `turn_id`, `score`, `chonks`,
   `materials`, `events`, `report_emitted`, and `started_at`.
 - `latest_report` is either `null` or an object with report `text`, `turn_id`, and `created_at`.
-- `dedupe_keys` contains recent hook-event dedupe strings and is capped to the newest 300 entries.
+- `dedupe_keys` contains recent reward `event_id` values, plus legacy hook-event dedupe strings when
+  migrating older state, and is capped to the newest 300 entries.
 - `asteroid_progress` contains the selected `asteroid_class_id` and mined counter.
 - `suit_condition` is an integer condition percentage, defaulting to 100.
 - `report_mode` is one of `off`, `every_turn_compact`, `every_turn_full`,
@@ -762,11 +768,58 @@ Required runtime validation and normalization:
 - No prompt text, assistant reply text, source code, terminal output, file path, repo name, browser
   content, app content, or raw transcript is stored by default.
 
+### Local Event Journal
+
+The local hook writes an append-only journal next to the materialized state file:
+`~/.mcp-miner/journal.jsonl` by default, or `MCP_MINER_JOURNAL_PATH` when overridden. Each line is a
+single JSON object. `state.json` remains the fast materialized view, while the journal is the replay
+source for supported reward fields.
+
+Reward events are appended before state reduction:
+
+```json
+{
+  "event_id": "evt_123",
+  "event_type": "work_apply_patch",
+  "timestamp": "2026-05-24T00:00:00Z",
+  "session_id": "session_abc",
+  "turn_id": "turn_def",
+  "privacy_class": "abstract",
+  "score": 8.5,
+  "rewards": {
+    "chonks": 10,
+    "materials": {
+      "mat_element_fe": 1
+    },
+    "asteroid_class_id": "asteroid_carbonyard",
+    "asteroid_mined_delta": 11,
+    "suit_damage": 0
+  },
+  "project_id": "project_abc123",
+  "agent_id": "agent_def456"
+}
+```
+
+Migration-only `state_snapshot` entries may be written when a pre-journal `state.json` is first
+loaded or a corrupt journal is backed up. Snapshots contain only the privacy-safe materialized state
+fields listed above and omit the local journal path.
+
+Required runtime behavior:
+
+- Reducers ignore duplicate reward events using deterministic `event_id` values.
+- Supported reward fields can be rebuilt from journal replay: inventory rewards, suit damage,
+  asteroid progress, current turn reward ledger, work-event counters, and anonymous project or agent
+  activity attached to reward events.
+- Corrupt `state.json` and `journal.jsonl` files are moved to `.corrupt-*` backups. If the journal is
+  readable, state is rebuilt from replay; if the state is readable and the journal is corrupt, a new
+  abstract migration snapshot is written.
+- Journal entries must not include prompts, assistant replies, source code, terminal output, file
+  paths, repository names, browser content, app content, or raw transcripts.
+
 ### Work Event
 
-This is the privacy-safe event shape future append-only journals and cloud sync should use. The
-current MVP materializes equivalent abstract event data into `stats`, `project_stats`, and
-`current_turn`.
+This is the privacy-safe event shape cloud sync should use. The current local journal stores the same
+abstract event fields plus deterministic reward deltas.
 
 ```json
 {

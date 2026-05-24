@@ -10,6 +10,7 @@ module McpMiner
   class GameEngine
     STATE_DIR = File.join(Dir.home, ".mcp-miner")
     DEFAULT_STATE_PATH = File.join(STATE_DIR, "state.json")
+    DEFAULT_JOURNAL_FILENAME = "journal.jsonl"
     MAX_DEDUPE_KEYS = 300
     REPORT_PREFIX = "MCP Miner:"
     MEANINGFUL_SCORE = 3.0
@@ -37,7 +38,7 @@ module McpMiner
       work_scoring: ["work_scoring.yaml", "work_events"]
     }.freeze
 
-    attr_reader :root, :state_path
+    attr_reader :root, :state_path, :journal_path
 
     def self.locate_repo_root(candidates = [])
       all_candidates = [
@@ -54,27 +55,31 @@ module McpMiner
       root
     end
 
-    def initialize(root: self.class.locate_repo_root, state_path: ENV["MCP_MINER_STATE_PATH"])
+    def initialize(root: self.class.locate_repo_root, state_path: ENV["MCP_MINER_STATE_PATH"], journal_path: ENV["MCP_MINER_JOURNAL_PATH"])
       @root = root
       @data_dir = File.join(root, "data")
       @state_path = state_path || DEFAULT_STATE_PATH
+      @journal_path = journal_path || File.join(File.dirname(@state_path), DEFAULT_JOURNAL_FILENAME)
       @data = load_data
       FileUtils.mkdir_p(File.dirname(@state_path))
+      FileUtils.mkdir_p(File.dirname(@journal_path))
     end
 
     def state
-      current_state = read_state
-      normalize_state(current_state)
-      current_state
+      FileUtils.mkdir_p(File.dirname(state_path))
+      File.open("#{state_path}.lock", "w") do |lock|
+        lock.flock(File::LOCK_EX)
+        load_materialized_state
+      end
     end
 
     def with_state
       FileUtils.mkdir_p(File.dirname(state_path))
       File.open("#{state_path}.lock", "w") do |lock|
         lock.flock(File::LOCK_EX)
-        current_state = read_state
-        normalize_state(current_state)
+        current_state = load_materialized_state
         result = yield current_state
+        sync_journal_metadata(current_state)
         atomic_write_state(current_state)
         result
       end
@@ -85,9 +90,17 @@ module McpMiner
       File.open("#{state_path}.lock", "w") do |lock|
         lock.flock(File::LOCK_EX)
         normalize_state(next_state)
+        sync_journal_metadata(next_state)
         atomic_write_state(next_state)
       end
       next_state
+    end
+
+    def replay_journal_state(entries = read_journal_entries)
+      current_state = initial_state
+      entries.each { |entry| apply_journal_entry(current_state, entry) }
+      sync_journal_metadata(current_state, entries)
+      current_state
     end
 
     def initial_state
@@ -114,6 +127,11 @@ module McpMiner
         "dedupe_keys" => [],
         "current_turn" => nil,
         "latest_report" => nil,
+        "journal" => {
+          "path" => journal_path,
+          "applied_event_count" => 0,
+          "last_event_id" => nil
+        },
         "created_at" => Time.now.utc.iso8601
       }
     end
@@ -141,6 +159,7 @@ module McpMiner
       state["dedupe_keys"] ||= []
       state["current_turn"] = nil unless state["current_turn"].is_a?(Hash)
       state["orders"] ||= []
+      state["journal"] = default_journal_metadata.merge(state["journal"] || {})
       state
     end
 
@@ -172,29 +191,27 @@ module McpMiner
       }
     end
 
-    def add_event_reward(state, event_id, turn_id:, hook_event_name:, line_count:, event_key_suffix:)
+    def add_event_reward(state, event_id, turn_id:, hook_event_name:, line_count:, event_key_suffix:, session_id: nil, project_id: nil, agent_id: nil)
       event_key = [turn_id, hook_event_name, event_id, event_key_suffix].join(":")
-      return if state["dedupe_keys"].include?(event_key)
-
-      state["dedupe_keys"] << event_key
-      state["dedupe_keys"] = state["dedupe_keys"].last(MAX_DEDUPE_KEYS)
+      journal_event_id = reward_journal_event_id(event_key)
+      return if state["dedupe_keys"].include?(event_key) || state["dedupe_keys"].include?(journal_event_id)
 
       score = event_score(event_id, line_count)
       return if score <= 0
 
-      reward = mine_reward(state, event_id, score, turn_id: turn_id)
-      turn = state["current_turn"]
-      turn["score"] = turn["score"].to_f + score
-      turn["chonks"] = turn["chonks"].to_i + reward[:chonks]
-      turn["events"][event_id] = turn["events"][event_id].to_i + 1
-      reward[:materials].each do |material_id, quantity|
-        turn["materials"][material_id] = turn["materials"][material_id].to_i + quantity
-      end
-
-      add_stat_event(state, event_id, score)
-      state["stats"]["chonks_mined_total"] = state["stats"]["chonks_mined_total"].to_i + reward[:chonks]
-      state["stats"]["materials_found_total"] = state["stats"]["materials_found_total"].to_i + reward[:materials].values.sum
-      state["stats"]["tool_events_seen"] = state["stats"]["tool_events_seen"].to_i + 1 unless event_id == "work_user_prompt"
+      reward = calculate_reward(state, event_id, score, turn_id: turn_id)
+      journal_entry = reward_journal_entry(
+        journal_event_id,
+        event_id,
+        score,
+        reward,
+        turn_id: turn_id,
+        session_id: session_id,
+        project_id: project_id,
+        agent_id: agent_id
+      )
+      append_journal_entry(journal_entry)
+      apply_journal_entry(state, journal_entry)
     end
 
     def add_stat_event(state, event_id, score)
@@ -247,23 +264,20 @@ module McpMiner
       score.round(2)
     end
 
-    def mine_reward(state, event_id, score, turn_id:)
+    def calculate_reward(state, event_id, score, turn_id:)
       asteroid = asteroid_for(state)
       multiplier = asteroid["yield_multiplier"].to_f * drill_multiplier(state)
       chonks = [(score * 1.25 * multiplier).floor, 1].max
       materials = weighted_materials(state, asteroid, score, turn_id: turn_id)
+      suit_damage = hazard_damage(event_id, asteroid, state)
 
-      inventory = state["inventory"]
-      inventory["mat_chonks"] = inventory["mat_chonks"].to_i + chonks
-      materials.each do |material_id, quantity|
-        inventory[material_id] = inventory[material_id].to_i + quantity
-      end
-
-      state["asteroid_progress"]["asteroid_class_id"] = asteroid["id"]
-      state["asteroid_progress"]["mined"] = state["asteroid_progress"]["mined"].to_i + chonks + materials.values.sum
-      state["suit_condition"] = [state["suit_condition"].to_i - hazard_damage(event_id, asteroid, state), 0].max
-
-      { chonks: chonks, materials: materials }
+      {
+        chonks: chonks,
+        materials: materials,
+        asteroid_class_id: asteroid["id"],
+        asteroid_mined_delta: chonks + materials.values.sum,
+        suit_damage: suit_damage
+      }
     end
 
     def weighted_materials(state, asteroid, score, turn_id:)
@@ -526,17 +540,287 @@ module McpMiner
       end
     end
 
-    def read_state
-      return initial_state unless File.exist?(state_path)
+    def load_materialized_state
+      state_payload, state_existed, state_was_corrupt = read_state_file
+      had_journal_metadata = state_payload.is_a?(Hash) && state_payload["journal"].is_a?(Hash)
+      current_state = state_payload ? normalize_state(state_payload) : initial_state
+      entries = read_journal_entries
+      materialized_changed = state_was_corrupt || (state_existed && !had_journal_metadata)
 
-      JSON.parse(File.read(state_path))
-    rescue JSON::ParserError
-      initial_state
+      if state_existed && entries.empty? && (!had_journal_metadata || !File.exist?(journal_path))
+        snapshot = migration_snapshot_entry(current_state)
+        append_journal_entry(snapshot)
+        entries = [snapshot]
+        materialized_changed = true
+      end
+
+      if !state_existed
+        if entries.any?
+          current_state = replay_journal_state(entries)
+          materialized_changed = true
+        end
+      elsif entries.any? && had_journal_metadata
+        applied_count = current_state.dig("journal", "applied_event_count").to_i
+        applied_count = entries.length if applied_count > entries.length
+        if applied_count < entries.length
+          entries.drop(applied_count).each { |entry| apply_journal_entry(current_state, entry) }
+          materialized_changed = true
+        end
+      end
+
+      sync_journal_metadata(current_state, entries)
+      atomic_write_state(current_state) if materialized_changed
+      current_state
+    end
+
+    def read_state_file
+      return [nil, false, false] unless File.exist?(state_path)
+
+      payload = JSON.parse(File.read(state_path))
+      raise JSON::ParserError, "state root is not an object" unless payload.is_a?(Hash)
+
+      [payload, true, false]
+    rescue JSON::ParserError => e
+      backup_corrupt_file(state_path, "state", e)
+      [nil, false, true]
+    end
+
+    def read_journal_entries
+      return [] unless File.exist?(journal_path)
+
+      entries = []
+      File.foreach(journal_path).with_index do |line, index|
+        next if line.strip.empty?
+
+        entry = JSON.parse(line)
+        raise JSON::ParserError, "journal line #{index + 1} is not an object" unless entry.is_a?(Hash)
+
+        entries << entry
+      end
+      entries
+    rescue JSON::ParserError => e
+      backup_corrupt_file(journal_path, "journal", e)
+      []
+    end
+
+    def append_journal_entry(entry)
+      FileUtils.mkdir_p(File.dirname(journal_path))
+      File.open(journal_path, File::WRONLY | File::APPEND | File::CREAT, 0o600) do |file|
+        file.flock(File::LOCK_EX)
+        file.write(JSON.generate(entry))
+        file.write("\n")
+        file.flush
+        file.fsync
+      end
+    end
+
+    def reward_journal_event_id(dedupe_key)
+      "evt_#{Digest::SHA256.hexdigest(dedupe_key)[0, 16]}"
+    end
+
+    def reward_journal_entry(event_id, event_type, score, reward, turn_id:, session_id:, project_id:, agent_id:)
+      {
+        "event_id" => event_id,
+        "event_type" => event_type,
+        "timestamp" => Time.now.utc.iso8601,
+        "session_id" => optional_string(session_id),
+        "turn_id" => safe_string(turn_id),
+        "privacy_class" => "abstract",
+        "score" => score.to_f,
+        "rewards" => {
+          "chonks" => reward.fetch(:chonks).to_i,
+          "materials" => reward.fetch(:materials).transform_values(&:to_i),
+          "asteroid_class_id" => reward.fetch(:asteroid_class_id),
+          "asteroid_mined_delta" => reward.fetch(:asteroid_mined_delta).to_i,
+          "suit_damage" => reward.fetch(:suit_damage).to_i
+        },
+        "project_id" => optional_string(project_id),
+        "agent_id" => optional_string(agent_id)
+      }.compact
+    end
+
+    def apply_journal_entry(state, entry)
+      normalize_state(state)
+      if entry["event_type"] == "state_snapshot"
+        apply_snapshot_journal_entry(state, entry)
+      elsif work_event_by_id.key?(safe_string(entry["event_type"]))
+        apply_reward_journal_entry(state, entry)
+      end
+      state
+    end
+
+    def apply_reward_journal_entry(state, entry)
+      dedupe_key = safe_string(entry["event_id"])
+      event_type = safe_string(entry["event_type"])
+      return if dedupe_key.empty? || state["dedupe_keys"].include?(dedupe_key)
+      return unless work_event_by_id.key?(event_type)
+
+      score = entry["score"].to_f
+      rewards = entry["rewards"].is_a?(Hash) ? entry["rewards"] : {}
+      materials = rewards["materials"].is_a?(Hash) ? rewards["materials"] : {}
+      chonks = rewards["chonks"].to_i
+      mined_delta = rewards["asteroid_mined_delta"].to_i
+      suit_damage = rewards["suit_damage"].to_i
+      timestamp = safe_string(entry["timestamp"])
+
+      ensure_turn(state, safe_string(entry["turn_id"]))
+      state["dedupe_keys"] << dedupe_key
+      state["dedupe_keys"] = state["dedupe_keys"].last(MAX_DEDUPE_KEYS)
+
+      state["inventory"]["mat_chonks"] = state["inventory"]["mat_chonks"].to_i + chonks
+      materials.each do |material_id, quantity|
+        next unless material_by_id.key?(material_id)
+
+        state["inventory"][material_id] = state["inventory"][material_id].to_i + quantity.to_i
+      end
+
+      state["asteroid_progress"]["asteroid_class_id"] = safe_string(rewards["asteroid_class_id"]) unless rewards["asteroid_class_id"].to_s.empty?
+      state["asteroid_progress"]["mined"] = state["asteroid_progress"]["mined"].to_i + mined_delta
+      state["suit_condition"] = [state["suit_condition"].to_i - suit_damage, 0].max
+
+      turn = state["current_turn"]
+      turn["score"] = (turn["score"].to_f + score).round(2)
+      turn["chonks"] = turn["chonks"].to_i + chonks
+      materials.each do |material_id, quantity|
+        next unless material_by_id.key?(material_id)
+
+        turn["materials"][material_id] = turn["materials"][material_id].to_i + quantity.to_i
+      end
+      turn["events"][event_type] = turn["events"][event_type].to_i + 1
+
+      add_stat_event(state, event_type, score)
+      unless event_type == "work_user_prompt"
+        state["stats"]["tool_events_seen"] = state["stats"]["tool_events_seen"].to_i + 1
+      end
+      state["stats"]["chonks_mined_total"] = state["stats"]["chonks_mined_total"].to_i + chonks
+      state["stats"]["materials_found_total"] = state["stats"]["materials_found_total"].to_i + materials.values.sum(&:to_i)
+
+      apply_project_journal_activity(state, entry["project_id"], event_type, safe_string(entry["turn_id"]), timestamp)
+      apply_agent_journal_activity(state, entry["agent_id"], event_type, timestamp)
+    end
+
+    def apply_project_journal_activity(state, project_id, event_type, turn_id, timestamp)
+      project_key = optional_string(project_id)
+      return unless project_key&.start_with?("project_")
+
+      project = state["project_stats"][project_key] ||= {
+        "turns" => {},
+        "work_events" => {},
+        "last_seen_at" => nil
+      }
+      project["turns"][turn_id] = true
+      project["work_events"][event_type] = project["work_events"][event_type].to_i + 1
+      project["last_seen_at"] = timestamp unless timestamp.empty?
+    end
+
+    def apply_agent_journal_activity(state, agent_id, event_type, timestamp)
+      agent_key = optional_string(agent_id)
+      return unless agent_key&.start_with?("agent_")
+
+      agent = state["agent_stats"][agent_key] ||= {
+        "agent_type" => "unknown",
+        "starts" => 0,
+        "stops" => 0,
+        "work_events" => {},
+        "last_seen_at" => nil
+      }
+      agent["work_events"][event_type] = agent["work_events"][event_type].to_i + 1
+      agent["last_seen_at"] = timestamp unless timestamp.empty?
+    end
+
+    def apply_snapshot_journal_entry(state, entry)
+      snapshot = entry["state"].is_a?(Hash) ? entry["state"] : {}
+      snapshot.each do |key, value|
+        next if key == "journal"
+
+        state[key] = deep_copy(value)
+      end
+      normalize_state(state)
+    end
+
+    def migration_snapshot_entry(state)
+      {
+        "event_id" => "evt_snapshot_#{Digest::SHA256.hexdigest(JSON.generate(snapshot_state(state)))[0, 16]}",
+        "event_type" => "state_snapshot",
+        "timestamp" => Time.now.utc.iso8601,
+        "privacy_class" => "abstract",
+        "score" => 0.0,
+        "rewards" => {},
+        "state" => snapshot_state(state)
+      }
+    end
+
+    def snapshot_state(state)
+      keys = %w[
+        space_bucks
+        inventory
+        unlocked_machine_ids
+        unlocked_asteroid_class_ids
+        current_asteroid_class_id
+        upgrades
+        base_modules
+        report_mode
+        cloud_sync
+        orders
+        orders_generated_at
+        suit_condition
+        asteroid_progress
+        stats
+        project_stats
+        agent_stats
+        dedupe_keys
+        current_turn
+        latest_report
+        last_session_id
+        last_seen_at
+        created_at
+      ]
+      keys.each_with_object({}) do |key, payload|
+        payload[key] = deep_copy(state[key]) if state.key?(key)
+      end
+    end
+
+    def sync_journal_metadata(state, entries = nil)
+      entries ||= read_journal_entries
+      last_event_id = entries.reverse_each.find { |entry| entry["event_id"] }&.fetch("event_id", nil)
+      state["journal"] = default_journal_metadata.merge(state["journal"] || {})
+      state["journal"]["path"] = journal_path
+      state["journal"]["applied_event_count"] = entries.length
+      state["journal"]["last_event_id"] = last_event_id
+    end
+
+    def default_journal_metadata
+      {
+        "path" => journal_path,
+        "applied_event_count" => 0,
+        "last_event_id" => nil
+      }
+    end
+
+    def backup_corrupt_file(path, label, error)
+      return unless File.exist?(path)
+
+      backup_path = "#{path}.corrupt-#{Time.now.utc.strftime('%Y%m%d%H%M%S')}-#{Process.pid}"
+      FileUtils.mv(path, backup_path)
+      warn "MCP Miner #{label} file was corrupt; backed up to #{backup_path}: #{error.message}"
+    end
+
+    def optional_string(value)
+      text = safe_string(value)
+      text.empty? ? nil : text
+    end
+
+    def deep_copy(value)
+      JSON.parse(JSON.generate(value))
     end
 
     def atomic_write_state(next_state)
       tmp_path = "#{state_path}.tmp"
-      File.write(tmp_path, JSON.pretty_generate(next_state))
+      File.open(tmp_path, "w", 0o600) do |file|
+        file.write(JSON.pretty_generate(next_state))
+        file.flush
+        file.fsync
+      end
       File.rename(tmp_path, state_path)
     end
 

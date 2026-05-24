@@ -83,7 +83,8 @@ class McpMinerHook
         turn_id: turn_id,
         hook_event_name: hook_event_name,
         line_count: 0,
-        event_key_suffix: "prompt"
+        event_key_suffix: "prompt",
+        session_id: @input["session_id"]
       )
       state["last_seen_at"] = Time.now.utc.iso8601
     end
@@ -99,6 +100,7 @@ class McpMinerHook
   def record_tool_use
     classification = classify_tool_use
     return unless classification
+    project_id = @engine.project_fingerprint(@input["cwd"])
 
     @engine.with_state do |state|
       @engine.ensure_turn(state, turn_id)
@@ -108,9 +110,10 @@ class McpMinerHook
         turn_id: turn_id,
         hook_event_name: hook_event_name,
         line_count: classification[:line_count],
-        event_key_suffix: safe_string(@input["tool_use_id"] || classification[:event_id])
+        event_key_suffix: safe_string(@input["tool_use_id"] || classification[:event_id]),
+        session_id: @input["session_id"],
+        project_id: project_id
       )
-      @engine.add_project_activity(state, classification[:event_id], turn_id: turn_id, cwd: @input["cwd"])
       state["last_seen_at"] = Time.now.utc.iso8601
     end
   end
