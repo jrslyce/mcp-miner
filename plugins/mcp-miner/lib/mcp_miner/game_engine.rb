@@ -606,8 +606,10 @@ module McpMiner
           next insufficient_inventory_payload(material_id, quantity, available)
         end
 
+        refinery_multiplier = upgrade_effect_by_id("upgrade_refinery_purity", current_state.dig("upgrades", "upgrade_refinery_purity").to_i)
+        produced_quantity = [(quantity * refinery_multiplier).floor, quantity].max
         current_state["inventory"][material_id] = available - quantity
-        current_state["inventory"][refined_id] = current_state["inventory"][refined_id].to_i + quantity
+        current_state["inventory"][refined_id] = current_state["inventory"][refined_id].to_i + produced_quantity
 
         {
           ok: true,
@@ -620,12 +622,13 @@ module McpMiner
             material_id => quantity
           },
           produced: {
-            refined_id => quantity
+            refined_id => produced_quantity
           },
           inventory: {
             material_id => current_state["inventory"][material_id].to_i,
             refined_id => current_state["inventory"][refined_id].to_i
           },
+          refinery_multiplier: refinery_multiplier,
           raw_space_bucks_each: material["raw_space_bucks"].to_i,
           refined_space_bucks_each: material["refined_space_bucks"].to_i,
           privacy: PRIVACY_NOTICE
@@ -689,6 +692,68 @@ module McpMiner
           },
           space_bucks: current_state["space_bucks"].to_i,
           direct_market: direct_market_config,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
+    def upgrade_status_payload(current_state = state)
+      {
+        upgrades: upgrade_list.map { |upgrade| upgrade_status(upgrade, current_state) },
+        balance: {
+          upgrade_phase: balance_config.fetch("upgrade_phase")
+        },
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def purchase_upgrade_payload(args)
+      upgrade_id = safe_string(args["upgrade_id"])
+      upgrade = upgrade_by_id[upgrade_id]
+      return unknown_upgrade_payload(upgrade_id) unless upgrade
+
+      with_state do |current_state|
+        before = upgrade_status(upgrade, current_state)
+        if before[:is_maxed]
+          next {
+            ok: false,
+            status: "max_level",
+            upgrade: before,
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        missing_space_bucks = before[:missing_space_bucks].to_i
+        missing_materials = before[:missing_materials] || {}
+        if missing_space_bucks.positive? || !missing_materials.empty?
+          next {
+            ok: false,
+            status: missing_space_bucks.positive? && !missing_materials.empty? ? "insufficient_resources" : (missing_space_bucks.positive? ? "insufficient_space_bucks" : "insufficient_materials"),
+            missing_space_bucks: missing_space_bucks,
+            missing_materials: missing_materials,
+            upgrade: before,
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        cost = before.fetch(:cost_to_next)
+        current_state["space_bucks"] = current_state["space_bucks"].to_i - cost.fetch(:space_bucks).to_i
+        cost.fetch(:materials).each do |material_id, quantity|
+          current_state["inventory"][material_id] = current_state["inventory"][material_id].to_i - quantity.to_i
+        end
+        current_state["upgrades"][upgrade_id] = before.fetch(:level).to_i + 1
+        after = upgrade_status(upgrade, current_state)
+
+        {
+          ok: true,
+          status: "purchased",
+          upgrade_id: upgrade_id,
+          display_name: upgrade["display_name"],
+          previous_level: before.fetch(:level),
+          new_level: after.fetch(:level),
+          spent: cost,
+          space_bucks: current_state["space_bucks"].to_i,
+          upgrade: after,
           privacy: PRIVACY_NOTICE
         }
       end
@@ -935,6 +1000,169 @@ module McpMiner
         needed: needed.to_i,
         available: available.to_i,
         missing: [needed.to_i - available.to_i, 0].max,
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def upgrade_status(upgrade, state)
+      level = state.dig("upgrades", upgrade.fetch("id")).to_i
+      max_level = upgrade.fetch("max_level").to_i
+      cost = level >= max_level ? nil : upgrade_next_cost(upgrade, level)
+      missing_space_bucks = cost ? [cost[:space_bucks].to_i - state["space_bucks"].to_i, 0].max : 0
+      missing_materials = cost ? missing_materials_for_cost(cost[:materials], state) : {}
+      current_effect = upgrade_effect(upgrade, level)
+      next_effect = level >= max_level ? current_effect : upgrade_effect(upgrade, level + 1)
+
+      {
+        upgrade_id: upgrade.fetch("id"),
+        display_name: upgrade.fetch("display_name"),
+        level: level,
+        max_level: max_level,
+        is_maxed: level >= max_level,
+        cost_to_next: cost,
+        can_purchase: cost && missing_space_bucks.zero? && missing_materials.empty?,
+        missing_space_bucks: missing_space_bucks,
+        missing_materials: missing_materials,
+        effect: current_effect,
+        next_effect: next_effect,
+        effect_delta: effect_delta(current_effect, next_effect),
+        formula: upgrade.dig("effect", "formula"),
+        target: upgrade.dig("effect", "target"),
+        effect_type: upgrade.dig("effect", "type")
+      }
+    end
+
+    def upgrade_next_cost(upgrade, level)
+      {
+        space_bucks: upgrade_space_bucks_cost(upgrade, level),
+        materials: upgrade_material_costs(upgrade, level)
+      }
+    end
+
+    def upgrade_space_bucks_cost(upgrade, level)
+      cost = upgrade.fetch("cost")
+      raw = cost.fetch("base_space_bucks").to_f *
+            (cost.fetch("growth_rate").to_f**level.to_i) *
+            upgrade_phase_multiplier(level) *
+            upgrade_rarity_pressure(upgrade, level)
+      nice_round(raw).ceil
+    end
+
+    def upgrade_material_costs(upgrade, level)
+      entries = Array(upgrade.dig("material_basket", "base_quantities")).map do |entry|
+        [entry.fetch("material_id"), entry.fetch("quantity").to_i]
+      end
+      Array(upgrade.dig("material_basket", "gates")).each do |gate|
+        next if level.to_i < gate.fetch("min_level").to_i
+
+        entries << [gate.fetch("add_material_id"), gate.fetch("base_quantity").to_i]
+      end
+
+      entries.each_with_object({}) do |(material_id, base_quantity), costs|
+        material = material_by_id.fetch(material_id)
+        scaled = base_quantity *
+                 rarity_multiplier(material["rarity"]) *
+                 ((1 + (level.to_i / 10.0))**1.30) *
+                 upgrade_phase_multiplier(level)
+        costs[material_id] = scaled.ceil
+      end
+    end
+
+    def upgrade_effect(upgrade, level)
+      value = evaluate_upgrade_formula(upgrade.dig("effect", "formula"), level)
+      {
+        value: value.round(4),
+        display: upgrade_effect_display(upgrade, value)
+      }
+    end
+
+    def upgrade_effect_by_id(upgrade_id, level)
+      upgrade = upgrade_by_id.fetch(upgrade_id)
+      upgrade_effect(upgrade, level).fetch(:value).to_f
+    end
+
+    def evaluate_upgrade_formula(formula, level)
+      l = level.to_f
+      case formula
+      when "1 + 2.6*(1-e^(-0.045L)) + 0.05*floor(L/10)"
+        1 + 2.6 * (1 - Math.exp(-0.045 * l)) + (0.05 * (level.to_i / 10).floor)
+      when "1 + 1.8*(1-e^(-0.05L))"
+        1 + 1.8 * (1 - Math.exp(-0.05 * l))
+      when "1 + 1.2*(1-e^(-0.04L))"
+        1 + 1.2 * (1 - Math.exp(-0.04 * l))
+      when "0.72*(1-e^(-0.045L))"
+        0.72 * (1 - Math.exp(-0.045 * l))
+      when "1 + 1.6*(1-e^(-0.04L))"
+        1 + 1.6 * (1 - Math.exp(-0.04 * l))
+      when "1 + 1.4*(1-e^(-0.06L))"
+        1 + 1.4 * (1 - Math.exp(-0.06 * l))
+      when "base_storage * 1.08^L"
+        1.08**l
+      when "1 + 0.06L + 0.005*L^1.35"
+        1 + (0.06 * l) + (0.005 * (l**1.35))
+      else
+        raise "Unsupported upgrade effect formula: #{formula}"
+      end
+    end
+
+    def upgrade_effect_display(upgrade, value)
+      if upgrade.dig("effect", "type") == "reduction"
+        "#{(value * 100).round}% reduction"
+      elsif upgrade.dig("effect", "target") == "storage_capacity"
+        "#{value.round(2)}x storage"
+      else
+        "#{value.round(2)}x"
+      end
+    end
+
+    def effect_delta(current_effect, next_effect)
+      (next_effect.fetch(:value).to_f - current_effect.fetch(:value).to_f).round(4)
+    end
+
+    def missing_materials_for_cost(materials, state)
+      materials.each_with_object({}) do |(material_id, quantity), missing|
+        available = state.dig("inventory", material_id).to_i
+        needed = quantity.to_i
+        missing[material_id] = needed - available if available < needed
+      end
+    end
+
+    def upgrade_phase_multiplier(level)
+      config = balance_config.fetch("upgrade_phase")
+      phase = level.to_i / config.fetch("interval").to_i
+      1 + (config.fetch("multiplier_per_phase_squared").to_f * (phase**2))
+    end
+
+    def upgrade_rarity_pressure(upgrade, level)
+      rare_gate_count = Array(upgrade.dig("material_basket", "gates")).count do |gate|
+        next false if level.to_i < gate.fetch("min_level").to_i
+
+        rare_upgrade_material?(material_by_id.fetch(gate.fetch("add_material_id")))
+      end
+      1 + (0.04 * rare_gate_count)
+    end
+
+    def rare_upgrade_material?(material)
+      %w[rare dangerous fictional_rare legendary].include?(material["rarity"])
+    end
+
+    def rarity_multiplier(rarity)
+      {
+        "common" => 1.0,
+        "uncommon" => 1.6,
+        "rare" => 2.4,
+        "dangerous" => 2.8,
+        "fictional_rare" => 3.2,
+        "legendary" => 5.0
+      }.fetch(rarity, 1.0)
+    end
+
+    def unknown_upgrade_payload(upgrade_id)
+      {
+        ok: false,
+        status: "unknown_upgrade",
+        upgrade_id: upgrade_id,
+        reason: "Upgrade is not defined in upgrades.yaml.",
         privacy: PRIVACY_NOTICE
       }
     end
@@ -1587,14 +1815,14 @@ module McpMiner
 
     def drill_multiplier(state)
       level = state.dig("upgrades", "upgrade_drill_power").to_i
-      1 + (2.6 * (1 - Math.exp(-0.045 * level))) + (0.05 * (level / 10).floor)
+      upgrade_effect_by_id("upgrade_drill_power", level)
     end
 
     def hazard_damage(event_id, asteroid, state)
       return 0 unless event_id == "work_test_fail"
 
       plating = state.dig("upgrades", "upgrade_suit_plating").to_i
-      reduction = 0.72 * (1 - Math.exp(-0.045 * plating))
+      reduction = upgrade_effect_by_id("upgrade_suit_plating", plating)
       damage = 2.0 * asteroid["hazard_multiplier"].to_f * (1 - reduction)
       damage.ceil
     end
@@ -1630,6 +1858,10 @@ module McpMiner
 
     def asteroid_by_id
       @asteroid_by_id ||= asteroid_list.to_h { |asteroid| [asteroid.fetch("id"), asteroid] }
+    end
+
+    def upgrade_by_id
+      @upgrade_by_id ||= upgrade_list.to_h { |upgrade| [upgrade.fetch("id"), upgrade] }
     end
 
     def work_event_by_id

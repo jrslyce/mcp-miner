@@ -915,6 +915,41 @@ Required runtime validation:
 - Direct market sales use `balance.direct_market.min_multiplier` and
   `balance.direct_market.max_multiplier`; they remain a lower-value pressure release than orders.
 
+### Upgrade Status And Purchases
+
+Upgrade state is stored in the top-level `upgrades` map as upgrade ID to integer level.
+
+```json
+{
+  "upgradeId": "upgrade_drill_power",
+  "level": 4,
+  "maxLevel": 50,
+  "costToNext": {
+    "spaceBucks": 240,
+    "materials": {
+      "mat_element_fe": 6,
+      "mat_element_ni": 3
+    }
+  },
+  "effect": {
+    "value": 1.4288,
+    "display": "1.43x"
+  }
+}
+```
+
+Required runtime validation:
+
+- `get_upgrade_status` exposes each upgrade's current level, next Space Bucks/material costs,
+  affordability, current effect, next effect, and formula metadata from `upgrades.yaml`.
+- `purchase_upgrade` rejects unknown upgrade IDs, max-level tracks, insufficient Space Bucks, and
+  insufficient materials before mutating state.
+- Successful purchases consume Space Bucks and material baskets, then increment exactly one level.
+- Upgrade costs use `phase_multiplier`, rarity pressure, nice rounding, and material rarity scaling
+  from the GDD/balance constants.
+- Upgrade effects are computed from the formula registry and are used by mining output, hazard
+  reduction, and refinery output where those systems exist locally.
+
 ### Order Instance
 
 ```json

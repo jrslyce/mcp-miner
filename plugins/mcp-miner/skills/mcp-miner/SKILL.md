@@ -24,6 +24,8 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 - `fulfill_order`: consume available inventory and complete an active order for Space Bucks.
 - `refine_material`: convert refinable raw inventory into refined inventory.
 - `sell_material`: sell raw or refined inventory directly for Space Bucks.
+- `get_upgrade_status`: inspect upgrade levels, next costs, effects, and affordability.
+- `purchase_upgrade`: spend Space Bucks/materials to buy one upgrade level.
 - `get_settings`: report mode, cloud-sync preference, and privacy posture.
 - `get_milestone_status`: current asteroid milestone progress and claim support status.
 - `get_catalog_summary`: counts of loaded materials, recipes, machines, asteroids, upgrades, and hazards.

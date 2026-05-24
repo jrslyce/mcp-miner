@@ -119,6 +119,20 @@ class McpMinerServer
         })
       },
       {
+        name: "get_upgrade_status",
+        description: "Return MCP Miner upgrade levels, next costs, effects, and affordability.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "purchase_upgrade",
+        description: "Purchase one level of an MCP Miner upgrade when Space Bucks and materials are available.",
+        inputSchema: object_schema({
+          upgrade_id: {
+            type: "string"
+          }
+        })
+      },
+      {
         name: "get_settings",
         description: "Return current MCP Miner report, privacy, and local sync settings.",
         inputSchema: object_schema({})
@@ -198,6 +212,10 @@ class McpMinerServer
         @engine.refine_material_payload(args)
       when "sell_material"
         @engine.sell_material_payload(args)
+      when "get_upgrade_status"
+        @engine.upgrade_status_payload
+      when "purchase_upgrade"
+        @engine.purchase_upgrade_payload(args)
       when "get_settings"
         @engine.settings_payload
       when "get_milestone_status"
