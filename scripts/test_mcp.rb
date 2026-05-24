@@ -93,6 +93,8 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     get_player_status
     get_latest_report
     get_inventory
+    get_asteroid_status
+    select_asteroid
     get_active_orders
     fulfill_order
     refine_material

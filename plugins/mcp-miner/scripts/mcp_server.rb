@@ -79,6 +79,20 @@ class McpMinerServer
         inputSchema: object_schema({})
       },
       {
+        name: "get_asteroid_status",
+        description: "Return unlocked/selectable MCP Miner asteroid classes, depletion, composition, hazards, and rare-find pity.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "select_asteroid",
+        description: "Select an unlocked MCP Miner asteroid class for future mining rewards.",
+        inputSchema: object_schema({
+          asteroid_id: {
+            type: "string"
+          }
+        })
+      },
+      {
         name: "get_active_orders",
         description: "Return currently generated MCP Miner orders with required materials and Space Bucks payouts.",
         inputSchema: object_schema({})
@@ -204,6 +218,10 @@ class McpMinerServer
         @engine.latest_report_payload
       when "get_inventory"
         @engine.inventory_payload
+      when "get_asteroid_status"
+        @engine.asteroid_status_payload
+      when "select_asteroid"
+        @engine.select_asteroid_payload(args)
       when "get_active_orders"
         @engine.active_orders_payload
       when "fulfill_order"

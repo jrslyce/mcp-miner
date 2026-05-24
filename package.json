@@ -8,7 +8,8 @@
     "test:orders": "ruby scripts/test_orders.rb",
     "test:market": "ruby scripts/test_market.rb",
     "test:upgrades": "ruby scripts/test_upgrades.rb",
+    "test:asteroids": "ruby scripts/test_asteroids.rb",
     "test:hooks": "ruby scripts/test_hooks.rb",
-    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:market && npm run test:upgrades && npm run test:hooks"
+    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:market && npm run test:upgrades && npm run test:asteroids && npm run test:hooks"
   }
 }

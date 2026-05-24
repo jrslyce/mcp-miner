@@ -130,6 +130,15 @@ module McpMiner
           "asteroid_class_id" => start.fetch("current_asteroid_class_id"),
           "mined" => 0
         },
+        "asteroid_progress_by_id" => {
+          start.fetch("current_asteroid_class_id") => {
+            "asteroid_class_id" => start.fetch("current_asteroid_class_id"),
+            "mined" => 0
+          }
+        },
+        "rare_find_pity_score" => 0.0,
+        "asteroid_depletions" => [],
+        "hazard_log" => [],
         "stats" => default_stats,
         "project_stats" => {},
         "agent_stats" => {},
@@ -164,6 +173,15 @@ module McpMiner
         "asteroid_class_id" => state["current_asteroid_class_id"] || start.fetch("current_asteroid_class_id"),
         "mined" => 0
       }
+      state["asteroid_progress_by_id"] ||= {}
+      progress_id = state["asteroid_progress"]["asteroid_class_id"] || state["current_asteroid_class_id"] || start.fetch("current_asteroid_class_id")
+      state["asteroid_progress_by_id"][progress_id] ||= {
+        "asteroid_class_id" => progress_id,
+        "mined" => state["asteroid_progress"]["mined"].to_i
+      }
+      state["rare_find_pity_score"] = state["rare_find_pity_score"].to_f
+      state["asteroid_depletions"] ||= []
+      state["hazard_log"] ||= []
       state["stats"] = default_stats.merge(state["stats"] || {})
       state["stats"]["work_events"] ||= {}
       state["project_stats"] ||= {}
@@ -286,31 +304,46 @@ module McpMiner
       asteroid = asteroid_for(state)
       multiplier = asteroid["yield_multiplier"].to_f * drill_multiplier(state)
       chonks = [(score * 1.25 * multiplier).floor, 1].max
-      materials = weighted_materials(state, asteroid, score, turn_id: turn_id)
-      suit_damage = hazard_damage(event_id, asteroid, state)
+      materials_result = weighted_materials(state, asteroid, score, turn_id: turn_id, event_id: event_id)
+      hazard = hazard_result(event_id, asteroid, state, seed: "#{turn_id}:#{event_id}:hazard")
 
       {
         chonks: chonks,
-        materials: materials,
+        materials: materials_result.fetch(:materials),
         asteroid_class_id: asteroid["id"],
-        asteroid_mined_delta: chonks + materials.values.sum,
-        suit_damage: suit_damage
+        asteroid_mined_delta: chonks + materials_result.fetch(:materials).values.sum,
+        suit_damage: hazard.fetch(:suit_damage),
+        rare_find: materials_result.fetch(:rare_find),
+        rare_find_chance: materials_result.fetch(:rare_find_chance),
+        hazard: hazard.fetch(:hazard)
       }
     end
 
-    def weighted_materials(state, asteroid, score, turn_id:)
+    def weighted_materials(state, asteroid, score, turn_id:, event_id:)
       units = [[(score / 4.0).floor, 1].max, 8].min
       weights = asteroid.fetch("composition")
       materials = Hash.new(0)
+      rare_found = false
+      chance = rare_find_chance(state, asteroid, event_id: event_id)
 
       units.times do |index|
-        material_id = pick_weighted(weights, "#{turn_id}:#{state.dig('stats', 'work_score_total')}:#{index}")
+        seed = "#{turn_id}:#{state.dig('stats', 'work_score_total')}:#{event_id}:#{index}"
+        material_id = if deterministic_unit("#{seed}:rare") < chance
+                        rare_found = true
+                        pick_weighted(rare_composition(weights), "#{seed}:rare_pick")
+                      else
+                        pick_weighted(weights, seed)
+                      end
         next if material_id == "mat_chonks"
 
         materials[material_id] += 1
       end
 
-      materials
+      {
+        materials: materials,
+        rare_find: rare_found,
+        rare_find_chance: chance.round(4)
+      }
     end
 
     def should_emit_report?(state)
@@ -383,6 +416,55 @@ module McpMiner
         milestones: milestone_status_payload(current_state)[:milestones],
         privacy: PRIVACY_NOTICE
       }
+    end
+
+    def asteroid_status_payload(current_state = state)
+      current_id = asteroid_for(current_state)["id"]
+      {
+        current_asteroid: asteroid_status_for(asteroid_by_id.fetch(current_id), current_state),
+        asteroids: asteroid_list.map { |asteroid| asteroid_status_for(asteroid, current_state) },
+        rare_find_pity: {
+          score: current_state["rare_find_pity_score"].to_f.round(2),
+          config: balance_config.fetch("pity")
+        },
+        recent_depletions: current_state["asteroid_depletions"] || [],
+        recent_hazards: current_state["hazard_log"] || [],
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def select_asteroid_payload(args)
+      asteroid_id = safe_string(args["asteroid_id"])
+      asteroid = asteroid_by_id[asteroid_id]
+      return unknown_asteroid_payload(asteroid_id) unless asteroid
+
+      with_state do |current_state|
+        unless (current_state["unlocked_asteroid_class_ids"] || []).include?(asteroid_id)
+          next {
+            ok: false,
+            status: "locked",
+            asteroid: asteroid_summary(asteroid_id),
+            required_unlock_tier: asteroid["unlock_tier"],
+            unlocked_asteroid_class_ids: current_state["unlocked_asteroid_class_ids"],
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        persist_current_asteroid_progress!(current_state)
+        progress = current_state["asteroid_progress_by_id"][asteroid_id] ||= {
+          "asteroid_class_id" => asteroid_id,
+          "mined" => 0
+        }
+        current_state["current_asteroid_class_id"] = asteroid_id
+        current_state["asteroid_progress"] = progress.dup
+
+        {
+          ok: true,
+          status: "selected",
+          current_asteroid: asteroid_status_for(asteroid, current_state),
+          privacy: PRIVACY_NOTICE
+        }
+      end
     end
 
     def inventory_payload(current_state = state)
@@ -1004,6 +1086,205 @@ module McpMiner
       }
     end
 
+    def asteroid_status_for(asteroid, state)
+      progress = asteroid_progress_for(asteroid["id"], state)
+      mined = progress["mined"].to_i
+      depletion_size = asteroid["depletion_size"].to_i
+      {
+        asteroid_class_id: asteroid["id"],
+        display_name: asteroid["display_name"],
+        unlock_tier: asteroid["unlock_tier"],
+        unlocked: (state["unlocked_asteroid_class_ids"] || []).include?(asteroid["id"]),
+        selected: state["current_asteroid_class_id"] == asteroid["id"],
+        depletion: {
+          mined: mined,
+          depletion_size: depletion_size,
+          remaining: [depletion_size - mined, 0].max,
+          percent_complete: depletion_size.positive? ? ((mined.to_f / depletion_size) * 100).round(2) : 0.0
+        },
+        yield_multiplier: asteroid["yield_multiplier"].to_f,
+        hazard_multiplier: asteroid["hazard_multiplier"].to_f,
+        base_rare_rate: asteroid["base_rare_rate"].to_f,
+        rare_find_chance: rare_find_chance(state, asteroid).round(4),
+        composition: asteroid.fetch("composition").map do |entry|
+          material = material_by_id.fetch(entry.fetch("material_id"))
+          {
+            material_id: material["id"],
+            display_name: material["display_name"],
+            rarity: material["rarity"],
+            weight: entry["weight"].to_f
+          }
+        end
+      }
+    end
+
+    def asteroid_progress_for(asteroid_id, state)
+      if state["current_asteroid_class_id"] == asteroid_id
+        state["asteroid_progress"] || { "asteroid_class_id" => asteroid_id, "mined" => 0 }
+      else
+        state.dig("asteroid_progress_by_id", asteroid_id) || { "asteroid_class_id" => asteroid_id, "mined" => 0 }
+      end
+    end
+
+    def persist_current_asteroid_progress!(state)
+      asteroid_id = state["current_asteroid_class_id"] || state.dig("asteroid_progress", "asteroid_class_id")
+      return if asteroid_id.to_s.empty?
+
+      state["asteroid_progress_by_id"][asteroid_id] = {
+        "asteroid_class_id" => asteroid_id,
+        "mined" => state.dig("asteroid_progress", "mined").to_i
+      }
+    end
+
+    def rare_find_chance(state, asteroid, event_id: nil)
+      pity = balance_config.fetch("pity")
+      base = asteroid["base_rare_rate"].to_f
+      pity_bonus = [state["rare_find_pity_score"].to_f, pity.fetch("max_score").to_f].min * pity.fetch("bonus_per_score").to_f
+      scanner_bonus = [(upgrade_effect_by_id("upgrade_scanner_precision", state.dig("upgrades", "upgrade_scanner_precision").to_i) - 1.0) * 0.02, 0.05].min
+      category_bonus = work_category_rare_bonus(event_id)
+      [base + pity_bonus + scanner_bonus + category_bonus, pity.fetch("max_final_rare_chance").to_f].min
+    end
+
+    def work_category_rare_bonus(event_id)
+      category = work_event_by_id.dig(event_id.to_s, "category")
+      case category
+      when "testing" then 0.01
+      when "research" then 0.005
+      when "review" then 0.004
+      else 0.0
+      end
+    end
+
+    def rare_composition(weights)
+      rare_weights = weights.select do |entry|
+        rare_upgrade_material?(material_by_id.fetch(entry.fetch("material_id")))
+      end
+      rare_weights.empty? ? weights : rare_weights
+    end
+
+    def hazard_result(event_id, asteroid, state, seed:)
+      hazard = hazard_for_event(event_id, seed)
+      return { suit_damage: 0, hazard: nil } unless hazard
+
+      trigger_chance = [hazard.dig("trigger", "base_chance").to_f * asteroid["hazard_multiplier"].to_f, 1.0].min
+      return { suit_damage: 0, hazard: nil } if event_id != "work_test_fail" && deterministic_unit("#{seed}:trigger") >= trigger_chance
+
+      reduction = hazard_mitigation(hazard, state)
+      damage_config = hazard.dig("effects", "suit_damage")
+      suit_damage = 0
+      if damage_config
+        raw_damage = deterministic_range(damage_config, "#{seed}:damage") * asteroid["hazard_multiplier"].to_f
+        suit_damage = [(raw_damage * (1 - reduction)).ceil, 0].max
+      end
+
+      {
+        suit_damage: suit_damage,
+        hazard: {
+          "hazard_id" => hazard["id"],
+          "display_name" => hazard["display_name"],
+          "trigger_source" => hazard.dig("trigger", "source"),
+          "trigger_chance" => trigger_chance.round(4),
+          "mitigation" => reduction.round(4),
+          "suit_damage" => suit_damage,
+          "flavor" => Array(hazard["flavor"]).first
+        }
+      }
+    end
+
+    def hazard_for_event(event_id, seed)
+      source = hazard_source_for_event(event_id)
+      return nil unless source
+
+      candidates = hazard_list.select { |hazard| hazard.dig("trigger", "source") == source }
+      return nil if candidates.empty?
+
+      deterministic_pick(candidates, "#{seed}:hazard")
+    end
+
+    def hazard_source_for_event(event_id)
+      case event_id
+      when "work_test_fail" then "failed_commands"
+      when "work_session_start" then "long_session_without_completion"
+      when "work_search" then "rare_find_roll"
+      when "work_file_read" then "repetitive_activity_pattern"
+      else nil
+      end
+    end
+
+    def hazard_mitigation(hazard, state)
+      upgrade_id = hazard.dig("mitigated_by", "upgrade_id")
+      return 0.0 if upgrade_id.to_s.empty?
+
+      level = state.dig("upgrades", upgrade_id).to_i
+      effect = upgrade_effect_by_id(upgrade_id, level)
+      upgrade = upgrade_by_id.fetch(upgrade_id)
+      reduction = upgrade.dig("effect", "type") == "reduction" ? effect : [(effect - 1.0) * 0.2, 0.65].min
+      reduction.clamp(0.0, 0.9)
+    end
+
+    def record_hazard!(state, hazard, timestamp)
+      state["hazard_log"] << hazard.merge("created_at" => timestamp)
+      state["hazard_log"] = state["hazard_log"].last(20)
+    end
+
+    def handle_asteroid_depletion!(state, timestamp)
+      loop_guard = 0
+      loop do
+        loop_guard += 1
+        break if loop_guard > asteroid_list.length
+
+        asteroid = asteroid_for(state)
+        mined = state.dig("asteroid_progress", "mined").to_i
+        depletion_size = asteroid["depletion_size"].to_i
+        break unless depletion_size.positive? && mined >= depletion_size
+
+        overflow = mined - depletion_size
+        state["asteroid_progress_by_id"][asteroid["id"]] = {
+          "asteroid_class_id" => asteroid["id"],
+          "mined" => depletion_size
+        }
+        next_asteroid = next_asteroid_unlock(state, asteroid)
+        state["asteroid_depletions"] << {
+          "asteroid_class_id" => asteroid["id"],
+          "depleted_at" => timestamp,
+          "overflow_mined" => overflow,
+          "unlocked_asteroid_class_id" => next_asteroid && next_asteroid["id"]
+        }.compact
+        state["asteroid_depletions"] = state["asteroid_depletions"].last(20)
+
+        unless next_asteroid
+          state["asteroid_progress"]["mined"] = depletion_size
+          break
+        end
+
+        state["unlocked_asteroid_class_ids"] << next_asteroid["id"] unless state["unlocked_asteroid_class_ids"].include?(next_asteroid["id"])
+        state["current_asteroid_class_id"] = next_asteroid["id"]
+        state["asteroid_progress"] = {
+          "asteroid_class_id" => next_asteroid["id"],
+          "mined" => overflow
+        }
+        state["asteroid_progress_by_id"][next_asteroid["id"]] = state["asteroid_progress"].dup
+      end
+    end
+
+    def next_asteroid_unlock(state, depleted_asteroid)
+      unlocked = state["unlocked_asteroid_class_ids"] || []
+      asteroid_list.find do |candidate|
+        !unlocked.include?(candidate["id"]) &&
+          candidate["unlock_tier"].to_i <= depleted_asteroid["unlock_tier"].to_i + 1
+      end
+    end
+
+    def unknown_asteroid_payload(asteroid_id)
+      {
+        ok: false,
+        status: "unknown_asteroid",
+        asteroid_id: asteroid_id,
+        reason: "Asteroid class is not defined in asteroid_classes.yaml.",
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
     def upgrade_status(upgrade, state)
       level = state.dig("upgrades", upgrade.fetch("id")).to_i
       max_level = upgrade.fetch("max_level").to_i
@@ -1450,7 +1731,10 @@ module McpMiner
           "materials" => reward.fetch(:materials).transform_values(&:to_i),
           "asteroid_class_id" => reward.fetch(:asteroid_class_id),
           "asteroid_mined_delta" => reward.fetch(:asteroid_mined_delta).to_i,
-          "suit_damage" => reward.fetch(:suit_damage).to_i
+          "suit_damage" => reward.fetch(:suit_damage).to_i,
+          "rare_find" => reward[:rare_find],
+          "rare_find_chance" => reward[:rare_find_chance],
+          "hazard" => reward[:hazard]
         },
         "project_id" => optional_string(project_id),
         "agent_id" => optional_string(agent_id)
@@ -1479,6 +1763,8 @@ module McpMiner
       chonks = rewards["chonks"].to_i
       mined_delta = rewards["asteroid_mined_delta"].to_i
       suit_damage = rewards["suit_damage"].to_i
+      rare_find = !!rewards["rare_find"]
+      hazard = rewards["hazard"].is_a?(Hash) ? rewards["hazard"] : nil
       timestamp = safe_string(entry["timestamp"])
 
       ensure_turn(state, safe_string(entry["turn_id"]))
@@ -1494,7 +1780,16 @@ module McpMiner
 
       state["asteroid_progress"]["asteroid_class_id"] = safe_string(rewards["asteroid_class_id"]) unless rewards["asteroid_class_id"].to_s.empty?
       state["asteroid_progress"]["mined"] = state["asteroid_progress"]["mined"].to_i + mined_delta
+      current_asteroid_id = state["asteroid_progress"]["asteroid_class_id"]
+      state["asteroid_progress_by_id"][current_asteroid_id] ||= {
+        "asteroid_class_id" => current_asteroid_id,
+        "mined" => 0
+      }
+      state["asteroid_progress_by_id"][current_asteroid_id]["mined"] = state["asteroid_progress"]["mined"].to_i
+      state["rare_find_pity_score"] = rare_find ? 0.0 : [state["rare_find_pity_score"].to_f + 1.0, balance_config.dig("pity", "max_score").to_f].min
       state["suit_condition"] = [state["suit_condition"].to_i - suit_damage, 0].max
+      record_hazard!(state, hazard, timestamp) if hazard
+      handle_asteroid_depletion!(state, timestamp)
 
       turn = state["current_turn"]
       turn["score"] = (turn["score"].to_f + score).round(2)
@@ -1589,6 +1884,10 @@ module McpMiner
         market_transactions
         suit_condition
         asteroid_progress
+        asteroid_progress_by_id
+        rare_find_pity_score
+        asteroid_depletions
+        hazard_log
         stats
         project_stats
         agent_stats

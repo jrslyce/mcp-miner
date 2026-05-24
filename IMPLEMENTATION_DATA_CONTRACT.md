@@ -692,6 +692,15 @@ Representative shape:
     "asteroid_class_id": "asteroid_starter_field",
     "mined": 0
   },
+  "asteroid_progress_by_id": {
+    "asteroid_starter_field": {
+      "asteroid_class_id": "asteroid_starter_field",
+      "mined": 0
+    }
+  },
+  "rare_find_pity_score": 0,
+  "asteroid_depletions": [],
+  "hazard_log": [],
   "stats": {
     "turns_seen": 0,
     "tool_events_seen": 0,
@@ -780,6 +789,11 @@ Required runtime validation and normalization:
 - `dedupe_keys` contains recent reward `event_id` values, plus legacy hook-event dedupe strings when
   migrating older state, and is capped to the newest 300 entries.
 - `asteroid_progress` contains the selected `asteroid_class_id` and mined counter.
+- `asteroid_progress_by_id` stores privacy-safe depletion progress for selectable asteroids.
+- `rare_find_pity_score` is capped by `balance.pity.max_score` and contributes only up to
+  `balance.pity.max_final_rare_chance`.
+- `asteroid_depletions` and `hazard_log` store recent privacy-safe asteroid class IDs, hazard IDs,
+  damage amounts, and timestamps; no work details are stored.
 - `suit_condition` is an integer condition percentage, defaulting to 100.
 - `report_mode` is one of `off`, `every_turn_compact`, `every_turn_full`,
   `meaningful_turns_only`, `session_summary_only`, or `milestones_only`.
@@ -889,6 +903,35 @@ Required runtime validation:
 - Reward materials exist.
 - Work event IDs are known in `work_scoring.yaml`.
 - Report templates are from `report_templates.yaml`.
+
+### Asteroid Selection And Progression
+
+Asteroid classes are selectable only after they appear in `unlocked_asteroid_class_ids`.
+
+```json
+{
+  "asteroidClassId": "asteroid_quartz_belt",
+  "unlocked": true,
+  "selected": false,
+  "depletion": {
+    "mined": 420,
+    "depletionSize": 1800,
+    "remaining": 1380
+  },
+  "rareFindChance": 0.055
+}
+```
+
+Required runtime validation:
+
+- `get_asteroid_status` exposes unlocked state, selection, depletion, composition, yield/hazard
+  multipliers, rare-find chance, recent depletions, and recent hazards without work details.
+- `select_asteroid` rejects locked or unknown asteroid classes and persists per-asteroid progress.
+- Mining rewards use selected asteroid composition, yield multiplier, hazard multiplier, and
+  `balance.pity` rare-find caps.
+- Hazard results come from `hazards.yaml` and apply data-defined mitigation upgrades.
+- Depleted asteroids record a privacy-safe depletion entry, unlock the next eligible asteroid class,
+  select it, and carry overflow mining progress forward.
 
 ### Refining And Direct Market Sales
 
