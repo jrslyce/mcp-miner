@@ -30,12 +30,19 @@ Run Firebase Auth account-linking smoke cases:
 npm run firebase:auth:smoke
 ```
 
+Run Cloud Functions sync API smoke cases:
+
+```sh
+npm run firebase:sync:smoke
+```
+
 Run the repo-level static Firebase scaffold checks:
 
 ```sh
 npm run test:firebase-config
 npm run test:firestore-schema
 npm run test:auth-linking
+npm run test:cloud-sync-api
 ```
 
 The emulator UI runs at `http://127.0.0.1:4000`, Hosting at `http://127.0.0.1:5000`, Functions at `http://127.0.0.1:5001`, Firestore at `127.0.0.1:8080`, and Auth at `127.0.0.1:9099`.

@@ -176,6 +176,8 @@ service cloud.firestore {
           "ownerUid",
           "eventId",
           "eventType",
+          "schemaVersion",
+          "sequence",
           "timestamp",
           "sessionId",
           "turnId",
@@ -183,19 +185,27 @@ service cloud.firestore {
           "privacyClass",
           "source",
           "signature",
+          "checksum",
           "clientCreatedAt",
+          "receivedAt",
+          "reducedAt",
           "rewardControl"
         ]) &&
-        data.keys().hasAll(["ownerUid", "eventId", "eventType", "timestamp", "privacyClass", "source"]) &&
+        data.keys().hasAll(["ownerUid", "eventId", "eventType", "schemaVersion", "sequence", "timestamp", "privacyClass", "source", "signature", "checksum"]) &&
         data.eventId == eventId &&
+        data.schemaVersion is int &&
+        data.sequence is int &&
         data.eventType is string &&
         data.eventType.matches("^work_[a-z_]+$") &&
         data.source == "codex_hook" &&
         timestampLike(data, "timestamp") &&
         timestampLike(data, "clientCreatedAt") &&
+        timestampLike(data, "receivedAt") &&
+        timestampLike(data, "reducedAt") &&
         optionalString(data, "sessionId") &&
         optionalString(data, "turnId") &&
         optionalString(data, "signature") &&
+        optionalString(data, "checksum") &&
         optionalMap(data, "observedFields") &&
         optionalMap(data, "rewardControl");
     }

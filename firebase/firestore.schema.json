@@ -50,7 +50,7 @@
       "owner": "uid",
       "clientAccess": ["read", "create"],
       "appendOnly": true,
-      "fields": ["ownerUid", "eventId", "eventType", "timestamp", "sessionId", "turnId", "observedFields", "privacyClass", "source", "signature", "clientCreatedAt", "rewardControl"]
+      "fields": ["ownerUid", "eventId", "eventType", "schemaVersion", "sequence", "timestamp", "sessionId", "turnId", "observedFields", "privacyClass", "source", "signature", "checksum", "clientCreatedAt", "receivedAt", "reducedAt", "rewardControl"]
     },
     "players/{uid}/gameState/current": {
       "owner": "uid",

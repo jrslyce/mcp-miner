@@ -41,6 +41,8 @@ Reward events are append-only and use deterministic event IDs from the local jou
   "ownerUid": "firebase-auth-uid",
   "eventId": "evt_abc123",
   "eventType": "work_apply_patch",
+  "schemaVersion": 1,
+  "sequence": 42,
   "timestamp": "2026-05-24T00:00:00Z",
   "sessionId": "session_abc",
   "turnId": "turn_def",
@@ -50,6 +52,7 @@ Reward events are append-only and use deterministic event IDs from the local jou
   },
   "privacyClass": "abstract",
   "source": "codex_hook",
+  "checksum": "sha256-of-canonical-abstract-payload",
   "signature": "v1.local-signature-placeholder"
 }
 ```

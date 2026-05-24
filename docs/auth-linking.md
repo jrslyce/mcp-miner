@@ -38,7 +38,7 @@ MCP tools expose the local account-linking state:
 - `link_cloud_profile`
 - `unlink_cloud_profile`
 
-`update_settings` can enable cloud sync before sign-in; in that case `sync_progress` returns `unauthenticated` instead of failing. Linking a UID changes `sync_progress` to `linked_sync_pending` until the sync API/reducer work is available.
+`update_settings` can enable cloud sync before sign-in; in that case `sync_progress` returns `unauthenticated` instead of failing. Linking a UID changes local status to `linked`; the sync client can then call the Cloud Functions sync API.
 
 ## Emulator Smoke
 

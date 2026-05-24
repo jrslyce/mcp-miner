@@ -1,5 +1,7 @@
 "use strict";
 
+const crypto = require("crypto");
+
 const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.FIREBASE_PROJECT || "demo-mcp-miner";
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST || "127.0.0.1:9099";
 const FIRESTORE_HOST = process.env.FIRESTORE_EMULATOR_HOST || "127.0.0.1:8080";
@@ -57,6 +59,30 @@ function mapField(fields) {
   return { mapValue: { fields } };
 }
 
+function stableJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableJson(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function checksum(event) {
+  return crypto.createHash("sha256").update(stableJson({
+    eventId: event.eventId,
+    eventType: event.eventType,
+    observedFields: event.observedFields || {},
+    privacyClass: event.privacyClass,
+    schemaVersion: event.schemaVersion,
+    sequence: event.sequence,
+    source: event.source,
+    timestamp: event.timestamp,
+    turnId: event.turnId || null
+  })).digest("hex");
+}
+
 async function patchDoc(path, token, fields, expectedStatus = 200) {
   return requestJson(documentUrl(path), {
     method: "PATCH",
@@ -85,13 +111,34 @@ async function main() {
     ownerUid: stringField(other.localId)
   }, 403);
 
+  const rewardEvent = {
+    eventId: "evt_rules_smoke",
+    eventType: "work_apply_patch",
+    schemaVersion: 1,
+    sequence: 1,
+    timestamp: now,
+    turnId: "turn_rules_smoke",
+    privacyClass: "abstract",
+    source: "codex_hook",
+    signature: "v1.rules-smoke",
+    observedFields: {
+      changedLines: 12,
+      filesTouchedCount: 2
+    }
+  };
+  rewardEvent.checksum = checksum(rewardEvent);
   const rewardFields = {
     ownerUid: stringField(owner.localId),
-    eventId: stringField("evt_rules_smoke"),
-    eventType: stringField("work_apply_patch"),
-    timestamp: stringField(now),
-    privacyClass: stringField("abstract"),
-    source: stringField("codex_hook"),
+    eventId: stringField(rewardEvent.eventId),
+    eventType: stringField(rewardEvent.eventType),
+    schemaVersion: intField(rewardEvent.schemaVersion),
+    sequence: intField(rewardEvent.sequence),
+    timestamp: stringField(rewardEvent.timestamp),
+    turnId: stringField(rewardEvent.turnId),
+    privacyClass: stringField(rewardEvent.privacyClass),
+    source: stringField(rewardEvent.source),
+    signature: stringField(rewardEvent.signature),
+    checksum: stringField(rewardEvent.checksum),
     observedFields: mapField({
       changedLines: intField(12),
       filesTouchedCount: intField(2)
