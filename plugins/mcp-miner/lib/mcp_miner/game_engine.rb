@@ -14,6 +14,8 @@ module McpMiner
     MAX_DEDUPE_KEYS = 300
     REPORT_PREFIX = "MCP Miner:"
     MEANINGFUL_SCORE = 3.0
+    MILESTONE_INTERVAL = 250
+    PRIVACY_NOTICE = "No prompts, code, file paths, repo names, terminal output, browser content, app content, or raw transcripts included."
     VALID_REPORT_MODES = %w[
       off
       every_turn_compact
@@ -343,7 +345,7 @@ module McpMiner
         return {
           report: existing_report,
           source: "local_hook_state",
-          privacy: "No prompts, code, file paths, repo names, or terminal output included."
+          privacy: PRIVACY_NOTICE
         }
       end
 
@@ -352,7 +354,7 @@ module McpMiner
       {
         report: "MCP Miner: #{chonks} Chonks banked, #{asteroid[:display_name]} selected, orders ready.",
         source: "local_state",
-        privacy: "No prompts, code, file paths, repo names, or terminal output included."
+        privacy: PRIVACY_NOTICE
       }
     end
 
@@ -373,7 +375,96 @@ module McpMiner
         stats: current_state["stats"] || {},
         project_stats: current_state["project_stats"] || {},
         agent_stats: current_state["agent_stats"] || {},
-        latest_report: latest_report_payload(current_state)[:report]
+        latest_report: latest_report_payload(current_state)[:report],
+        settings: settings_payload(current_state)[:settings],
+        sync: sync_progress_payload(current_state)[:sync],
+        milestones: milestone_status_payload(current_state)[:milestones],
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def inventory_payload(current_state = state)
+      items = inventory_items(current_state)
+      {
+        inventory: {
+          total_units: items.sum { |item| item[:quantity].to_i },
+          total_raw_space_bucks: items.sum { |item| item[:total_raw_space_bucks].to_i },
+          categories: inventory_category_totals(items),
+          items: items,
+          gems: items.select { |item| item[:category] == "gem" }
+        },
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def settings_payload(current_state = state)
+      {
+        settings: {
+          report_mode: current_state["report_mode"],
+          cloud_sync: current_state["cloud_sync"],
+          valid_report_modes: VALID_REPORT_MODES
+        },
+        sync: sync_progress_payload(current_state)[:sync],
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def milestone_status_payload(current_state = state)
+      asteroid = asteroid_for(current_state)
+      mined = current_state.dig("asteroid_progress", "mined").to_i
+      depletion_size = asteroid["depletion_size"].to_i
+      percent_complete = depletion_size.positive? ? ((mined.to_f / depletion_size) * 100).round(2) : 0.0
+      next_target = next_milestone_target(mined, depletion_size)
+
+      {
+        milestones: {
+          status: mined >= depletion_size && depletion_size.positive? ? "asteroid_depleted" : "in_progress",
+          current_asteroid: asteroid_summary(asteroid["id"]),
+          progress: {
+            mined: mined,
+            depletion_size: depletion_size,
+            remaining: [depletion_size - mined, 0].max,
+            percent_complete: percent_complete
+          },
+          milestone_interval: MILESTONE_INTERVAL,
+          reached_count: mined / MILESTONE_INTERVAL,
+          next_milestone: next_target && {
+            target_mined: next_target,
+            remaining: [next_target - mined, 0].max,
+            percent_of_asteroid: depletion_size.positive? ? ((next_target.to_f / depletion_size) * 100).round(2) : 0.0
+          },
+          claimable: false,
+          claim_status: "not_supported_in_local_mvp"
+        },
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def sync_progress_payload(current_state = state)
+      {
+        ok: true,
+        sync: {
+          status: "local_only",
+          available: false,
+          cloud_sync_enabled: current_state["cloud_sync"],
+          materialized_state: "available",
+          journal: {
+            applied_event_count: current_state.dig("journal", "applied_event_count").to_i,
+            last_event_id: current_state.dig("journal", "last_event_id")
+          },
+          note: "Cloud sync is not implemented in the local MVP; progress remains in local state and journal."
+        },
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def claim_milestone_payload(_args = {})
+      {
+        ok: false,
+        status: "disabled",
+        reason: "Milestone claiming is not implemented in the local MVP because milestone rewards are not yet defined.",
+        milestones: milestone_status_payload[:milestones],
+        privacy: PRIVACY_NOTICE
       }
     end
 
@@ -405,7 +496,9 @@ module McpMiner
           settings: {
             report_mode: current_state["report_mode"],
             cloud_sync: current_state["cloud_sync"]
-          }
+          },
+          sync: sync_progress_payload(current_state)[:sync],
+          privacy: PRIVACY_NOTICE
         }
       end
     end
@@ -416,7 +509,11 @@ module McpMiner
           current_state["orders"] = generate_orders
           current_state["orders_generated_at"] = Time.now.utc.iso8601
         end
-        { orders: current_state["orders"], generated_at: current_state["orders_generated_at"] }
+        {
+          orders: current_state["orders"],
+          generated_at: current_state["orders_generated_at"],
+          privacy: PRIVACY_NOTICE
+        }
       end
     end
 
@@ -538,6 +635,51 @@ module McpMiner
 
         YAML.load_file(path).fetch(root_key)
       end
+    end
+
+    def inventory_items(current_state)
+      items = (current_state["inventory"] || {}).each_with_object([]) do |(material_id, quantity), payload|
+        quantity = quantity.to_i
+        next unless quantity.positive?
+
+        material = material_by_id[material_id] || {}
+        raw_space_bucks = material["raw_space_bucks"].to_i
+        payload << {
+          material_id: material_id,
+          display_name: material["display_name"] || material_id,
+          category: material["category"] || "unknown",
+          rarity: material["rarity"] || "unknown",
+          state_group: material["state_group"] || "unknown",
+          quantity: quantity,
+          raw_space_bucks_each: raw_space_bucks,
+          total_raw_space_bucks: raw_space_bucks * quantity,
+          can_refine: !!material["can_refine"]
+        }
+      end
+
+      items.sort_by { |item| [item[:material_id] == "mat_chonks" ? 0 : 1, item[:display_name]] }
+    end
+
+    def inventory_category_totals(items)
+      items.each_with_object({}) do |item, totals|
+        category = item[:category]
+        totals[category] ||= {
+          items: 0,
+          quantity: 0,
+          total_raw_space_bucks: 0
+        }
+        totals[category][:items] += 1
+        totals[category][:quantity] += item[:quantity].to_i
+        totals[category][:total_raw_space_bucks] += item[:total_raw_space_bucks].to_i
+      end
+    end
+
+    def next_milestone_target(mined, depletion_size)
+      return nil unless depletion_size.positive?
+      return nil if mined >= depletion_size
+
+      next_target = ((mined / MILESTONE_INTERVAL) + 1) * MILESTONE_INTERVAL
+      [next_target, depletion_size].min
     end
 
     def load_materialized_state

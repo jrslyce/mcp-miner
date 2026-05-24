@@ -74,8 +74,23 @@ class McpMinerServer
         inputSchema: object_schema({})
       },
       {
+        name: "get_inventory",
+        description: "Return the local MCP Miner inventory with material names, categories, rarity, and value totals.",
+        inputSchema: object_schema({})
+      },
+      {
         name: "get_active_orders",
         description: "Return currently generated MCP Miner orders with required materials and Space Bucks payouts.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "get_settings",
+        description: "Return current MCP Miner report, privacy, and local sync settings.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "get_milestone_status",
+        description: "Return current asteroid milestone progress and local claim support status.",
         inputSchema: object_schema({})
       },
       {
@@ -93,6 +108,20 @@ class McpMinerServer
           },
           cloud_sync: {
             type: "boolean"
+          }
+        })
+      },
+      {
+        name: "sync_progress",
+        description: "Report local/offline sync state. Cloud sync is disabled in the local MVP stub.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "claim_milestone",
+        description: "Return local milestone claim availability. Claiming is disabled until milestone rewards are defined.",
+        inputSchema: object_schema({
+          milestone_id: {
+            type: "string"
           }
         })
       },
@@ -124,16 +153,38 @@ class McpMinerServer
         @engine.player_status
       when "get_latest_report"
         @engine.latest_report_payload
+      when "get_inventory"
+        @engine.inventory_payload
       when "get_active_orders"
         @engine.active_orders_payload
+      when "get_settings"
+        @engine.settings_payload
+      when "get_milestone_status"
+        @engine.milestone_status_payload
       when "get_catalog_summary"
         @engine.catalog_summary
       when "update_settings"
         @engine.update_settings(args)
+      when "sync_progress"
+        @engine.sync_progress_payload
+      when "claim_milestone"
+        @engine.claim_milestone_payload(args)
       when "open_dashboard"
-        { dashboard_url: "http://localhost:3317/dashboard", note: "Dashboard server is not implemented yet; this is the reserved MVP URL." }
+        {
+          dashboard_url: "http://localhost:3317/dashboard",
+          status: "reserved",
+          available: false,
+          note: "Dashboard server is not implemented yet; this is the reserved MVP URL.",
+          privacy: McpMiner::GameEngine::PRIVACY_NOTICE
+        }
       when "open_store"
-        { store_url: "http://localhost:3317/store", note: "Store UI is not implemented yet; this is the reserved in-game store URL." }
+        {
+          store_url: "http://localhost:3317/store",
+          status: "reserved",
+          available: false,
+          note: "Store UI is not implemented yet; this is the reserved in-game store URL.",
+          privacy: McpMiner::GameEngine::PRIVACY_NOTICE
+        }
       else
         return error_response(id, -32_602, "Unknown tool: #{name}")
       end

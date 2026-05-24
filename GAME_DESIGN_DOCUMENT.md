@@ -1114,12 +1114,21 @@ Commands should be optional utility tools, not the main game loop.
 
 - `get_player_status`
 - `get_latest_report`
+- `get_inventory`
 - `open_dashboard`
 - `open_store`
 - `get_active_orders`
+- `get_settings`
+- `get_milestone_status`
+- `get_catalog_summary`
 - `sync_progress`
 - `update_settings`
 - `claim_milestone`
+
+Local MVP tools should return structured JSON text and must not expose prompts, source code,
+terminal output, file paths, repository names, browser content, app content, or raw transcripts.
+Cloud sync and milestone claiming may return explicit disabled/stub status until those systems have
+defined server-side or economy behavior.
 
 ## 18. Hook Design
 
