@@ -1,9 +1,10 @@
 {
   "scripts": {
     "validate:data": "ruby scripts/validate_data.rb",
+    "test:validator": "ruby scripts/test_validate_data.rb",
     "validate:plugin": "python3 /Users/jared/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/mcp-miner",
     "test:mcp": "printf '%s\n' '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}' '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"get_catalog_summary\",\"arguments\":{}}}' | ruby plugins/mcp-miner/scripts/mcp_server.rb",
     "test:hooks": "ruby scripts/test_hooks.rb",
-    "check": "npm run validate:data && npm run validate:plugin && npm run test:mcp && npm run test:hooks"
+    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:mcp && npm run test:hooks"
   }
 }
