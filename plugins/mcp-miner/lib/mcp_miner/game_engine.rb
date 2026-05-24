@@ -300,7 +300,7 @@ module McpMiner
     def should_emit_report?(state)
       mode = state["report_mode"] || "meaningful_turns_only"
       turn = state["current_turn"] || {}
-      return false if mode == "off" || mode == "session_summary_only"
+      return false if mode == "off"
       return false if turn["report_emitted"]
       return true if mode == "every_turn_compact" || mode == "every_turn_full"
       return milestone_turn?(state) if mode == "milestones_only"
@@ -310,23 +310,9 @@ module McpMiner
 
     def build_report(state)
       mode = state["report_mode"] || "meaningful_turns_only"
-      turn = state["current_turn"]
-      asteroid = asteroid_for(state)
-      summary = material_summary(turn["materials"])
-      order_summary = "orders waiting"
-      suit_condition = state["suit_condition"].to_i
-
-      template_key = mode == "every_turn_full" ? "full" : "compact"
-      template = @data.dig(:reports, template_key)&.first || "#{REPORT_PREFIX} +{chonks} Chonks, {material_summary}, {order_summary}."
-      fill_report_template(template, {
-        "chonks" => turn["chonks"].to_i,
-        "highlight" => highlight(turn),
-        "material_summary" => summary,
-        "order_summary" => order_summary,
-        "suit_condition" => suit_condition,
-        "asteroid_name" => asteroid["display_name"],
-        "space_bucks" => state["space_bucks"].to_i
-      })
+      turn = state["current_turn"] || {}
+      template_key = report_template_key(state, mode)
+      fill_report_template(report_template(template_key), report_values(state, turn))
     end
 
     def record_report(state, report, turn_id:)
@@ -990,6 +976,37 @@ module McpMiner
       end
     end
 
+    def report_template_key(state, mode)
+      return "milestone" if milestone_turn?(state) && %w[meaningful_turns_only milestones_only].include?(mode)
+      return "full" if mode == "every_turn_full" || mode == "session_summary_only"
+      return "no_progress" unless turn_progress?(state["current_turn"] || {})
+      return "order_progress" if has_active_orders?(state) && order_progress_percent(state).positive?
+
+      "compact"
+    end
+
+    def report_template(key)
+      @data.dig(:reports, key)&.first ||
+        @data.dig(:reports, "compact")&.first ||
+        "#{REPORT_PREFIX} +{chonks} Chonks, {material_summary}, {order_summary}."
+    end
+
+    def report_values(state, turn)
+      asteroid = asteroid_for(state)
+      {
+        "chonks" => turn["chonks"].to_i,
+        "highlight" => highlight(turn),
+        "material_summary" => material_summary(turn["materials"]),
+        "order_summary" => order_summary(state),
+        "suit_condition" => state["suit_condition"].to_i,
+        "asteroid_name" => asteroid["display_name"],
+        "space_bucks" => state["space_bucks"].to_i,
+        "order_percent" => order_progress_percent(state),
+        "time_remaining" => order_time_remaining(state),
+        "milestone_summary" => milestone_summary(state)
+      }
+    end
+
     def highlight(turn)
       events = turn["events"] || {}
       priority = {
@@ -1034,6 +1051,57 @@ module McpMiner
       concrete_count.positive? && turn["score"].to_f >= MEANINGFUL_SCORE
     end
 
+    def turn_progress?(turn)
+      turn["score"].to_f.positive? ||
+        turn["chonks"].to_i.positive? ||
+        (turn["materials"] || {}).values.sum(&:to_i).positive?
+    end
+
+    def order_summary(state)
+      order = first_active_order(state)
+      return "orders waiting" unless order
+
+      "#{order_progress_percent(state)}% toward #{order['product'] || order['order_id']}"
+    end
+
+    def order_progress_percent(state)
+      order = first_active_order(state)
+      return 0 unless order
+
+      required = order["required_materials"] || {}
+      total_required = required.values.sum(&:to_i)
+      return 0 unless total_required.positive?
+
+      inventory = state["inventory"] || {}
+      filled = required.sum do |material_id, quantity|
+        [inventory[material_id].to_i, quantity.to_i].min
+      end
+      [((filled.to_f / total_required) * 100).floor, 100].min
+    end
+
+    def order_time_remaining(state)
+      order = first_active_order(state)
+      return "time unknown" unless order
+
+      days = order["expires_in_days"].to_i
+      days.positive? ? "#{days} days" : "time unknown"
+    end
+
+    def has_active_orders?(state)
+      !!first_active_order(state)
+    end
+
+    def first_active_order(state)
+      orders = state["orders"].is_a?(Array) ? state["orders"] : []
+      orders.first
+    end
+
+    def milestone_summary(state)
+      milestones = milestone_status_payload(state).fetch(:milestones)
+      progress = milestones.fetch(:progress)
+      "#{milestones.dig(:current_asteroid, :display_name)} #{progress[:mined]}/#{progress[:depletion_size]} mined (#{progress[:percent_complete]}%)"
+    end
+
     def asteroid_for(state)
       asteroid_id = state["current_asteroid_class_id"] || state.dig("asteroid_progress", "asteroid_class_id")
       asteroid_by_id[asteroid_id] || @data.fetch(:asteroids).first
@@ -1055,8 +1123,12 @@ module McpMiner
 
     def milestone_turn?(state)
       mined = state.dig("asteroid_progress", "mined").to_i
-      size = asteroid_for(state)["depletion_size"].to_i
-      mined.positive? && size.positive? && (mined % 250) < [state.dig("current_turn", "chonks").to_i, 1].max
+      turn = state["current_turn"] || {}
+      turn_mined = turn["chonks"].to_i + (turn["materials"] || {}).values.sum(&:to_i)
+      previous_mined = [mined - turn_mined, 0].max
+      mined.positive? &&
+        turn_mined.positive? &&
+        (mined / MILESTONE_INTERVAL) > (previous_mined / MILESTONE_INTERVAL)
     end
 
     def material_name(material_id)

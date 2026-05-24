@@ -88,6 +88,13 @@ def stop_turn(turn_id, state_path, last_message: "Implemented and tested.")
   }, state_path)
 end
 
+def update_report_mode(state_path, mode)
+  run_mcp(state_path, [
+    { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+    { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "update_settings", arguments: { report_mode: mode } } }
+  ])
+end
+
 def patch_command(path: "example.rb", from: "old", to: "new")
   "*** Begin Patch\n*** Update File: #{path}\n@@\n-#{from}\n+#{to}\n*** End Patch\n"
 end
@@ -118,6 +125,10 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
   every_stop = stop_turn("turn-every", state_path)
   assert("every_turn_compact should emit for prompt-only turns") do
     every_stop["decision"] == "block" && every_stop["reason"].include?("MCP Miner:")
+  end
+  duplicate_stop = stop_turn("turn-every", state_path, last_message: every_stop["reason"])
+  assert("Stop hook should not duplicate an existing MCP Miner footer") do
+    duplicate_stop["continue"] == true && !duplicate_stop.key?("decision")
   end
 
   run_mcp(state_path, [
@@ -220,6 +231,85 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
   stop_turn("turn-test-pass", state_path)
   assert("passing tests should use test highlight") do
     state(state_path).dig("latest_report", "text").include?("lab alarms stayed polite")
+  end
+
+  Dir.mktmpdir("mcp-miner-report-modes") do |report_dir|
+    report_state_path = File.join(report_dir, "state.json")
+
+    update_report_mode(report_state_path, "off")
+    user_prompt("turn-off", report_state_path)
+    post_tool("turn-off", report_state_path,
+              tool_name: "apply_patch",
+              tool_use_id: "tool-off",
+              command: patch_command(path: "off.rb"),
+              response: { "status" => "success" })
+    off_stop = stop_turn("turn-off", report_state_path)
+    assert("off report mode should never emit") do
+      off_stop["continue"] == true && !off_stop.key?("decision")
+    end
+
+    update_report_mode(report_state_path, "every_turn_full")
+    user_prompt("turn-full", report_state_path)
+    full_stop = stop_turn("turn-full", report_state_path)
+    assert("every_turn_full should use the full expedition template") do
+      full_stop["decision"] == "block" &&
+        full_stop["reason"].include?("MCP Miner Expedition Report") &&
+        full_stop["reason"].include?("Space Bucks:")
+    end
+
+    update_report_mode(report_state_path, "session_summary_only")
+    user_prompt("turn-session", report_state_path)
+    post_tool("turn-session", report_state_path,
+              tool_name: "apply_patch",
+              tool_use_id: "tool-session",
+              command: patch_command(path: "session.rb"),
+              response: { "status" => "success" })
+    session_stop = stop_turn("turn-session", report_state_path)
+    assert("session_summary_only should emit detailed summaries for concrete work") do
+      session_stop["decision"] == "block" &&
+        session_stop["reason"].include?("MCP Miner Expedition Report") &&
+        session_stop["reason"].include?("Asteroid:")
+    end
+
+    update_report_mode(report_state_path, "milestones_only")
+    McpMiner::GameEngine.new(root: ROOT, state_path: report_state_path).with_state do |mode_state|
+      mode_state["asteroid_progress"]["mined"] = McpMiner::GameEngine::MILESTONE_INTERVAL - 1
+      mode_state["current_turn"] = nil
+    end
+    post_tool("turn-milestone", report_state_path,
+              tool_name: "apply_patch",
+              tool_use_id: "tool-milestone",
+              command: patch_command(path: "milestone.rb"),
+              response: { "status" => "success" })
+    milestone_stop = stop_turn("turn-milestone", report_state_path)
+    assert("milestones_only should emit deterministic milestone reports") do
+      milestone_stop["decision"] == "block" &&
+        milestone_stop["reason"].include?("MCP Miner milestone:") &&
+        milestone_stop["reason"].include?("Space Bucks balance")
+    end
+
+    update_report_mode(report_state_path, "every_turn_compact")
+    run_mcp(report_state_path, [
+      { jsonrpc: "2.0", id: 3, method: "initialize", params: {} },
+      { jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "get_active_orders", arguments: {} } }
+    ])
+    McpMiner::GameEngine.new(root: ROOT, state_path: report_state_path).with_state do |mode_state|
+      mode_state["inventory"]["mat_chonks"] = 18
+      mode_state["inventory"]["mat_element_fe"] = 6
+      mode_state["inventory"]["mat_element_ni"] = 2
+      mode_state["current_turn"] = nil
+    end
+    post_tool("turn-order", report_state_path,
+              tool_name: "apply_patch",
+              tool_use_id: "tool-order",
+              command: patch_command(path: "order.rb"),
+              response: { "status" => "success" })
+    order_stop = stop_turn("turn-order", report_state_path)
+    assert("compact reports should use order progress templates when orders are active") do
+      order_stop["decision"] == "block" &&
+        order_stop["reason"].include?("order +100%") &&
+        order_stop["reason"].include?("3 days left")
+    end
   end
 
   run_hook("subagent_start", {

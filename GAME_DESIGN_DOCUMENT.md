@@ -1200,7 +1200,7 @@ Report modes:
 - `every_turn_full`: report every turn with full templates.
 - `meaningful_turns_only`: report concrete non-prompt work when the turn score reaches the
   meaningful threshold, or when a milestone is reached.
-- `session_summary_only`: suppress per-turn reports in the current MVP.
+- `session_summary_only`: report only concrete-work summaries using the full expedition template.
 - `milestones_only`: report only when asteroid milestone progress is reached.
 
 ### Report Rules
