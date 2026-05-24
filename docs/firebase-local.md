@@ -42,6 +42,12 @@ Run the Firebase Hosting dashboard smoke case:
 npm run firebase:dashboard:smoke
 ```
 
+Run the full Auth, Firestore rules, Functions sync, and dashboard integration smoke case:
+
+```sh
+npm run firebase:integration:smoke
+```
+
 Run the repo-level static Firebase scaffold checks:
 
 ```sh
@@ -49,6 +55,7 @@ npm run test:firebase-config
 npm run test:firestore-schema
 npm run test:auth-linking
 npm run test:dashboard
+npm run test:firebase-integration
 npm run test:cloud-sync-api
 ```
 
