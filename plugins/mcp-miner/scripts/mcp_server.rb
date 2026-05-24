@@ -233,6 +233,11 @@ class McpMinerServer
         inputSchema: object_schema({})
       },
       {
+        name: "get_reward_controls",
+        description: "Return privacy-safe MCP Miner reward-control diagnostics, cooldowns, soft caps, and diversity policy.",
+        inputSchema: object_schema({})
+      },
+      {
         name: "get_milestone_status",
         description: "Return current asteroid milestone progress and local claim support status.",
         inputSchema: object_schema({})
@@ -333,6 +338,8 @@ class McpMinerServer
         @engine.purchase_base_module_payload(args)
       when "get_settings"
         @engine.settings_payload
+      when "get_reward_controls"
+        @engine.reward_controls_payload
       when "get_milestone_status"
         @engine.milestone_status_payload
       when "get_catalog_summary"

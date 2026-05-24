@@ -80,8 +80,9 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     { jsonrpc: "2.0", id: 10, method: "tools/call", params: { name: "sync_progress", arguments: {} } },
     { jsonrpc: "2.0", id: 11, method: "tools/call", params: { name: "claim_milestone", arguments: {} } },
     { jsonrpc: "2.0", id: 12, method: "tools/call", params: { name: "get_catalog_summary", arguments: {} } },
-    { jsonrpc: "2.0", id: 13, method: "tools/call", params: { name: "open_dashboard", arguments: {} } },
-    { jsonrpc: "2.0", id: 14, method: "tools/call", params: { name: "open_store", arguments: {} } }
+    { jsonrpc: "2.0", id: 13, method: "tools/call", params: { name: "get_reward_controls", arguments: {} } },
+    { jsonrpc: "2.0", id: 14, method: "tools/call", params: { name: "open_dashboard", arguments: {} } },
+    { jsonrpc: "2.0", id: 15, method: "tools/call", params: { name: "open_store", arguments: {} } }
   ])
 
   assert("initialize should advertise MCP tools capability") do
@@ -110,6 +111,7 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     get_base_status
     purchase_base_module
     get_settings
+    get_reward_controls
     get_milestone_status
     get_catalog_summary
     update_settings
@@ -135,8 +137,9 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
   sync_payload = tool_payload(responses[9])
   claim_payload = tool_payload(responses[10])
   catalog_payload = tool_payload(responses[11])
-  dashboard_payload = tool_payload(responses[12])
-  store_payload = tool_payload(responses[13])
+  reward_controls_payload = tool_payload(responses[12])
+  dashboard_payload = tool_payload(responses[13])
+  store_payload = tool_payload(responses[14])
 
   assert("update_settings should remain backward compatible") do
     update_payload["ok"] == true &&
@@ -189,6 +192,11 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     catalog_payload["materials"] >= 100 &&
       catalog_payload["asteroid_classes"] >= 1
   end
+  assert("get_reward_controls should expose privacy-safe reward policy") do
+    reward_controls_payload["ok"] == true &&
+      reward_controls_payload.dig("reward_controls", "policy", "events", "work_review", "cooldown_seconds") == 30 &&
+      reward_controls_payload.dig("reward_controls", "recent_diagnostics").is_a?(Array)
+  end
   assert("open_dashboard should return the reserved dashboard URL") do
     dashboard_payload["dashboard_url"] == "http://localhost:3317/dashboard" &&
       dashboard_payload["available"] == false
@@ -208,6 +216,7 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     milestone_payload,
     sync_payload,
     claim_payload,
+    reward_controls_payload,
     dashboard_payload,
     store_payload
   ])

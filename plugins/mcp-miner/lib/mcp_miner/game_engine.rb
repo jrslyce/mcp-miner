@@ -114,6 +114,7 @@ module McpMiner
         "state_schema_version" => CURRENT_STATE_SCHEMA_VERSION,
         "profile" => default_profile,
         "space_bucks" => start.fetch("space_bucks"),
+        "reward_controls" => default_reward_controls,
         "inventory" => start.fetch("inventory").dup,
         "unlocked_machine_ids" => start.fetch("unlocked_machine_ids").dup,
         "unlocked_asteroid_class_ids" => start.fetch("unlocked_asteroid_class_ids").dup,
@@ -170,6 +171,10 @@ module McpMiner
       state["profile"] = default_profile.merge(state["profile"].is_a?(Hash) ? state["profile"] : {})
       state["profile"]["customization_unlocks"] ||= []
       state["profile"]["generated_assets"] ||= []
+      state["reward_controls"] = default_reward_controls.merge(state["reward_controls"].is_a?(Hash) ? state["reward_controls"] : {})
+      state["reward_controls"]["event_stats"] ||= {}
+      state["reward_controls"]["daily_category_counts"] ||= {}
+      state["reward_controls"]["diagnostics"] ||= []
       state["space_bucks"] = start.fetch("space_bucks") unless state.key?("space_bucks")
       state["inventory"] ||= start.fetch("inventory").dup
       state["unlocked_machine_ids"] ||= start.fetch("unlocked_machine_ids").dup
@@ -241,6 +246,14 @@ module McpMiner
       }
     end
 
+    def default_reward_controls
+      {
+        "event_stats" => {},
+        "daily_category_counts" => {},
+        "diagnostics" => []
+      }
+    end
+
     def ensure_turn(state, turn_id)
       current = state["current_turn"]
       return if current && current["turn_id"] == turn_id
@@ -262,7 +275,9 @@ module McpMiner
       journal_event_id = reward_journal_event_id(event_key)
       return if state["dedupe_keys"].include?(event_key) || state["dedupe_keys"].include?(journal_event_id)
 
-      score = event_score(event_id, line_count)
+      raw_score = event_score(event_id, line_count)
+      control = reward_control_decision(state, event_id, raw_score, Time.now.utc)
+      score = (raw_score * control.fetch("multiplier").to_f).round(2)
       return if score <= 0
 
       reward = calculate_reward(state, event_id, score, turn_id: turn_id)
@@ -274,7 +289,8 @@ module McpMiner
         turn_id: turn_id,
         session_id: session_id,
         project_id: project_id,
-        agent_id: agent_id
+        agent_id: agent_id,
+        reward_control: control
       )
       append_journal_entry(journal_entry)
       apply_journal_entry(state, journal_entry)
@@ -328,6 +344,46 @@ module McpMiner
 
       score *= event["verification_bonus"].to_f if event_id == "work_test_pass" && event["verification_bonus"]
       score.round(2)
+    end
+
+    def reward_control_decision(state, event_id, raw_score, now)
+      event = work_event_by_id.fetch(event_id)
+      date_key = now.strftime("%Y-%m-%d")
+      event_stats = state.dig("reward_controls", "event_stats", event_id) || {}
+      day_stats = event_stats.dig("daily", date_key) || {}
+      reasons = []
+      multiplier = 1.0
+
+      cooldown = event["cooldown_seconds"].to_i
+      last_rewarded_at = parse_time(event_stats["last_rewarded_at"])
+      if cooldown.positive? && last_rewarded_at && (now - last_rewarded_at) < cooldown
+        multiplier *= 0.25
+        reasons << "cooldown"
+      end
+
+      soft_cap = event["daily_soft_cap"].to_i
+      if soft_cap.positive? && day_stats["count"].to_i >= soft_cap
+        multiplier *= 0.2
+        reasons << "daily_soft_cap"
+      end
+
+      category = event["category"].to_s
+      categories_today = (state.dig("reward_controls", "daily_category_counts", date_key) || {}).keys
+      if !categories_today.include?(category) && categories_today.length >= 2
+        multiplier *= 1.10
+        reasons << "diverse_work_bonus"
+      end
+
+      {
+        "raw_score" => raw_score.to_f.round(2),
+        "multiplier" => multiplier.round(4),
+        "effective_score" => (raw_score.to_f * multiplier).round(2),
+        "reasons" => reasons.empty? ? ["standard"] : reasons,
+        "event_type" => event_id,
+        "category" => category,
+        "date" => date_key,
+        "privacy_class" => "abstract"
+      }
     end
 
     def calculate_reward(state, event_id, score, turn_id:)
@@ -782,6 +838,26 @@ module McpMiner
           last_migration: current_state["last_migration"],
           last_recovery: current_state["last_recovery"],
           note: "Cloud sync is not implemented in the local MVP; progress remains in local state and journal."
+        },
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def reward_controls_payload(current_state = state)
+      controls = default_reward_controls.merge(current_state["reward_controls"].is_a?(Hash) ? current_state["reward_controls"] : {})
+      diagnostics = Array(controls["diagnostics"]).last(25)
+      {
+        ok: true,
+        reward_controls: {
+          policy: reward_control_policy,
+          event_stats: controls["event_stats"] || {},
+          daily_category_counts: controls["daily_category_counts"] || {},
+          recent_diagnostics: diagnostics,
+          diagnostics_retention: {
+            stored: Array(controls["diagnostics"]).length,
+            returned: diagnostics.length,
+            max_stored: 100
+          }
         },
         privacy: PRIVACY_NOTICE
       }
@@ -1291,6 +1367,25 @@ module McpMiner
     end
 
     private
+
+    def reward_control_policy
+      {
+        dedupe: "Identical abstract hook events are rewarded once.",
+        cooldown: "Event-specific cooldowns reduce repeated rewards without inspecting work content.",
+        daily_soft_cap: "Event-specific daily soft caps reduce rewards after normal-use thresholds.",
+        diversity_bonus: {
+          threshold_distinct_categories: 2,
+          multiplier: 1.10
+        },
+        events: work_event_by_id.transform_values do |event|
+          {
+            category: event["category"],
+            cooldown_seconds: event["cooldown_seconds"].to_i,
+            daily_soft_cap: event["daily_soft_cap"].to_i
+          }
+        end
+      }
+    end
 
     def load_data
       DATA_FILES.transform_values do |(file, root_key)|
@@ -2513,7 +2608,7 @@ module McpMiner
       "evt_#{Digest::SHA256.hexdigest(dedupe_key)[0, 16]}"
     end
 
-    def reward_journal_entry(event_id, event_type, score, reward, turn_id:, session_id:, project_id:, agent_id:)
+    def reward_journal_entry(event_id, event_type, score, reward, turn_id:, session_id:, project_id:, agent_id:, reward_control: nil)
       {
         "event_id" => event_id,
         "event_type" => event_type,
@@ -2532,6 +2627,7 @@ module McpMiner
           "rare_find_chance" => reward[:rare_find_chance],
           "hazard" => reward[:hazard]
         },
+        "reward_control" => reward_control,
         "project_id" => optional_string(project_id),
         "agent_id" => optional_string(agent_id)
       }.compact
@@ -2599,6 +2695,7 @@ module McpMiner
       turn["events"][event_type] = turn["events"][event_type].to_i + 1
 
       add_stat_event(state, event_type, score)
+      apply_reward_control_journal(state, event_type, entry)
       unless event_type == "work_user_prompt"
         state["stats"]["tool_events_seen"] = state["stats"]["tool_events_seen"].to_i + 1
       end
@@ -2607,6 +2704,50 @@ module McpMiner
 
       apply_project_journal_activity(state, entry["project_id"], event_type, safe_string(entry["turn_id"]), timestamp)
       apply_agent_journal_activity(state, entry["agent_id"], event_type, timestamp)
+    end
+
+    def apply_reward_control_journal(state, event_type, entry)
+      control = entry["reward_control"].is_a?(Hash) ? entry["reward_control"] : {
+        "event_type" => event_type,
+        "category" => work_event_by_id.dig(event_type, "category").to_s,
+        "date" => safe_string(entry["timestamp"])[0, 10],
+        "raw_score" => entry["score"].to_f,
+        "effective_score" => entry["score"].to_f,
+        "multiplier" => 1.0,
+        "reasons" => ["legacy"]
+      }
+      date_key = safe_string(control["date"])
+      date_key = safe_string(entry["timestamp"])[0, 10] if date_key.empty?
+      category = safe_string(control["category"])
+      category = work_event_by_id.dig(event_type, "category").to_s if category.empty?
+
+      controls = state["reward_controls"] ||= default_reward_controls
+      event_stats = controls["event_stats"][event_type] ||= {
+        "count" => 0,
+        "daily" => {},
+        "last_rewarded_at" => nil
+      }
+      event_stats["count"] = event_stats["count"].to_i + 1
+      event_stats["last_rewarded_at"] = safe_string(entry["timestamp"])
+      daily = event_stats["daily"][date_key] ||= { "count" => 0, "effective_score" => 0.0 }
+      daily["count"] = daily["count"].to_i + 1
+      daily["effective_score"] = (daily["effective_score"].to_f + control["effective_score"].to_f).round(2)
+
+      category_counts = controls["daily_category_counts"][date_key] ||= {}
+      category_counts[category] = category_counts[category].to_i + 1 unless category.empty?
+
+      controls["diagnostics"] << {
+        "event_type" => event_type,
+        "category" => category,
+        "date" => date_key,
+        "raw_score" => control["raw_score"].to_f.round(2),
+        "effective_score" => control["effective_score"].to_f.round(2),
+        "multiplier" => control["multiplier"].to_f.round(4),
+        "reasons" => Array(control["reasons"]),
+        "privacy_class" => "abstract",
+        "created_at" => safe_string(entry["timestamp"])
+      }
+      controls["diagnostics"] = controls["diagnostics"].last(100)
     end
 
     def apply_project_journal_activity(state, project_id, event_type, turn_id, timestamp)
@@ -2665,6 +2806,7 @@ module McpMiner
         state_schema_version
         profile
         space_bucks
+        reward_controls
         inventory
         unlocked_machine_ids
         unlocked_asteroid_class_ids

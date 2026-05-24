@@ -9,7 +9,7 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 
 ## Behavior
 
-- Use MCP Miner MCP tools for player status, latest reports, active orders, inventory, settings, milestone status, sync state, and catalog summaries.
+- Use MCP Miner MCP tools for player status, latest reports, active orders, inventory, settings, reward-control diagnostics, milestone status, sync state, and catalog summaries.
 - Do not invent gameplay data. Gameplay content comes from the validated `data/*.yaml` files.
 - Keep reports compact unless the user asks for detail.
 - Never include private work details such as prompts, code, file paths, repo names, terminal output, or browser content in game reports.
@@ -37,6 +37,7 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 - `get_base_status`: inspect base modules, configured effects, and drone automation.
 - `purchase_base_module`: spend Space Bucks/materials to build or repair one base module level.
 - `get_settings`: report mode, cloud-sync preference, and privacy posture.
+- `get_reward_controls`: privacy-safe cooldown, soft-cap, dedupe, and diversity diagnostics for rewarded work.
 - `get_milestone_status`: current asteroid milestone progress and claim support status.
 - `get_catalog_summary`: counts of loaded materials, recipes, machines, asteroids, upgrades, and hazards.
 - `update_settings`: change report mode or cloud sync preference.
