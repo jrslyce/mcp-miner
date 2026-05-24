@@ -27,6 +27,8 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 - `get_fabrication_status`: inspect fabrication machines, queues, completed products, and throughput.
 - `queue_fabrication`: consume recipe materials and queue a fabricated product.
 - `get_active_orders`: current generated orders.
+- `get_weekly_contracts`: inspect longer-lived weekly contract goals.
+- `complete_weekly_contract`: fulfill a weekly contract from materials or completed product stock.
 - `fulfill_order`: consume available inventory and complete an active order for Space Bucks.
 - `refine_material`: convert refinable raw inventory into refined inventory.
 - `sell_material`: sell raw or refined inventory directly for Space Bucks.

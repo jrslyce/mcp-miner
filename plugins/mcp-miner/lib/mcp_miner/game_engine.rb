@@ -125,6 +125,9 @@ module McpMiner
         "orders" => [],
         "completed_orders" => [],
         "order_generation_index" => 0,
+        "weekly_contracts" => [],
+        "completed_weekly_contracts" => [],
+        "weekly_contract_generation_index" => 0,
         "market_sale_index" => 0,
         "market_transactions" => [],
         "fabrication_queue" => [],
@@ -199,6 +202,9 @@ module McpMiner
       state["orders"] ||= []
       state["completed_orders"] ||= []
       state["order_generation_index"] = state["order_generation_index"].to_i
+      state["weekly_contracts"] ||= []
+      state["completed_weekly_contracts"] ||= []
+      state["weekly_contract_generation_index"] = state["weekly_contract_generation_index"].to_i
       state["market_sale_index"] = state["market_sale_index"].to_i
       state["market_transactions"] ||= []
       state["fabrication_queue"] ||= []
@@ -923,6 +929,84 @@ module McpMiner
           replacement_order: order_payload(replacement, current_state),
           privacy: PRIVACY_NOTICE
         }
+      end
+    end
+
+    def weekly_contracts_payload
+      with_state do |current_state|
+        refresh_weekly_contracts!(current_state)
+        {
+          contracts: current_state["weekly_contracts"].map { |contract| weekly_contract_payload(contract, current_state) },
+          generated_at: current_state["weekly_contracts_generated_at"],
+          refresh_due_at: current_state["weekly_contracts_refresh_due_at"],
+          refresh_cadence_days: 7,
+          missed_contract_penalty: "lost_opportunity_only",
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
+    def complete_weekly_contract_payload(args)
+      contract_id = safe_string(args["contract_id"])
+      raise "contract_id is required" if contract_id.empty?
+
+      with_state do |current_state|
+        refresh_weekly_contracts!(current_state)
+        contract = current_state["weekly_contracts"].find { |candidate| candidate["contract_id"] == contract_id }
+        unless contract
+          next {
+            ok: false,
+            status: "not_found",
+            contract_id: contract_id,
+            contracts: current_state["weekly_contracts"].map { |candidate| weekly_contract_payload(candidate, current_state) },
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        completed_product = completed_product_for_order(contract, current_state)
+        consumed_product = nil
+        if completed_product
+          consumed_product = completed_product_key(contract["recipe_id"], contract["variant_id"], completed_product["quality_grade"].to_i)
+          consume_completed_product!(current_state, completed_product, contract["quantity"].to_i)
+        else
+          missing = missing_materials(contract, current_state)
+          unless missing.empty?
+            next {
+              ok: false,
+              status: "missing_materials",
+              contract: weekly_contract_payload(contract, current_state),
+              missing_materials: missing,
+              privacy: PRIVACY_NOTICE
+            }
+          end
+          (contract["required_materials"] || {}).each do |material_id, quantity|
+            current_state["inventory"][material_id] = current_state["inventory"][material_id].to_i - quantity.to_i
+          end
+        end
+
+        current_state["space_bucks"] = current_state["space_bucks"].to_i + contract["payout_space_bucks"].to_i
+        completed_at = Time.now.utc.iso8601
+        completed_contract = contract.merge(
+          "status" => "fulfilled",
+          "fulfilled_at" => completed_at,
+          "fulfilled_by" => consumed_product ? "completed_product" : "materials"
+        )
+        current_state["completed_weekly_contracts"] << completed_contract
+        current_state["completed_weekly_contracts"] = current_state["completed_weekly_contracts"].last(20)
+        current_state["weekly_contracts"].delete_if { |candidate| candidate["contract_id"] == contract_id }
+        replacement = replace_weekly_contract_for_slot!(current_state, contract["slot"].to_i)
+
+        {
+          ok: true,
+          status: "fulfilled",
+          contract: completed_contract,
+          consumed_materials: consumed_product ? nil : contract["required_materials"],
+          consumed_product: consumed_product,
+          payout_space_bucks: contract["payout_space_bucks"].to_i,
+          space_bucks: current_state["space_bucks"].to_i,
+          replacement_contract: weekly_contract_payload(replacement, current_state),
+          privacy: PRIVACY_NOTICE
+        }.compact
       end
     end
 
@@ -2111,6 +2195,143 @@ module McpMiner
       )
     end
 
+    def refresh_weekly_contracts!(state)
+      now = Time.now.utc
+      state["weekly_contract_generation_index"] = state["weekly_contract_generation_index"].to_i
+      state["weekly_contracts"] = [] unless state["weekly_contracts"].is_a?(Array)
+      refresh_due = parse_time(state["weekly_contracts_refresh_due_at"])
+
+      if state["weekly_contracts"].empty? || (refresh_due && refresh_due <= now)
+        state["weekly_contract_generation_index"] += 1 unless state["weekly_contracts"].empty?
+        state["weekly_contracts"] = generate_weekly_contracts(state, generated_at: now)
+        stamp_weekly_contract_generation!(state, now)
+        return
+      end
+
+      expired_slots = state["weekly_contracts"].select { |contract| order_expired?(contract, now) }.map { |contract| contract["slot"].to_i }
+      return if expired_slots.empty?
+
+      state["weekly_contracts"].reject! { |contract| expired_slots.include?(contract["slot"].to_i) }
+      expired_slots.each { |slot| replace_weekly_contract_for_slot!(state, slot, generated_at: now) }
+      stamp_weekly_contract_generation!(state, now)
+    end
+
+    def generate_weekly_contracts(state, generated_at:)
+      weekly_contract_slots_for(state).times.map do |slot|
+        generate_weekly_contract_for_slot(state, slot, generated_at: generated_at)
+      end
+    end
+
+    def replace_weekly_contract_for_slot!(state, slot, generated_at: Time.now.utc)
+      state["weekly_contract_generation_index"] = state["weekly_contract_generation_index"].to_i + 1
+      replacement = generate_weekly_contract_for_slot(state, slot, generated_at: generated_at)
+      state["weekly_contracts"] << replacement
+      state["weekly_contracts"].sort_by! { |contract| contract["slot"].to_i }
+      stamp_weekly_contract_generation!(state, generated_at) unless state["weekly_contracts_generated_at"]
+      replacement
+    end
+
+    def stamp_weekly_contract_generation!(state, generated_at)
+      state["weekly_contracts_generated_at"] = generated_at.iso8601
+      state["weekly_contracts_refresh_due_at"] = (generated_at + (7 * 86_400)).iso8601
+    end
+
+    def generate_weekly_contract_for_slot(state, slot, generated_at:)
+      tier = player_tier(state)
+      candidates = weekly_recipe_candidates(state, tier)
+      raise "No valid weekly contract recipes for player tier #{tier}" if candidates.empty?
+
+      generation = state["weekly_contract_generation_index"].to_i
+      seed = "weekly:#{generation}:#{slot}"
+      recipe = deterministic_pick(candidates, "#{seed}:recipe")
+      machine = machine_by_id.fetch(recipe["machine_id"])
+      variants = variant_list.select do |variant|
+        variant["quality_grade_required"].to_i <= machine.dig("quality", "max_quality_grade").to_i &&
+          weekly_variant_accessible?(recipe, variant, state)
+      end
+      variants = [variant_list.first] if variants.empty?
+      variant = deterministic_pick(variants, "#{seed}:variant")
+      buyers = buyer_list.select { |buyer| buyer["unlock_tier"].to_i <= tier }
+      buyer = deterministic_pick(buyers.empty? ? buyer_list : buyers, "#{seed}:buyer")
+      base_quantity = deterministic_range(order_generator.fetch("quantity_by_tier").fetch(recipe["progression_tier"].to_i), "#{seed}:quantity")
+      quantity = [base_quantity + 2, base_quantity * 2].max
+      required = required_materials(recipe, variant, quantity)
+      windfall = deterministic_unit("#{seed}:windfall") < (order_generator.dig("windfall", "chance").to_f / 2.0)
+      price_multiplier = (windfall ? windfall_multiplier("#{seed}:windfall_multiplier") : normal_price_multiplier("#{seed}:normal_price")) * 1.35
+      payout = order_payout(required, recipe, variant, buyer, price_multiplier: price_multiplier)
+      digest = Digest::SHA256.hexdigest("#{seed}:#{recipe['id']}:#{variant['id']}:#{buyer['id']}")[0, 10]
+
+      {
+        "contract_id" => "weekly_#{generation}_#{slot + 1}_#{digest}",
+        "slot" => slot,
+        "kind" => "weekly_contract",
+        "status" => "active",
+        "recipe_id" => recipe["id"],
+        "product" => "#{variant['display_name']} #{recipe['display_name']}",
+        "variant_id" => variant["id"],
+        "buyer_id" => buyer["id"],
+        "buyer" => buyer["display_name"],
+        "quantity" => quantity,
+        "required_materials" => required,
+        "payout_space_bucks" => payout,
+        "price_multiplier" => price_multiplier.round(4),
+        "is_windfall" => windfall,
+        "windfall_label" => windfall ? deterministic_pick(order_generator.fetch("windfall_labels"), "#{seed}:windfall_label") : nil,
+        "deadline_days" => 7,
+        "expires_in_days" => 7,
+        "missed_contract_penalty" => "lost_opportunity_only",
+        "created_at" => generated_at.iso8601,
+        "expires_at" => (generated_at + (7 * 86_400)).iso8601
+      }.compact
+    end
+
+    def weekly_contract_payload(contract, state)
+      payload = order_payload(contract, state)
+      payload["contract_id"] = contract["contract_id"]
+      payload["can_complete"] = payload["can_fulfill"]
+      payload.delete("can_fulfill")
+      payload
+    end
+
+    def weekly_contract_slots_for(_state)
+      1
+    end
+
+    def weekly_recipe_candidates(state, tier)
+      recipe_list.select do |recipe|
+        next false if recipe["progression_tier"].to_i > tier
+        next false unless machine_unlocked?(machine_by_id.fetch(recipe["machine_id"]), state)
+
+        recipe["inputs"].all? { |input| weekly_material_accessible?(input["material_id"], state) }
+      end
+    end
+
+    def weekly_variant_accessible?(recipe, variant, state)
+      return false if variant["adds_refined_primary"] && !weekly_material_accessible?(recipe["primary_material_id"], state)
+
+      if variant["adds_collector_accent"]
+        return false unless weekly_material_accessible?(recipe.dig("collector_accent", "material_id"), state)
+      end
+      true
+    end
+
+    def weekly_material_accessible?(material_id, state)
+      return false if material_id.to_s.empty?
+      return true if (state["inventory"] || {}).key?(material_id)
+
+      base_id = material_id.sub(/^refined:/, "")
+      accessible_material_ids(state).include?(base_id)
+    end
+
+    def accessible_material_ids(state)
+      unlocked = state["unlocked_asteroid_class_ids"] || []
+      ids = unlocked.flat_map do |asteroid_id|
+        asteroid = asteroid_by_id[asteroid_id]
+        asteroid ? asteroid.fetch("composition").map { |entry| entry["material_id"] } : []
+      end
+      (ids + (state["inventory"] || {}).keys.map { |id| id.sub(/^refined:/, "") }).uniq
+    end
+
     def missing_materials(order, state)
       inventory = state["inventory"] || {}
       (order["required_materials"] || {}).each_with_object({}) do |(material_id, quantity), missing|
@@ -2457,6 +2678,11 @@ module McpMiner
         orders_generated_at
         orders_refresh_due_at
         order_generation_index
+        weekly_contracts
+        completed_weekly_contracts
+        weekly_contracts_generated_at
+        weekly_contracts_refresh_due_at
+        weekly_contract_generation_index
         market_sale_index
         market_transactions
         fabrication_queue

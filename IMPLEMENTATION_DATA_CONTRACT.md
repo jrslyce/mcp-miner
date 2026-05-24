@@ -692,6 +692,9 @@ Representative shape:
   "cloud_sync": false,
   "orders": [],
   "completed_orders": [],
+  "weekly_contracts": [],
+  "completed_weekly_contracts": [],
+  "weekly_contract_generation_index": 0,
   "orders_generated_at": "2026-05-24T00:00:00Z",
   "orders_refresh_due_at": "2026-05-25T00:00:00Z",
   "order_generation_index": 0,
@@ -1141,6 +1144,38 @@ Required runtime validation:
 - Expired orders are replaced without inventory loss; `missed_order_penalty` remains
   `lost_opportunity_only`.
 - Expiration is after creation.
+
+### Weekly Contract Instance
+
+Weekly contracts reuse order recipe, variant, buyer, pricing, and fulfillment semantics, but live in
+`weekly_contracts` instead of regular order slots.
+
+```json
+{
+  "contractId": "weekly_0_1_abcdef1234",
+  "kind": "weekly_contract",
+  "status": "active",
+  "recipeId": "recipe_hull_patch_clips",
+  "variantId": "order_variant_standard_batch",
+  "quantity": 4,
+  "requiredMaterials": {
+    "mat_chonks": 72,
+    "mat_element_fe": 24
+  },
+  "payoutSpaceBucks": 900,
+  "deadlineDays": 7,
+  "missedContractPenalty": "lost_opportunity_only"
+}
+```
+
+Required runtime validation:
+
+- Weekly contracts are generated separately from active order slots.
+- Requirements are selected from recipes, machines, variants, and materials available to the
+  player's unlocked tier.
+- Completion consumes required materials or matching completed product stock, pays Space Bucks,
+  archives the completed contract, and replaces the weekly slot.
+- Expired weekly contracts are replaced without inventory loss.
 
 ## Validation Test Suite
 

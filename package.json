@@ -12,7 +12,8 @@
     "test:fabrication": "ruby scripts/test_fabrication.rb",
     "test:base": "ruby scripts/test_base_modules.rb",
     "test:profile": "ruby scripts/test_profile.rb",
+    "test:weekly": "ruby scripts/test_weekly_contracts.rb",
     "test:hooks": "ruby scripts/test_hooks.rb",
-    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:market && npm run test:upgrades && npm run test:asteroids && npm run test:fabrication && npm run test:base && npm run test:profile && npm run test:hooks"
+    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:market && npm run test:upgrades && npm run test:asteroids && npm run test:fabrication && npm run test:base && npm run test:profile && npm run test:weekly && npm run test:hooks"
   }
 }

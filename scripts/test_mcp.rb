@@ -100,6 +100,8 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     get_fabrication_status
     queue_fabrication
     get_active_orders
+    get_weekly_contracts
+    complete_weekly_contract
     fulfill_order
     refine_material
     sell_material

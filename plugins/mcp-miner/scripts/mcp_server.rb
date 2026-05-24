@@ -151,6 +151,20 @@ class McpMinerServer
         inputSchema: object_schema({})
       },
       {
+        name: "get_weekly_contracts",
+        description: "Return longer-lived MCP Miner weekly contracts generated separately from active orders.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "complete_weekly_contract",
+        description: "Complete a weekly contract using available materials or matching completed product stock.",
+        inputSchema: object_schema({
+          contract_id: {
+            type: "string"
+          }
+        })
+      },
+      {
         name: "fulfill_order",
         description: "Fulfill an active MCP Miner order when required inventory is available.",
         inputSchema: object_schema({
@@ -299,6 +313,10 @@ class McpMinerServer
         @engine.queue_fabrication_payload(args)
       when "get_active_orders"
         @engine.active_orders_payload
+      when "get_weekly_contracts"
+        @engine.weekly_contracts_payload
+      when "complete_weekly_contract"
+        @engine.complete_weekly_contract_payload(args)
       when "fulfill_order"
         @engine.fulfill_order_payload(args)
       when "refine_material"
