@@ -687,6 +687,9 @@ Representative shape:
   "order_generation_index": 0,
   "market_sale_index": 0,
   "market_transactions": [],
+  "fabrication_queue": [],
+  "completed_products": [],
+  "fabrication_sequence": 0,
   "suit_condition": 100,
   "asteroid_progress": {
     "asteroid_class_id": "asteroid_starter_field",
@@ -794,6 +797,8 @@ Required runtime validation and normalization:
   `balance.pity.max_final_rare_chance`.
 - `asteroid_depletions` and `hazard_log` store recent privacy-safe asteroid class IDs, hazard IDs,
   damage amounts, and timestamps; no work details are stored.
+- `fabrication_queue` stores queued product jobs by recipe, variant, machine, progress, and required
+  materials; `completed_products` stores aggregate product stock by product key.
 - `suit_condition` is an integer condition percentage, defaulting to 100.
 - `report_mode` is one of `off`, `every_turn_compact`, `every_turn_full`,
   `meaningful_turns_only`, `session_summary_only`, or `milestones_only`.
@@ -992,6 +997,34 @@ Required runtime validation:
   from the GDD/balance constants.
 - Upgrade effects are computed from the formula registry and are used by mining output, hazard
   reduction, and refinery output where those systems exist locally.
+
+### Fabrication Queue
+
+Fabrication jobs consume inventory when queued and produce completed product stock when finished.
+
+```json
+{
+  "fabricationId": "fab_1_abcdef1234",
+  "recipeId": "recipe_hull_patch_clips",
+  "variantId": "order_variant_standard_batch",
+  "machineId": "machine_basic_3d_printer",
+  "quantity": 1,
+  "qualityGrade": 0,
+  "progress": 10,
+  "progressRequired": 20
+}
+```
+
+Required runtime validation:
+
+- `get_fabrication_status` exposes unlocked/locked machines, queue limits, effective throughput,
+  queued jobs, and completed product stock.
+- `queue_fabrication` rejects unknown recipes/variants, locked machines, full queues, insufficient
+  materials, and variant quality above machine quality caps.
+- Queueing consumes the recipe/variant material requirements immediately.
+- Work events advance queued jobs using machine throughput and fabricator throughput upgrades.
+- Completed products can satisfy matching fabricated product orders before raw material fulfillment
+  is attempted.
 
 ### Order Instance
 

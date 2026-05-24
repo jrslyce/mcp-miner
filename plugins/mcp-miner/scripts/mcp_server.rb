@@ -93,6 +93,27 @@ class McpMinerServer
         })
       },
       {
+        name: "get_fabrication_status",
+        description: "Return MCP Miner fabrication machines, queue state, completed products, and throughput.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "queue_fabrication",
+        description: "Queue a fabricated product from a recipe and order variant when machine and materials are available.",
+        inputSchema: object_schema({
+          recipe_id: {
+            type: "string"
+          },
+          variant_id: {
+            type: "string"
+          },
+          quantity: {
+            type: "integer",
+            minimum: 1
+          }
+        })
+      },
+      {
         name: "get_active_orders",
         description: "Return currently generated MCP Miner orders with required materials and Space Bucks payouts.",
         inputSchema: object_schema({})
@@ -222,6 +243,10 @@ class McpMinerServer
         @engine.asteroid_status_payload
       when "select_asteroid"
         @engine.select_asteroid_payload(args)
+      when "get_fabrication_status"
+        @engine.fabrication_status_payload
+      when "queue_fabrication"
+        @engine.queue_fabrication_payload(args)
       when "get_active_orders"
         @engine.active_orders_payload
       when "fulfill_order"

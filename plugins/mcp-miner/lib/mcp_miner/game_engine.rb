@@ -125,6 +125,9 @@ module McpMiner
         "order_generation_index" => 0,
         "market_sale_index" => 0,
         "market_transactions" => [],
+        "fabrication_queue" => [],
+        "completed_products" => [],
+        "fabrication_sequence" => 0,
         "suit_condition" => 100,
         "asteroid_progress" => {
           "asteroid_class_id" => start.fetch("current_asteroid_class_id"),
@@ -193,6 +196,9 @@ module McpMiner
       state["order_generation_index"] = state["order_generation_index"].to_i
       state["market_sale_index"] = state["market_sale_index"].to_i
       state["market_transactions"] ||= []
+      state["fabrication_queue"] ||= []
+      state["completed_products"] ||= []
+      state["fabrication_sequence"] = state["fabrication_sequence"].to_i
       state["journal"] = default_journal_metadata.merge(state["journal"] || {})
       state["last_migration"] = nil unless state["last_migration"].nil? || state["last_migration"].is_a?(Hash)
       state["last_recovery"] = nil unless state["last_recovery"].nil? || state["last_recovery"].is_a?(Hash)
@@ -467,6 +473,94 @@ module McpMiner
       end
     end
 
+    def fabrication_status_payload(current_state = state)
+      {
+        machines: machine_list.map { |machine| machine_status(machine, current_state) },
+        queue: (current_state["fabrication_queue"] || []).map { |item| fabrication_item_payload(item) },
+        completed_products: current_state["completed_products"] || [],
+        throughput_multiplier: upgrade_effect_by_id("upgrade_fabricator_throughput", current_state.dig("upgrades", "upgrade_fabricator_throughput").to_i),
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def queue_fabrication_payload(args)
+      recipe_id = safe_string(args["recipe_id"])
+      variant_id = safe_string(args["variant_id"])
+      variant_id = "order_variant_standard_batch" if variant_id.empty?
+      quantity = args["quantity"].to_i
+      quantity = 1 if quantity <= 0
+
+      recipe = recipe_by_id[recipe_id]
+      return unknown_recipe_payload(recipe_id) unless recipe
+      variant = variant_by_id[variant_id]
+      return unknown_variant_payload(variant_id) unless variant
+      machine = machine_by_id.fetch(recipe.fetch("machine_id"))
+
+      with_state do |current_state|
+        unless machine_unlocked?(machine, current_state)
+          next {
+            ok: false,
+            status: "machine_locked",
+            machine: machine_status(machine, current_state),
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        queued_for_machine = current_state["fabrication_queue"].count { |item| item["machine_id"] == machine["id"] }
+        if queued_for_machine >= machine.dig("throughput", "max_queue_size").to_i
+          next {
+            ok: false,
+            status: "queue_full",
+            machine: machine_status(machine, current_state),
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        quality_grade = variant["quality_grade_required"].to_i
+        if quality_grade.positive? && !recipe["quality_allowed"]
+          next fabrication_quality_error("recipe_quality_locked", recipe, variant, machine)
+        end
+        if quality_grade > machine.dig("quality", "max_quality_grade").to_i
+          next fabrication_quality_error("quality_exceeds_machine", recipe, variant, machine)
+        end
+
+        required = required_materials(recipe, variant, quantity)
+        missing = missing_materials({ "required_materials" => required }, current_state)
+        unless missing.empty?
+          next {
+            ok: false,
+            status: "insufficient_materials",
+            missing_materials: missing,
+            required_materials: required,
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        required.each do |material_id, needed|
+          current_state["inventory"][material_id] = current_state["inventory"][material_id].to_i - needed.to_i
+        end
+        current_state["fabrication_sequence"] = current_state["fabrication_sequence"].to_i + 1
+        item = build_fabrication_item(
+          current_state["fabrication_sequence"],
+          recipe,
+          variant,
+          machine,
+          quantity,
+          required
+        )
+        current_state["fabrication_queue"] << item
+
+        {
+          ok: true,
+          status: "queued",
+          item: fabrication_item_payload(item),
+          consumed_materials: required,
+          machine: machine_status(machine, current_state),
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
     def inventory_payload(current_state = state)
       items = inventory_items(current_state)
       {
@@ -618,6 +712,33 @@ module McpMiner
             status: "not_found",
             order_id: order_id,
             orders: current_state["orders"].map { |candidate| order_payload(candidate, current_state) },
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        completed_product = completed_product_for_order(order, current_state)
+        if completed_product
+          consume_completed_product!(current_state, completed_product, order["quantity"].to_i)
+          current_state["space_bucks"] = current_state["space_bucks"].to_i + order["payout_space_bucks"].to_i
+          fulfilled_at = Time.now.utc.iso8601
+          completed_order = order.merge(
+            "status" => "fulfilled",
+            "fulfilled_at" => fulfilled_at,
+            "fulfilled_by" => "completed_product"
+          )
+          current_state["completed_orders"] << completed_order
+          current_state["completed_orders"] = current_state["completed_orders"].last(50)
+          current_state["orders"].delete_if { |candidate| candidate["order_id"] == order_id }
+          replacement = replace_order_for_slot!(current_state, order["slot"].to_i)
+
+          next {
+            ok: true,
+            status: "fulfilled",
+            order: completed_order,
+            consumed_product: completed_product_key(order["recipe_id"], order["variant_id"], completed_product["quality_grade"].to_i),
+            payout_space_bucks: order["payout_space_bucks"].to_i,
+            space_bucks: current_state["space_bucks"].to_i,
+            replacement_order: order_payload(replacement, current_state),
             privacy: PRIVACY_NOTICE
           }
         end
@@ -1285,6 +1406,171 @@ module McpMiner
       }
     end
 
+    def machine_status(machine, state)
+      unlocked = machine_unlocked?(machine, state)
+      queue_items = (state["fabrication_queue"] || []).select { |item| item["machine_id"] == machine["id"] }
+      {
+        machine_id: machine["id"],
+        display_name: machine["display_name"],
+        progression_tier: machine["progression_tier"],
+        unlocked: unlocked,
+        unlock: machine["unlock"],
+        throughput: {
+          base_progress_per_turn: machine.dig("throughput", "base_progress_per_turn").to_i,
+          effective_progress_per_turn: (machine.dig("throughput", "base_progress_per_turn").to_f * upgrade_effect_by_id("upgrade_fabricator_throughput", state.dig("upgrades", "upgrade_fabricator_throughput").to_i)).round(2),
+          max_queue_size: machine.dig("throughput", "max_queue_size").to_i,
+          queued: queue_items.length
+        },
+        quality: machine["quality"],
+        recipes_available: recipe_list.count { |recipe| recipe["machine_id"] == machine["id"] },
+        queue: queue_items.map { |item| fabrication_item_payload(item) }
+      }
+    end
+
+    def machine_unlocked?(machine, state)
+      return true if machine["starts_unlocked"]
+      return true if (state["unlocked_machine_ids"] || []).include?(machine["id"])
+
+      false
+    end
+
+    def build_fabrication_item(sequence, recipe, variant, machine, quantity, required)
+      progress_required = (recipe["base_craft_progress"].to_f * variant["recipe_quantity_multiplier"].to_f * quantity.to_i).ceil
+      digest = Digest::SHA256.hexdigest("#{sequence}:#{recipe['id']}:#{variant['id']}")[0, 10]
+      {
+        "fabrication_id" => "fab_#{sequence}_#{digest}",
+        "recipe_id" => recipe["id"],
+        "variant_id" => variant["id"],
+        "machine_id" => machine["id"],
+        "product" => "#{variant['display_name']} #{recipe['display_name']}",
+        "quantity" => quantity.to_i,
+        "quality_grade" => variant["quality_grade_required"].to_i,
+        "required_materials" => required,
+        "progress" => 0.0,
+        "progress_required" => progress_required,
+        "status" => "queued",
+        "queued_at" => Time.now.utc.iso8601
+      }
+    end
+
+    def fabrication_item_payload(item)
+      progress_required = item["progress_required"].to_f
+      progress = item["progress"].to_f
+      item.merge(
+        "progress" => progress.round(2),
+        "progress_percent" => progress_required.positive? ? ((progress / progress_required) * 100).round(2) : 100.0,
+        "remaining_progress" => [progress_required - progress, 0].max.round(2)
+      )
+    end
+
+    def advance_fabrication!(state, event_type, score, timestamp)
+      return if (state["fabrication_queue"] || []).empty?
+
+      throughput_multiplier = upgrade_effect_by_id("upgrade_fabricator_throughput", state.dig("upgrades", "upgrade_fabricator_throughput").to_i)
+      grouped = state["fabrication_queue"].group_by { |item| item["machine_id"] }
+      grouped.each_value do |items|
+        item = items.first
+        machine = machine_by_id.fetch(item["machine_id"])
+        progress = machine.dig("throughput", "base_progress_per_turn").to_f *
+                   throughput_multiplier *
+                   fabrication_event_multiplier(event_type) *
+                   (1 + (score.to_f / 20.0))
+        item["progress"] = item["progress"].to_f + progress
+        item["last_progress_at"] = timestamp
+      end
+
+      complete_ready_fabrication!(state, timestamp)
+    end
+
+    def fabrication_event_multiplier(event_type)
+      category = work_event_by_id.dig(event_type.to_s, "category")
+      case category
+      when "fabrication" then 1.5
+      when "shipping" then 1.2
+      when "testing" then 1.1
+      when "research" then 0.6
+      else 1.0
+      end
+    end
+
+    def complete_ready_fabrication!(state, timestamp)
+      completed, remaining = state["fabrication_queue"].partition do |item|
+        item["progress"].to_f >= item["progress_required"].to_f
+      end
+      state["fabrication_queue"] = remaining
+      completed.each do |item|
+        key = completed_product_key(item["recipe_id"], item["variant_id"], item["quality_grade"].to_i)
+        product = state["completed_products"].find { |candidate| candidate["product_key"] == key }
+        unless product
+          product = {
+            "product_key" => key,
+            "recipe_id" => item["recipe_id"],
+            "variant_id" => item["variant_id"],
+            "product" => item["product"],
+            "quality_grade" => item["quality_grade"].to_i,
+            "quantity" => 0,
+            "completed_at" => timestamp
+          }
+          state["completed_products"] << product
+        end
+        product["quantity"] = product["quantity"].to_i + item["quantity"].to_i
+        product["completed_at"] = timestamp
+      end
+    end
+
+    def completed_product_for_order(order, state)
+      required_quality = variant_by_id.fetch(order["variant_id"])["quality_grade_required"].to_i
+      needed_quantity = order["quantity"].to_i
+      (state["completed_products"] || []).find do |product|
+        product["recipe_id"] == order["recipe_id"] &&
+          product["variant_id"] == order["variant_id"] &&
+          product["quality_grade"].to_i >= required_quality &&
+          product["quantity"].to_i >= needed_quantity
+      end
+    end
+
+    def consume_completed_product!(state, product, quantity)
+      product["quantity"] = product["quantity"].to_i - quantity.to_i
+      state["completed_products"].reject! { |candidate| candidate["quantity"].to_i <= 0 }
+    end
+
+    def completed_product_key(recipe_id, variant_id, quality_grade)
+      "product:#{recipe_id}:#{variant_id}:q#{quality_grade}"
+    end
+
+    def fabrication_quality_error(status, recipe, variant, machine)
+      {
+        ok: false,
+        status: status,
+        recipe_id: recipe["id"],
+        variant_id: variant["id"],
+        machine_id: machine["id"],
+        required_quality_grade: variant["quality_grade_required"].to_i,
+        machine_max_quality_grade: machine.dig("quality", "max_quality_grade").to_i,
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def unknown_recipe_payload(recipe_id)
+      {
+        ok: false,
+        status: "unknown_recipe",
+        recipe_id: recipe_id,
+        reason: "Recipe is not defined in recipes.yaml.",
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def unknown_variant_payload(variant_id)
+      {
+        ok: false,
+        status: "unknown_variant",
+        variant_id: variant_id,
+        reason: "Order variant is not defined in order_variants.yaml.",
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
     def upgrade_status(upgrade, state)
       level = state.dig("upgrades", upgrade.fetch("id")).to_i
       max_level = upgrade.fetch("max_level").to_i
@@ -1530,9 +1816,11 @@ module McpMiner
 
     def order_payload(order, state)
       missing = missing_materials(order, state)
+      product = completed_product_for_order(order, state)
       order.merge(
-        "can_fulfill" => missing.empty?,
-        "missing_materials" => missing
+        "can_fulfill" => missing.empty? || !!product,
+        "missing_materials" => missing,
+        "completed_product_available" => !!product
       )
     end
 
@@ -1790,6 +2078,7 @@ module McpMiner
       state["suit_condition"] = [state["suit_condition"].to_i - suit_damage, 0].max
       record_hazard!(state, hazard, timestamp) if hazard
       handle_asteroid_depletion!(state, timestamp)
+      advance_fabrication!(state, event_type, score, timestamp)
 
       turn = state["current_turn"]
       turn["score"] = (turn["score"].to_f + score).round(2)
@@ -1882,6 +2171,9 @@ module McpMiner
         order_generation_index
         market_sale_index
         market_transactions
+        fabrication_queue
+        completed_products
+        fabrication_sequence
         suit_condition
         asteroid_progress
         asteroid_progress_by_id
@@ -2153,6 +2445,14 @@ module McpMiner
 
     def machine_by_id
       @machine_by_id ||= machine_list.to_h { |machine| [machine["id"], machine] }
+    end
+
+    def recipe_by_id
+      @recipe_by_id ||= recipe_list.to_h { |recipe| [recipe.fetch("id"), recipe] }
+    end
+
+    def variant_by_id
+      @variant_by_id ||= variant_list.to_h { |variant| [variant.fetch("id"), variant] }
     end
 
     def asteroid_by_id
