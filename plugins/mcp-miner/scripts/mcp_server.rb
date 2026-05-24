@@ -214,6 +214,21 @@ class McpMinerServer
         })
       },
       {
+        name: "get_store_catalog",
+        description: "Return the earned Space Bucks store catalog with affordability, lock, owned, and maxed states.",
+        inputSchema: object_schema({})
+      },
+      {
+        name: "purchase_store_item",
+        description: "Purchase an earned Space Bucks store item after local/server-side validation.",
+        inputSchema: object_schema({
+          store_item_id: {
+            type: "string",
+            description: "Store item ID such as upgrade:upgrade_drill_power, machine:machine_circuit_loom, base_module:base_workshop, or cosmetic:cosmetic_suit_trim_teal."
+          }
+        })
+      },
+      {
         name: "get_base_status",
         description: "Return MCP Miner base modules, configured effects, and drone automation state.",
         inputSchema: object_schema({})
@@ -366,6 +381,10 @@ class McpMinerServer
         @engine.upgrade_status_payload
       when "purchase_upgrade"
         @engine.purchase_upgrade_payload(args)
+      when "get_store_catalog"
+        @engine.store_catalog_payload
+      when "purchase_store_item"
+        @engine.purchase_store_item_payload(args)
       when "get_base_status"
         @engine.base_status_payload
       when "purchase_base_module"
@@ -402,10 +421,10 @@ class McpMinerServer
         }
       when "open_store"
         {
-          store_url: "http://localhost:3317/store",
-          status: "reserved",
-          available: false,
-          note: "Store UI is not implemented yet; this is the reserved in-game store URL.",
+          store_url: "http://localhost:3317/dashboard#store",
+          status: "available",
+          available: true,
+          note: "Store catalog and purchases are available through get_store_catalog and purchase_store_item.",
           privacy: McpMiner::GameEngine::PRIVACY_NOTICE
         }
       else

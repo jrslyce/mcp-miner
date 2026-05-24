@@ -114,6 +114,7 @@ h2 {
 .status-grid,
 .compact-list,
 .data-list,
+.store-list,
 .report-list,
 .progress-stack,
 .privacy-list {
@@ -347,6 +348,7 @@ dd {
 }
 
 .row-item,
+.store-row,
 .upgrade-row,
 .report-list article {
   border: 1px solid var(--line);
@@ -377,6 +379,29 @@ dd {
 
 .order-row b {
   color: var(--amber);
+}
+
+.store-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 66px;
+  padding: 12px;
+}
+
+.store-row strong,
+.store-row span {
+  display: block;
+}
+
+.store-state {
+  color: var(--blue);
+  font-weight: 800;
+}
+
+.store-buy {
+  min-width: 76px;
 }
 
 .upgrade-row {
@@ -461,6 +486,7 @@ dd {
   .dashboard-grid,
   .metric-strip,
   .actions,
+  .store-row,
   .inline-stats {
     grid-template-columns: 1fr;
   }

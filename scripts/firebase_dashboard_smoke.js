@@ -97,7 +97,7 @@ async function main() {
 
   const indexHtml = await requestText(`http://${HOSTING_HOST}/`);
   const dashboardJs = await requestText(`http://${HOSTING_HOST}/auth.js`);
-  const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "reports", "sync-privacy"];
+  const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "sync-privacy"];
   const missingPanels = requiredPanels.filter((panel) => !indexHtml.includes(`data-panel="${panel}"`));
   if (missingPanels.length) {
     throw new Error(`dashboard hosting response missing panels: ${missingPanels.join(", ")}`);

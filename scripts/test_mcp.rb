@@ -108,6 +108,8 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     sell_material
     get_upgrade_status
     purchase_upgrade
+    get_store_catalog
+    purchase_store_item
     get_base_status
     purchase_base_module
     get_settings
@@ -208,9 +210,9 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     dashboard_payload["dashboard_url"] == "http://localhost:3317/dashboard" &&
       dashboard_payload["available"] == false
   end
-  assert("open_store should return the reserved store URL") do
-    store_payload["store_url"] == "http://localhost:3317/store" &&
-      store_payload["available"] == false
+  assert("open_store should return the store URL") do
+    store_payload["store_url"] == "http://localhost:3317/dashboard#store" &&
+      store_payload["available"] == true
   end
 
   serialized_payloads = JSON.generate([

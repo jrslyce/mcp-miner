@@ -34,6 +34,8 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 - `sell_material`: sell raw or refined inventory directly for Space Bucks.
 - `get_upgrade_status`: inspect upgrade levels, next costs, effects, and affordability.
 - `purchase_upgrade`: spend Space Bucks/materials to buy one upgrade level.
+- `get_store_catalog`: inspect the earned Space Bucks store across upgrades, machines, recipes, base modules, and cosmetics.
+- `purchase_store_item`: buy a store item after local/server-side validation of costs, locks, ownership, and max levels.
 - `get_base_status`: inspect base modules, configured effects, and drone automation.
 - `purchase_base_module`: spend Space Bucks/materials to build or repair one base module level.
 - `get_settings`: report mode, cloud-sync preference, and privacy posture.

@@ -33,6 +33,29 @@ module McpMiner
       linked
       sync_error
     ].freeze
+    STORE_COSMETICS = [
+      {
+        "id" => "cosmetic_suit_trim_teal",
+        "unlock_id" => "suit_trim_teal",
+        "display_name" => "Teal Suit Trim",
+        "description" => "A profile cosmetic for the local miner suit.",
+        "space_bucks" => 90
+      },
+      {
+        "id" => "cosmetic_helmet_glow_green",
+        "unlock_id" => "helmet_glow_green",
+        "display_name" => "Green Helmet Glow",
+        "description" => "A soft dashboard portrait lighting unlock.",
+        "space_bucks" => 140
+      },
+      {
+        "id" => "cosmetic_survey_badge_gold",
+        "unlock_id" => "survey_badge_gold",
+        "display_name" => "Gold Survey Badge",
+        "description" => "A profile badge bought only with earned Space Bucks.",
+        "space_bucks" => 260
+      }
+    ].freeze
 
     DATA_FILES = {
       materials: ["materials.yaml", "materials"],
@@ -141,6 +164,7 @@ module McpMiner
         "weekly_contract_generation_index" => 0,
         "market_sale_index" => 0,
         "market_transactions" => [],
+        "store_transactions" => [],
         "fabrication_queue" => [],
         "completed_products" => [],
         "fabrication_sequence" => 0,
@@ -232,6 +256,7 @@ module McpMiner
       state["weekly_contract_generation_index"] = state["weekly_contract_generation_index"].to_i
       state["market_sale_index"] = state["market_sale_index"].to_i
       state["market_transactions"] ||= []
+      state["store_transactions"] ||= []
       state["fabrication_queue"] ||= []
       state["completed_products"] ||= []
       state["fabrication_sequence"] = state["fabrication_sequence"].to_i
@@ -627,6 +652,55 @@ module McpMiner
       }
     end
 
+    def store_catalog_payload(current_state = state)
+      categories = {
+        upgrades: upgrade_list.map { |upgrade| upgrade_store_item(upgrade, current_state) },
+        machines: machine_list.map { |machine| machine_store_item(machine, current_state) },
+        recipes: recipe_list.map { |recipe| recipe_store_item(recipe, current_state) },
+        base_modules: base_module_list.map { |mod| base_module_store_item(mod, current_state) },
+        cosmetics: STORE_COSMETICS.map { |cosmetic| cosmetic_store_item(cosmetic, current_state) }
+      }
+
+      {
+        ok: true,
+        store: {
+          currency: "Space Bucks",
+          real_money: false,
+          payment_integration: false,
+          space_bucks: current_state["space_bucks"].to_i,
+          categories: categories,
+          summary: store_summary(categories),
+          purchase_tool: "purchase_store_item"
+        },
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def purchase_store_item_payload(args)
+      kind, item_id = parse_store_item(args)
+      result =
+        case kind
+        when "upgrade"
+          purchase_upgrade_payload("upgrade_id" => item_id)
+        when "base_module"
+          purchase_base_module_payload("module_id" => item_id)
+        when "machine"
+          purchase_machine_unlock_payload("machine_id" => item_id)
+        when "cosmetic"
+          purchase_cosmetic_payload("cosmetic_id" => item_id)
+        else
+          {
+            ok: false,
+            status: "unknown_store_item",
+            store_item_id: safe_string(args["store_item_id"]),
+            reason: "Store item IDs must use upgrade:, base_module:, machine:, or cosmetic:.",
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+      attach_store_purchase_context(result, kind, item_id)
+    end
+
     def purchase_base_module_payload(args)
       module_id = safe_string(args["module_id"])
       mod = base_module_by_id[module_id]
@@ -671,6 +745,7 @@ module McpMiner
           current_state["inventory"][material_id] = current_state["inventory"][material_id].to_i - quantity.to_i
         end
         current_state["base_modules"][module_id] = status.fetch(:level).to_i + 1
+        record_store_transaction!(current_state, "base_module", module_id, cost)
 
         {
           ok: true,
@@ -1086,8 +1161,197 @@ module McpMiner
         asteroid_classes: asteroid_list.length,
         upgrades: upgrade_list.length,
         base_modules: base_module_list.length,
+        store_cosmetics: STORE_COSMETICS.length,
         hazards: hazard_list.length
       }
+    end
+
+    def parse_store_item(args)
+      raw = safe_string(args["store_item_id"])
+      if raw.include?(":")
+        kind, item_id = raw.split(":", 2)
+      else
+        kind = safe_string(args["kind"])
+        item_id = safe_string(args["item_id"])
+      end
+      kind = kind.tr("-", "_")
+      kind = "base_module" if kind == "base"
+      [kind, item_id]
+    end
+
+    def attach_store_purchase_context(result, kind, item_id)
+      payload = result.dup
+      payload[:store_item_id] ||= "#{kind}:#{item_id}" unless kind.to_s.empty? || item_id.to_s.empty?
+      current_state = state
+      payload[:store] = store_catalog_payload(current_state)[:store]
+      payload[:dashboard] = store_dashboard_snapshot(current_state)
+      payload
+    end
+
+    def store_dashboard_snapshot(current_state)
+      {
+        space_bucks: current_state["space_bucks"].to_i,
+        inventory: inventory_payload(current_state)[:inventory],
+        upgrades: upgrade_status_payload(current_state)[:upgrades],
+        base: base_status_payload(current_state),
+        fabrication: fabrication_status_payload(current_state),
+        profile: store_profile_snapshot(current_state)
+      }
+    end
+
+    def store_profile_snapshot(current_state)
+      profile = default_profile.merge(current_state["profile"] || {})
+      {
+        display_name: profile["display_name"],
+        miner_name: profile["miner_name"],
+        customization_unlocks: Array(profile["customization_unlocks"]),
+        cloud_sync: profile["cloud_sync"]
+      }
+    end
+
+    def store_summary(categories)
+      items = categories.values.flatten
+      states = items.each_with_object(Hash.new(0)) do |item, counts|
+        counts[item[:purchase_state].to_s] += 1
+      end
+      {
+        total_items: items.length,
+        affordable: states["affordable"],
+        unaffordable: states["unaffordable"],
+        locked: states["locked"],
+        maxed: states["maxed"],
+        owned: states["owned"],
+        available: states["available"]
+      }
+    end
+
+    def upgrade_store_item(upgrade, current_state)
+      status = upgrade_status(upgrade, current_state)
+      status.merge(
+        store_item_id: "upgrade:#{status[:upgrade_id]}",
+        kind: "upgrade",
+        cost: status[:cost_to_next] || store_cost(0),
+        purchase_state: store_purchase_state(
+          maxed: status[:is_maxed],
+          missing_space_bucks: status[:missing_space_bucks],
+          missing_materials: status[:missing_materials]
+        ),
+        no_real_money: true
+      )
+    end
+
+    def base_module_store_item(mod, current_state)
+      status = base_module_status(mod, current_state)
+      status.merge(
+        store_item_id: "base_module:#{status[:module_id]}",
+        kind: "base_module",
+        cost: status[:cost_to_next] || store_cost(0),
+        purchase_state: store_purchase_state(
+          maxed: status[:is_maxed],
+          locked: !status[:prerequisites_met],
+          missing_space_bucks: status[:missing_space_bucks],
+          missing_materials: status[:missing_materials]
+        ),
+        no_real_money: true
+      )
+    end
+
+    def machine_store_item(machine, current_state)
+      owned = machine["starts_unlocked"] || (current_state["unlocked_machine_ids"] || []).include?(machine["id"])
+      requirements = machine_unlock_requirements(machine, current_state)
+      locked = !requirements[:missing_required_base_modules].empty? || !requirements[:missing_required_upgrades].empty?
+      {
+        store_item_id: "machine:#{machine['id']}",
+        kind: "machine",
+        machine_id: machine["id"],
+        display_name: machine["display_name"],
+        progression_tier: machine["progression_tier"],
+        cost: requirements[:cost],
+        purchase_state: store_purchase_state(
+          owned: owned,
+          locked: locked,
+          missing_space_bucks: requirements[:missing_space_bucks],
+          missing_materials: {}
+        ),
+        can_purchase: !owned && !locked && requirements[:missing_space_bucks].zero?,
+        missing_space_bucks: requirements[:missing_space_bucks],
+        missing_materials: {},
+        missing_required_base_modules: requirements[:missing_required_base_modules],
+        missing_required_upgrades: requirements[:missing_required_upgrades],
+        recipes_available: recipe_list.count { |recipe| recipe["machine_id"] == machine["id"] },
+        no_real_money: true
+      }
+    end
+
+    def recipe_store_item(recipe, current_state)
+      machine = machine_by_id.fetch(recipe.fetch("machine_id"))
+      available = machine_unlocked?(machine, current_state)
+      {
+        store_item_id: "recipe:#{recipe['id']}",
+        kind: "recipe",
+        recipe_id: recipe["id"],
+        display_name: recipe["display_name"],
+        machine_id: recipe["machine_id"],
+        progression_tier: recipe["progression_tier"],
+        cost: store_cost(0),
+        purchase_state: available ? "available" : "locked",
+        can_purchase: false,
+        unlock_note: available ? "included_with_unlocked_machine" : "unlock_machine_first",
+        no_real_money: true
+      }
+    end
+
+    def cosmetic_store_item(cosmetic, current_state)
+      unlocks = Array(current_state.dig("profile", "customization_unlocks"))
+      owned = unlocks.include?(cosmetic.fetch("unlock_id"))
+      missing_space_bucks = [cosmetic.fetch("space_bucks").to_i - current_state["space_bucks"].to_i, 0].max
+      {
+        store_item_id: "cosmetic:#{cosmetic['id']}",
+        kind: "cosmetic",
+        cosmetic_id: cosmetic["id"],
+        unlock_id: cosmetic["unlock_id"],
+        display_name: cosmetic["display_name"],
+        description: cosmetic["description"],
+        cost: store_cost(cosmetic.fetch("space_bucks")),
+        purchase_state: store_purchase_state(
+          owned: owned,
+          missing_space_bucks: missing_space_bucks,
+          missing_materials: {}
+        ),
+        can_purchase: !owned && missing_space_bucks.zero?,
+        missing_space_bucks: missing_space_bucks,
+        missing_materials: {},
+        no_real_money: true
+      }
+    end
+
+    def store_purchase_state(maxed: false, owned: false, locked: false, missing_space_bucks: 0, missing_materials: {})
+      return "maxed" if maxed
+      return "owned" if owned
+      return "locked" if locked
+      return "unaffordable" if missing_space_bucks.to_i.positive? || !missing_materials.empty?
+
+      "affordable"
+    end
+
+    def store_cost(space_bucks, materials = {})
+      {
+        space_bucks: space_bucks.to_i,
+        materials: materials || {}
+      }
+    end
+
+    def record_store_transaction!(current_state, kind, item_id, cost)
+      current_state["store_transactions"] ||= []
+      current_state["store_transactions"] << {
+        "type" => "store_purchase",
+        "kind" => kind,
+        "item_id" => item_id,
+        "space_bucks" => cost[:space_bucks].to_i,
+        "materials" => cost[:materials] || {},
+        "created_at" => Time.now.utc.iso8601
+      }
+      current_state["store_transactions"] = current_state["store_transactions"].last(50)
     end
 
     def update_settings(args)
@@ -1451,6 +1715,7 @@ module McpMiner
           current_state["inventory"][material_id] = current_state["inventory"][material_id].to_i - quantity.to_i
         end
         current_state["upgrades"][upgrade_id] = before.fetch(:level).to_i + 1
+        record_store_transaction!(current_state, "upgrade", upgrade_id, cost)
         after = upgrade_status(upgrade, current_state)
 
         {
@@ -1463,6 +1728,107 @@ module McpMiner
           spent: cost,
           space_bucks: current_state["space_bucks"].to_i,
           upgrade: after,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
+    def purchase_machine_unlock_payload(args)
+      machine_id = safe_string(args["machine_id"])
+      machine = machine_by_id[machine_id]
+      return unknown_machine_payload(machine_id) unless machine
+
+      with_state do |current_state|
+        item = machine_store_item(machine, current_state)
+        case item[:purchase_state]
+        when "owned"
+          next {
+            ok: false,
+            status: "already_owned",
+            machine: item,
+            privacy: PRIVACY_NOTICE
+          }
+        when "locked"
+          next {
+            ok: false,
+            status: "locked_prerequisites",
+            missing_required_base_modules: item[:missing_required_base_modules],
+            missing_required_upgrades: item[:missing_required_upgrades],
+            machine: item,
+            privacy: PRIVACY_NOTICE
+          }
+        when "unaffordable"
+          next {
+            ok: false,
+            status: "insufficient_space_bucks",
+            missing_space_bucks: item[:missing_space_bucks],
+            machine: item,
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        cost = item.fetch(:cost)
+        current_state["space_bucks"] = current_state["space_bucks"].to_i - cost.fetch(:space_bucks).to_i
+        current_state["unlocked_machine_ids"] ||= []
+        current_state["unlocked_machine_ids"] << machine_id unless current_state["unlocked_machine_ids"].include?(machine_id)
+        record_store_transaction!(current_state, "machine", machine_id, cost)
+
+        {
+          ok: true,
+          status: "purchased",
+          machine_id: machine_id,
+          display_name: machine["display_name"],
+          spent: cost,
+          space_bucks: current_state["space_bucks"].to_i,
+          machine: machine_store_item(machine, current_state),
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
+    def purchase_cosmetic_payload(args)
+      cosmetic_id = safe_string(args["cosmetic_id"])
+      cosmetic = STORE_COSMETICS.find { |item| item.fetch("id") == cosmetic_id }
+      return unknown_cosmetic_payload(cosmetic_id) unless cosmetic
+
+      with_state do |current_state|
+        item = cosmetic_store_item(cosmetic, current_state)
+        case item[:purchase_state]
+        when "owned"
+          next {
+            ok: false,
+            status: "already_owned",
+            cosmetic: item,
+            privacy: PRIVACY_NOTICE
+          }
+        when "unaffordable"
+          next {
+            ok: false,
+            status: "insufficient_space_bucks",
+            missing_space_bucks: item[:missing_space_bucks],
+            cosmetic: item,
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        cost = item.fetch(:cost)
+        profile = default_profile.merge(current_state["profile"] || {})
+        profile["customization_unlocks"] ||= []
+        profile["customization_unlocks"] << cosmetic.fetch("unlock_id") unless profile["customization_unlocks"].include?(cosmetic.fetch("unlock_id"))
+        current_state["profile"] = profile
+        current_state["space_bucks"] = current_state["space_bucks"].to_i - cost.fetch(:space_bucks).to_i
+        record_store_transaction!(current_state, "cosmetic", cosmetic_id, cost)
+
+        {
+          ok: true,
+          status: "purchased",
+          cosmetic_id: cosmetic_id,
+          unlock_id: cosmetic.fetch("unlock_id"),
+          display_name: cosmetic.fetch("display_name"),
+          spent: cost,
+          space_bucks: current_state["space_bucks"].to_i,
+          cosmetic: cosmetic_store_item(cosmetic, current_state),
+          profile: store_profile_snapshot(current_state),
           privacy: PRIVACY_NOTICE
         }
       end
@@ -2143,14 +2509,40 @@ module McpMiner
       }
     end
 
+    def unknown_machine_payload(machine_id)
+      {
+        ok: false,
+        status: "unknown_machine",
+        machine_id: machine_id,
+        reason: "Fabrication machine is not defined in fabrication_machines.yaml.",
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def unknown_cosmetic_payload(cosmetic_id)
+      {
+        ok: false,
+        status: "unknown_cosmetic",
+        cosmetic_id: cosmetic_id,
+        reason: "Cosmetic is not defined in the Space Bucks store catalog.",
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
     def machine_status(machine, state)
-      unlocked = machine_unlocked?(machine, state)
+      store_item = machine_store_item(machine, state)
+      unlocked = store_item[:purchase_state] == "owned"
       queue_items = (state["fabrication_queue"] || []).select { |item| item["machine_id"] == machine["id"] }
       {
         machine_id: machine["id"],
         display_name: machine["display_name"],
         progression_tier: machine["progression_tier"],
         unlocked: unlocked,
+        unlock_state: store_item[:purchase_state],
+        can_unlock: store_item[:can_purchase],
+        missing_space_bucks: store_item[:missing_space_bucks],
+        missing_required_base_modules: store_item[:missing_required_base_modules],
+        missing_required_upgrades: store_item[:missing_required_upgrades],
         unlock: machine["unlock"],
         throughput: {
           base_progress_per_turn: machine.dig("throughput", "base_progress_per_turn").to_i,
@@ -2167,14 +2559,32 @@ module McpMiner
 
     def machine_unlocked?(machine, state)
       return true if machine["starts_unlocked"]
-      return true if (state["unlocked_machine_ids"] || []).include?(machine["id"])
+      (state["unlocked_machine_ids"] || []).include?(machine["id"])
+    end
 
+    def machine_unlock_requirements(machine, state)
       unlock = machine["unlock"] || {}
-      modules_met = Array(unlock["required_base_modules"]).all? { |module_id| state.dig("base_modules", module_id).to_i.positive? }
-      upgrades_met = Array(unlock["required_upgrades"]).all? do |requirement|
-        requirement.all? { |upgrade_id, level| state.dig("upgrades", upgrade_id).to_i >= level.to_i }
+      missing_base_modules = Array(unlock["required_base_modules"]).reject do |module_id|
+        state.dig("base_modules", module_id).to_i.positive?
       end
-      modules_met && upgrades_met && state["space_bucks"].to_i >= unlock["space_bucks"].to_i
+      missing_upgrades = Array(unlock["required_upgrades"]).flat_map do |requirement|
+        requirement.each_with_object([]) do |(upgrade_id, level), missing|
+          current_level = state.dig("upgrades", upgrade_id).to_i
+          next if current_level >= level.to_i
+
+          missing << {
+            upgrade_id: upgrade_id,
+            required_level: level.to_i,
+            current_level: current_level
+          }
+        end
+      end
+      {
+        cost: { space_bucks: unlock["space_bucks"].to_i, materials: {} },
+        missing_space_bucks: [unlock["space_bucks"].to_i - state["space_bucks"].to_i, 0].max,
+        missing_required_base_modules: missing_base_modules,
+        missing_required_upgrades: missing_upgrades
+      }
     end
 
     def build_fabrication_item(sequence, recipe, variant, machine, quantity, required)
@@ -3240,6 +3650,7 @@ module McpMiner
         weekly_contract_generation_index
         market_sale_index
         market_transactions
+        store_transactions
         fabrication_queue
         completed_products
         fabrication_sequence

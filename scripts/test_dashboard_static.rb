@@ -23,7 +23,7 @@ asset = read("firebase/hosting/assets/asteroid-scan.svg")
 smoke = read("scripts/firebase_dashboard_smoke.js")
 package = JSON.parse(read("package.json"))
 
-required_panels = %w[auth sync-privacy status asteroid inventory orders upgrades reports base]
+required_panels = %w[auth sync-privacy status asteroid inventory orders upgrades store reports base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -38,6 +38,8 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     inventory-list
     orders-list
     upgrades-list
+    store-list
+    store-balance
     reports-list
     sync-status
     privacy-list
@@ -55,6 +57,7 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     httpsCallable
     connectFunctionsEmulator
     DEMO_DASHBOARD
+    renderStore
     getSyncState
     ensureLinkedProfile
   ].all? { |needle| auth_js.include?(needle) }

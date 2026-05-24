@@ -83,6 +83,24 @@ const DEMO_DASHBOARD = {
     { upgradeId: "upgrade_scanner_precision", displayName: "Scanner Precision", level: 1, maxLevel: 5, effect: "+2% rare find", nextEffect: "+3% rare find" },
     { upgradeId: "upgrade_suit_plating", displayName: "Suit Plating", level: 1, maxLevel: 5, effect: "8% hazard reduction", nextEffect: "14% hazard reduction" }
   ],
+  store: {
+    realMoney: false,
+    categories: {
+      upgrades: [
+        { storeItemId: "upgrade:upgrade_drill_power", kind: "upgrade", displayName: "Drill Power", purchaseState: "affordable", cost: { spaceBucks: 180, materials: { mat_iron: 4 } } },
+        { storeItemId: "upgrade:upgrade_drone_automation", kind: "upgrade", displayName: "Drone Automation", purchaseState: "unaffordable", cost: { spaceBucks: 1450, materials: { mat_quartz: 2 } } }
+      ],
+      machines: [
+        { storeItemId: "machine:machine_circuit_loom", kind: "machine", displayName: "Circuit Loom", purchaseState: "locked", cost: { spaceBucks: 750, materials: {} } }
+      ],
+      baseModules: [
+        { storeItemId: "base_module:base_workshop", kind: "base_module", displayName: "Workshop", purchaseState: "affordable", cost: { spaceBucks: 150, materials: { mat_chonks: 80 } } }
+      ],
+      cosmetics: [
+        { storeItemId: "cosmetic:cosmetic_suit_trim_teal", kind: "cosmetic", displayName: "Teal Suit Trim", purchaseState: "affordable", cost: { spaceBucks: 90, materials: {} } }
+      ]
+    }
+  },
   reports: [
     "Mined 64 Chonks and mapped a quartz pocket.",
     "Order board has one fulfillable buyer request.",
@@ -141,10 +159,13 @@ const cloudDetail = document.querySelector("#cloud-detail");
 const inventoryList = document.querySelector("#inventory-list");
 const ordersList = document.querySelector("#orders-list");
 const upgradesList = document.querySelector("#upgrades-list");
+const storeBalance = document.querySelector("#store-balance");
+const storeList = document.querySelector("#store-list");
 const reportsList = document.querySelector("#reports-list");
 const baseDetail = document.querySelector("#base-detail");
 
 let currentUser = null;
+let activeDashboard = cloneDemo();
 
 function setMessage(text, isError = false) {
   message.textContent = text;
@@ -430,12 +451,14 @@ async function loadDashboardForUser(user) {
   fallback.orders = orders.length ? orders : fallback.orders;
   fallback.asteroid = cloudState.asteroidProgress || cloudState.asteroid_progress || cloudState.currentAsteroid || cloudState.current_asteroid ? normalizeAsteroid(cloudState) : fallback.asteroid;
   fallback.upgrades = upgrades.length ? upgrades : fallback.upgrades;
+  fallback.store = cloudState.store || fallback.store;
   fallback.base = { ...fallback.base, ...base };
   fallback.reports = Array.isArray(cloudState.reports) && cloudState.reports.length ? cloudState.reports.slice(0, 5) : fallback.reports;
   return fallback;
 }
 
 function renderDashboard(data) {
+  activeDashboard = data;
   const inventory = data.inventory || [];
   const cloudState = data.cloudState || {};
   const syncMetadata = data.syncMetadata || {};
@@ -465,6 +488,7 @@ function renderDashboard(data) {
   renderInventory(inventory);
   renderOrders(data.orders || []);
   renderUpgrades(data.upgrades || []);
+  renderStore(data);
   renderReports(data.reports || []);
   renderCloudDetail(cloudState, asteroid);
   renderBase(data.base || {});
@@ -525,6 +549,84 @@ function renderUpgrades(upgrades) {
       </div>
     `;
   }).join("");
+}
+
+function normalizeStoreCategories(store) {
+  const categories = store && store.categories ? store.categories : {};
+  return {
+    upgrades: categories.upgrades || [],
+    machines: categories.machines || [],
+    baseModules: categories.baseModules || categories.base_modules || [],
+    cosmetics: categories.cosmetics || []
+  };
+}
+
+function storeCostLabel(cost) {
+  const spaceBucks = numberValue(cost && (cost.spaceBucks ?? cost.space_bucks));
+  const materials = (cost && cost.materials) || {};
+  const materialCount = Object.keys(materials).length;
+  return `${formatNumber(spaceBucks)} SB${materialCount ? ` + ${materialCount} material${materialCount === 1 ? "" : "s"}` : ""}`;
+}
+
+function renderStore(data) {
+  const categories = normalizeStoreCategories(data.store);
+  const items = [
+    ...categories.upgrades,
+    ...categories.machines,
+    ...categories.baseModules,
+    ...categories.cosmetics
+  ].slice(0, 8);
+  storeBalance.textContent = `${formatNumber(data.player && data.player.spaceBucks)} Space Bucks`;
+
+  if (!items.length) {
+    storeList.innerHTML = `<p class="empty-state">No store catalog has been synced yet.</p>`;
+    return;
+  }
+
+  storeList.innerHTML = items.map((item) => {
+    const state = item.purchaseState || item.purchase_state || "locked";
+    const canBuy = state === "affordable";
+    const storeItemId = item.storeItemId || item.store_item_id;
+    return `
+      <div class="store-row" data-state="${escapeHtml(state)}">
+        <div>
+          <strong>${escapeHtml(item.displayName || item.display_name)}</strong>
+          <span>${escapeHtml(displayNameFromId(item.kind || "store"))} - ${escapeHtml(storeCostLabel(item.cost))}</span>
+        </div>
+        <span class="store-state">${escapeHtml(displayNameFromId(state))}</span>
+        <button type="button" class="button-secondary store-buy" data-store-item-id="${escapeHtml(storeItemId)}" ${canBuy ? "" : "disabled"}>Buy</button>
+      </div>
+    `;
+  }).join("");
+}
+
+function findStoreItem(data, storeItemId) {
+  const categories = normalizeStoreCategories(data.store);
+  return [
+    ...categories.upgrades,
+    ...categories.machines,
+    ...categories.baseModules,
+    ...categories.cosmetics
+  ].find((item) => (item.storeItemId || item.store_item_id) === storeItemId);
+}
+
+function applyDemoStorePurchase(storeItemId) {
+  const item = findStoreItem(activeDashboard, storeItemId);
+  if (!item) {
+    setMessage("Store item is unavailable.", true);
+    return;
+  }
+  const state = item.purchaseState || item.purchase_state;
+  if (state !== "affordable") {
+    setMessage(`${item.displayName || item.display_name} is ${state}.`, true);
+    return;
+  }
+
+  const cost = item.cost || {};
+  activeDashboard.player.spaceBucks = numberValue(activeDashboard.player.spaceBucks) - numberValue(cost.spaceBucks ?? cost.space_bucks);
+  item.purchaseState = item.kind === "cosmetic" ? "owned" : "maxed";
+  renderDashboard(activeDashboard);
+  setMessage(`${item.displayName || item.display_name} purchased with earned Space Bucks.`);
 }
 
 function renderReports(reports) {
@@ -599,6 +701,18 @@ signOutButton.addEventListener("click", () => {
 
 refreshDashboard.addEventListener("click", () => {
   refreshForCurrentUser();
+});
+
+storeList.addEventListener("click", (event) => {
+  const button = event.target.closest(".store-buy");
+  if (!button) {
+    return;
+  }
+  if (currentUser) {
+    setMessage("Store purchases are validated through the local MCP store flow.", true);
+    return;
+  }
+  applyDemoStorePurchase(button.dataset.storeItemId);
 });
 
 onAuthStateChanged(auth, async (user) => {
