@@ -10,7 +10,7 @@
     <main class="dashboard-shell">
       <header class="topbar">
         <div class="brand-lockup">
-          <img class="brand-mark" src="/assets/asteroid-scan.svg" alt="">
+          <img class="brand-mark" src="/assets/asteroid-scan.svg" alt="" aria-hidden="true">
           <div>
             <p class="eyebrow">Firebase dashboard</p>
             <h1>MCP Miner</h1>
@@ -19,7 +19,6 @@
         <div class="topbar-actions">
           <span id="connection-pill" class="pill">Demo mode</span>
           <button id="refresh-dashboard" type="button" class="button-secondary">
-            <span aria-hidden="true">R</span>
             <span>Refresh</span>
           </button>
         </div>
@@ -54,8 +53,8 @@
 
             <dl class="status-grid">
               <div>
-                <dt>UID</dt>
-                <dd id="auth-uid">-</dd>
+                <dt>Account</dt>
+                <dd id="auth-identity">Not signed in</dd>
               </div>
               <div>
                 <dt>Profile</dt>
@@ -137,7 +136,7 @@
                 <span id="asteroid-name" class="pill">-</span>
               </div>
               <div class="scan-row">
-                <img class="scan-art" src="/assets/asteroid-scan.svg" alt="">
+                <img class="scan-art" src="/assets/asteroid-scan.svg" alt="Asteroid scan visualization for the current rock">
                 <div class="progress-stack">
                   <div class="progress-meta">
                     <strong id="asteroid-progress-label">0 / 0 mined</strong>
@@ -216,6 +215,7 @@
       </section>
     </main>
 
+    <script src="/firebase-config.js"></script>
     <script type="module" src="/auth.js"></script>
   </body>
 </html>

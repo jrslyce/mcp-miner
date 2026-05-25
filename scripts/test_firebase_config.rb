@@ -34,6 +34,26 @@ assert("Firebase config should wire Firestore rules and indexes") do
     indexes["indexes"].is_a?(Array)
 end
 
+assert("Firebase Hosting should revalidate launch-critical dashboard files") do
+  headers = firebase.dig("hosting", "headers") || []
+  headers.any? do |entry|
+    entry["source"] == "**" &&
+      entry["headers"].any? { |header| header["key"] == "Cache-Control" && header["value"] == "no-cache" }
+  end
+end
+
+assert("Firebase Hosting should include baseline browser security headers") do
+  headers = firebase.dig("hosting", "headers") || []
+  dashboard_headers = headers.find { |entry| entry["source"] == "**" }.fetch("headers")
+  header_values = dashboard_headers.to_h { |header| [header["key"], header["value"]] }
+  header_values["X-Content-Type-Options"] == "nosniff" &&
+    header_values["Referrer-Policy"] == "strict-origin-when-cross-origin" &&
+    header_values["X-Frame-Options"] == "DENY" &&
+    header_values["Permissions-Policy"].include?("camera=()") &&
+    header_values["Permissions-Policy"].include?("microphone=()") &&
+    header_values["Permissions-Policy"].include?("geolocation=()")
+end
+
 assert("Emulator config should cover Auth, Firestore, Functions, Hosting, and UI") do
   emulators = firebase.fetch("emulators")
   emulators.dig("auth", "port") == 9099 &&

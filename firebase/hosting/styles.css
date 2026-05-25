@@ -8,7 +8,7 @@
   --accent: #1f7a5a;
   --accent-strong: #15583f;
   --blue: #2d5b91;
-  --amber: #b46b16;
+  --amber: #92400e;
   --warn: #9a3412;
   --shadow: rgba(25, 34, 30, 0.08);
 }
@@ -233,7 +233,10 @@ button:hover:not(:disabled) {
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  border-color: #cbd5d1;
+  background: #e9eee9;
+  color: #526158;
+  opacity: 1;
 }
 
 .pill,
@@ -370,6 +373,8 @@ dd {
 .upgrade-row strong,
 .upgrade-row small {
   display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .row-item b {
@@ -393,6 +398,8 @@ dd {
 .store-row strong,
 .store-row span {
   display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .store-state {
@@ -491,6 +498,11 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .privacy-list li {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
   .panel,
   .metric-card,
   .mode-strip {
@@ -499,5 +511,17 @@ dd {
 
   h1 {
     font-size: 1.65rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .panel-heading {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .panel-heading .pill,
+  .panel-heading .status-dot {
+    justify-self: start;
   }
 }

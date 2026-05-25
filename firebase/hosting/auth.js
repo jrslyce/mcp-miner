@@ -113,6 +113,80 @@ const DEMO_DASHBOARD = {
   }
 };
 
+const EMPTY_CLOUD_DASHBOARD = {
+  mode: "Firebase profile",
+  source: "No synced game state yet",
+  hasCloudState: false,
+  profile: {
+    displayName: "Local Prospector",
+    minerName: "Prospector"
+  },
+  player: {
+    spaceBucks: 0,
+    suitCondition: 100
+  },
+  settings: {
+    reportMode: "meaningful_turns_only",
+    cloudSyncEnabled: true
+  },
+  cloudState: {
+    eventCount: 0,
+    workScoreTotal: 0,
+    lastSequence: 0,
+    lastEventId: null,
+    updatedAt: "No synced state yet"
+  },
+  syncMetadata: {
+    lastSequence: 0,
+    conflictState: "none",
+    acceptedCount: 0,
+    duplicateCount: 0,
+    rejectedCount: 0
+  },
+  inventory: [],
+  orders: [],
+  asteroid: {
+    displayName: "No synced asteroid",
+    mined: 0,
+    depletionSize: 0,
+    percentComplete: 0,
+    rareFindChance: "n/a"
+  },
+  upgrades: [],
+  store: {
+    realMoney: false,
+    categories: {
+      upgrades: [],
+      machines: [],
+      baseModules: [],
+      cosmetics: []
+    }
+  },
+  reports: [],
+  base: {
+    moduleCount: 0,
+    droneLevel: 0,
+    storageBonus: "1.00x"
+  }
+};
+
+const AUTH_ERROR_MESSAGES = {
+  "auth/email-already-in-use": "That email already has an MCP Miner account. Try signing in.",
+  "auth/invalid-credential": "Email or password did not match an MCP Miner account.",
+  "auth/invalid-email": "Enter a valid email address.",
+  "auth/missing-email": "Enter your email address.",
+  "auth/missing-password": "Enter your password.",
+  "auth/network-request-failed": "Network connection failed. Try again in a moment.",
+  "auth/too-many-requests": "Too many attempts. Wait a moment, then try again.",
+  "auth/user-not-found": "Email or password did not match an MCP Miner account.",
+  "auth/weak-password": "Use a password with at least 6 characters.",
+  "auth/wrong-password": "Email or password did not match an MCP Miner account."
+};
+const FORM_VALIDATION_MESSAGE = "Check the highlighted email and password fields.";
+const DASHBOARD_REFRESH_SUCCESS = "Dashboard refreshed.";
+const DASHBOARD_REFRESH_PARTIAL = "Some cloud data could not be refreshed. Showing available owner data.";
+const SYNC_API_REFRESH_PARTIAL = "Cloud sync API did not respond. Showing available owner data.";
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -130,11 +204,12 @@ if (useEmulators && !window.__MCP_MINER_EMULATORS_CONNECTED) {
 const form = document.querySelector("#auth-form");
 const email = document.querySelector("#email");
 const password = document.querySelector("#password");
+const signInButton = document.querySelector("#sign-in");
 const createAccount = document.querySelector("#create-account");
 const signOutButton = document.querySelector("#sign-out");
 const refreshDashboard = document.querySelector("#refresh-dashboard");
 const authStatus = document.querySelector("#auth-status");
-const authUid = document.querySelector("#auth-uid");
+const authIdentity = document.querySelector("#auth-identity");
 const profileStatus = document.querySelector("#profile-status");
 const dashboardSource = document.querySelector("#dashboard-source");
 const message = document.querySelector("#auth-message");
@@ -174,6 +249,19 @@ function setMessage(text, isError = false) {
 
 function cloneDemo(overrides = {}) {
   return JSON.parse(JSON.stringify({ ...DEMO_DASHBOARD, ...overrides }));
+}
+
+function cloneEmptyCloud(overrides = {}) {
+  return JSON.parse(JSON.stringify({ ...EMPTY_CLOUD_DASHBOARD, ...overrides }));
+}
+
+function updateAuthControls(user) {
+  const signedIn = Boolean(user);
+  email.disabled = signedIn;
+  password.disabled = signedIn;
+  signInButton.disabled = signedIn;
+  createAccount.disabled = signedIn;
+  signOutButton.disabled = !signedIn;
 }
 
 function profilePayload(user) {
@@ -234,8 +322,26 @@ async function handleAuth(fn) {
     setMessage("");
     await fn();
   } catch (error) {
-    setMessage(error.message || "Authentication failed.", true);
+    setMessage(friendlyAuthMessage(error), true);
+  } finally {
+    password.value = "";
   }
+}
+
+function validateAuthForm() {
+  if (form.reportValidity()) {
+    return true;
+  }
+  setMessage(FORM_VALIDATION_MESSAGE, true);
+  return false;
+}
+
+function handleInvalidAuthField() {
+  setMessage(FORM_VALIDATION_MESSAGE, true);
+}
+
+function friendlyAuthMessage(error) {
+  return AUTH_ERROR_MESSAGES[error && error.code] || "Authentication failed. Try again.";
 }
 
 function escapeHtml(value) {
@@ -280,6 +386,19 @@ function displayNameFromId(id) {
     .replace(/^upgrade_/, "")
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function reportModeLabel(mode) {
+  return displayNameFromId(mode || "meaningful_turns_only");
+}
+
+function eventLabel(cloudState) {
+  const eventId = cloudState.lastEventId || cloudState.last_event_id;
+  const sequence = numberValue(cloudState.lastSequence || cloudState.last_sequence);
+  if (!eventId) {
+    return "No events yet";
+  }
+  return sequence > 0 ? `Event ${formatNumber(sequence)}` : displayNameFromId(eventId);
 }
 
 function materialQuantity(items, materialId) {
@@ -397,12 +516,30 @@ function docsData(results, index) {
   return result.value.exists() ? result.value.data() : null;
 }
 
+function docExists(results, index) {
+  const result = results[index];
+  return Boolean(result && result.status === "fulfilled" && result.value.exists());
+}
+
 function queryResult(results, index) {
   const result = results[index];
   if (!result || result.status !== "fulfilled") {
     return null;
   }
   return result.value;
+}
+
+function refreshWarning(reads) {
+  const failedIndexes = reads
+    .map((result, index) => result && result.status === "rejected" ? index : null)
+    .filter((index) => index !== null);
+  if (!failedIndexes.length) {
+    return "";
+  }
+  if (failedIndexes.includes(9)) {
+    return SYNC_API_REFRESH_PARTIAL;
+  }
+  return DASHBOARD_REFRESH_PARTIAL;
 }
 
 async function loadDashboardForUser(user) {
@@ -423,6 +560,8 @@ async function loadDashboardForUser(user) {
   const player = docsData(reads, 0) || {};
   const profile = docsData(reads, 1) || {};
   const settings = docsData(reads, 2) || {};
+  const directStateExists = docExists(reads, 3);
+  const directSyncExists = docExists(reads, 4);
   const directState = docsData(reads, 3) || {};
   const directSync = docsData(reads, 4) || {};
   const callable = reads[9] && reads[9].status === "fulfilled" ? reads[9].value.data : {};
@@ -432,17 +571,26 @@ async function loadDashboardForUser(user) {
   const orders = normalizeOrderRows(queryResult(reads, 8) || { forEach() {} });
   const upgrades = normalizeUpgradeRows(docsData(reads, 5));
   const base = docsData(reads, 6) || {};
-  const hasCloudEconomy = inventory.length || orders.length || upgrades.length || cloudState.spaceBucks !== undefined;
-  const fallback = cloneDemo({
-    mode: "Firebase profile",
-    source: hasCloudEconomy ? "Firebase owner data" : "Firebase profile plus demo economy preview"
+  const hasCloudState = directStateExists ||
+    directSyncExists ||
+    inventory.length > 0 ||
+    orders.length > 0 ||
+    upgrades.length > 0 ||
+    cloudState.spaceBucks !== undefined ||
+    cloudState.space_bucks !== undefined ||
+    cloudState.eventCount !== undefined ||
+    cloudState.lastSequence !== undefined;
+  const fallback = cloneEmptyCloud({
+    source: hasCloudState ? "Firebase owner data" : "No synced game state yet",
+    hasCloudState,
+    refreshWarning: refreshWarning(reads)
   });
 
   fallback.profile = { ...fallback.profile, ...profile, ...player };
   fallback.player = {
     ...fallback.player,
-    spaceBucks: numberValue(cloudState.spaceBucks || cloudState.space_bucks, fallback.player.spaceBucks),
-    suitCondition: numberValue(cloudState.suitCondition || cloudState.suit_condition, fallback.player.suitCondition)
+    spaceBucks: numberValue(cloudState.spaceBucks ?? cloudState.space_bucks, fallback.player.spaceBucks),
+    suitCondition: numberValue(cloudState.suitCondition ?? cloudState.suit_condition, fallback.player.suitCondition)
   };
   fallback.settings = { ...fallback.settings, ...settings, cloudSyncEnabled: settings.cloudSyncEnabled ?? player.cloudSyncEnabled ?? true };
   fallback.cloudState = { ...fallback.cloudState, ...cloudState };
@@ -465,6 +613,7 @@ function renderDashboard(data) {
   const asteroid = data.asteroid || {};
   const progress = Math.max(0, Math.min(100, numberValue(asteroid.percentComplete)));
   const syncOn = Boolean(data.settings && data.settings.cloudSyncEnabled);
+  const hasCloudState = Boolean(data.hasCloudState);
   const conflictState = syncMetadata.conflictState || syncMetadata.conflict_state || (numberValue(syncMetadata.rejectedCount || syncMetadata.rejected_count) > 0 ? "needs review" : "none");
 
   connectionPill.textContent = currentUser ? "Firebase profile" : "Demo mode";
@@ -475,14 +624,19 @@ function renderDashboard(data) {
   metricChonks.textContent = formatNumber(materialQuantity(inventory, "mat_chonks"));
   metricSuit.textContent = formatPercent(data.player && data.player.suitCondition);
   metricEvents.textContent = formatNumber(cloudState.eventCount || syncMetadata.acceptedCount || 0);
-  syncStatus.textContent = syncOn ? "Enabled" : "Off";
+  syncStatus.textContent = currentUser && !hasCloudState ? "No data" : (syncOn ? "Enabled" : "Off");
   syncEvents.textContent = formatNumber(cloudState.eventCount || syncMetadata.acceptedCount || 0);
   syncSequence.textContent = formatNumber(syncMetadata.lastSequence || cloudState.lastSequence || 0);
   syncConflicts.textContent = conflictState === "none" ? "None" : displayNameFromId(conflictState);
+  const hasAsteroidProgress = numberValue(asteroid.depletionSize) > 0;
   asteroidName.textContent = asteroid.displayName || "-";
-  asteroidProgressLabel.textContent = `${formatNumber(asteroid.mined)} / ${formatNumber(asteroid.depletionSize)} mined`;
-  asteroidProgressPercent.textContent = formatPercent(progress);
+  asteroidProgressLabel.textContent = hasAsteroidProgress
+    ? `${formatNumber(asteroid.mined)} / ${formatNumber(asteroid.depletionSize)} mined`
+    : "No asteroid progress synced yet.";
+  asteroidProgressPercent.textContent = hasAsteroidProgress ? formatPercent(progress) : "";
+  asteroidProgressPercent.hidden = !hasAsteroidProgress;
   asteroidProgressFill.style.width = `${progress}%`;
+  progressTrack.hidden = !hasAsteroidProgress;
   progressTrack.setAttribute("aria-valuenow", String(progress));
 
   renderInventory(inventory);
@@ -518,13 +672,14 @@ function renderOrders(orders) {
   }
   ordersList.innerHTML = orders.map((order) => {
     const missing = Object.keys(order.missingMaterials || {}).length;
+    const reward = formatNumber(order.rewardSpaceBucks);
     return `
       <div class="row-item order-row">
         <div>
           <strong>${escapeHtml(order.productName)}</strong>
           <span>${escapeHtml(order.buyerName)} - ${order.canFulfill ? "ready" : `${missing} missing`}</span>
         </div>
-        <b>${formatNumber(order.rewardSpaceBucks)}</b>
+        <b>${reward} SB</b>
       </div>
     `;
   }).join("");
@@ -564,8 +719,48 @@ function normalizeStoreCategories(store) {
 function storeCostLabel(cost) {
   const spaceBucks = numberValue(cost && (cost.spaceBucks ?? cost.space_bucks));
   const materials = (cost && cost.materials) || {};
-  const materialCount = Object.keys(materials).length;
-  return `${formatNumber(spaceBucks)} SB${materialCount ? ` + ${materialCount} material${materialCount === 1 ? "" : "s"}` : ""}`;
+  const materialLabels = Object.entries(materials)
+    .filter(([, quantity]) => numberValue(quantity) > 0)
+    .map(([materialId, quantity]) => `${formatNumber(quantity)} ${displayNameFromId(materialId)}`);
+  return `${formatNumber(spaceBucks)} SB${materialLabels.length ? ` + ${materialLabels.join(", ")}` : ""}`;
+}
+
+function storeActionLabel(state, canBuy) {
+  if (canBuy) {
+    return "Buy";
+  }
+  if (currentUser && state === "affordable") {
+    return "Unavailable";
+  }
+  const disabledLabels = {
+    locked: "Unavailable",
+    maxed: "Maxed",
+    owned: "Owned",
+    purchased: "Owned",
+    unaffordable: "Need more"
+  };
+  return disabledLabels[state] || displayNameFromId(state);
+}
+
+function storeButtonAccessibleLabel(item, actionLabel) {
+  const itemName = item.displayName || item.display_name || "Store item";
+  const kind = displayNameFromId(item.kind || "store");
+  if (actionLabel === "Buy") {
+    return `Buy ${itemName} ${kind}`;
+  }
+  if (actionLabel === "Need more") {
+    return `Need more for ${itemName} ${kind}`;
+  }
+  if (actionLabel === "Unavailable") {
+    return `${itemName} ${kind} unavailable`;
+  }
+  if (actionLabel === "Owned") {
+    return `${itemName} ${kind} owned`;
+  }
+  if (actionLabel === "Maxed") {
+    return `${itemName} ${kind} maxed`;
+  }
+  return `${actionLabel} ${itemName} ${kind}`;
 }
 
 function renderStore(data) {
@@ -585,7 +780,9 @@ function renderStore(data) {
 
   storeList.innerHTML = items.map((item) => {
     const state = item.purchaseState || item.purchase_state || "locked";
-    const canBuy = state === "affordable";
+    const canBuy = state === "affordable" && !currentUser;
+    const actionLabel = storeActionLabel(state, canBuy);
+    const accessibleLabel = storeButtonAccessibleLabel(item, actionLabel);
     const storeItemId = item.storeItemId || item.store_item_id;
     return `
       <div class="store-row" data-state="${escapeHtml(state)}">
@@ -594,7 +791,7 @@ function renderStore(data) {
           <span>${escapeHtml(displayNameFromId(item.kind || "store"))} - ${escapeHtml(storeCostLabel(item.cost))}</span>
         </div>
         <span class="store-state">${escapeHtml(displayNameFromId(state))}</span>
-        <button type="button" class="button-secondary store-buy" data-store-item-id="${escapeHtml(storeItemId)}" ${canBuy ? "" : "disabled"}>Buy</button>
+        <button type="button" class="button-secondary store-buy" data-store-item-id="${escapeHtml(storeItemId)}" aria-label="${escapeHtml(accessibleLabel)}" ${canBuy ? "" : "disabled"}>${escapeHtml(actionLabel)}</button>
       </div>
     `;
   }).join("");
@@ -623,13 +820,37 @@ function applyDemoStorePurchase(storeItemId) {
   }
 
   const cost = item.cost || {};
+  const materials = cost.materials || {};
   activeDashboard.player.spaceBucks = numberValue(activeDashboard.player.spaceBucks) - numberValue(cost.spaceBucks ?? cost.space_bucks);
-  item.purchaseState = item.kind === "cosmetic" ? "owned" : "maxed";
+  Object.entries(materials).forEach(([materialId, quantity]) => {
+    const inventoryItem = activeDashboard.inventory.find((candidate) => candidate.materialId === materialId);
+    if (inventoryItem) {
+      inventoryItem.quantity = Math.max(0, numberValue(inventoryItem.quantity) - numberValue(quantity));
+    }
+  });
+  if (item.kind === "upgrade") {
+    const upgradeId = String(item.storeItemId || item.store_item_id || "").replace(/^upgrade:/, "");
+    const upgrade = activeDashboard.upgrades.find((candidate) => candidate.upgradeId === upgradeId);
+    if (upgrade) {
+      upgrade.level = Math.min(numberValue(upgrade.level) + 1, numberValue(upgrade.maxLevel, 5));
+      upgrade.effect = upgrade.nextEffect || upgrade.effect;
+    }
+  }
+  if (item.kind === "base_module") {
+    activeDashboard.base.moduleCount = numberValue(activeDashboard.base.moduleCount || activeDashboard.base.module_count) + 1;
+  }
+  item.purchaseState = "purchased";
+  item.purchase_state = "purchased";
   renderDashboard(activeDashboard);
   setMessage(`${item.displayName || item.display_name} purchased with earned Space Bucks.`);
 }
 
 function renderReports(reports) {
+  if (!reports.length) {
+    reportsList.innerHTML = `<p class="empty-state">No cloud reports have been synced yet.</p>`;
+    return;
+  }
+
   reportsList.innerHTML = reports.slice(0, 5).map((report) => `
     <article>
       <p>${escapeHtml(report)}</p>
@@ -640,7 +861,7 @@ function renderReports(reports) {
 function renderCloudDetail(cloudState, asteroid) {
   cloudDetail.innerHTML = `
     <div><dt>Work score</dt><dd>${formatNumber(cloudState.workScoreTotal || 0)}</dd></div>
-    <div><dt>Last event</dt><dd>${escapeHtml(cloudState.lastEventId || "none")}</dd></div>
+    <div><dt>Last event</dt><dd>${escapeHtml(eventLabel(cloudState))}</dd></div>
     <div><dt>Rare find</dt><dd>${escapeHtml(asteroid.rareFindChance || "n/a")}</dd></div>
   `;
 }
@@ -655,10 +876,10 @@ function renderBase(base) {
 
 function renderPrivacy(data) {
   const privacyItems = [
-    ["Owner scope", currentUser ? "Firebase UID boundary" : "Local demo"],
-    ["Data class", "abstract"],
-    ["Report mode", data.settings && data.settings.reportMode ? data.settings.reportMode : "meaningful_turns_only"],
-    ["Private details", "not fetched"]
+    ["Owner scope", currentUser ? "Private profile boundary" : "Local demo"],
+    ["Data class", "Abstract progress only"],
+    ["Report mode", reportModeLabel(data.settings && data.settings.reportMode)],
+    ["Private details", "Not collected"]
   ];
   privacyList.innerHTML = privacyItems.map(([label, value]) => `
     <li><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></li>
@@ -670,11 +891,16 @@ async function refreshForCurrentUser() {
   try {
     if (!currentUser) {
       renderDashboard(cloneDemo());
+      setMessage("Demo preview refreshed.");
       return;
     }
     const data = await loadDashboardForUser(currentUser);
     renderDashboard(data);
-    setMessage("Dashboard refreshed.");
+    if (data.refreshWarning) {
+      setMessage(data.refreshWarning, true);
+    } else {
+      setMessage(DASHBOARD_REFRESH_SUCCESS);
+    }
   } catch (error) {
     renderDashboard(cloneDemo({
       mode: "Demo fallback",
@@ -688,10 +914,18 @@ async function refreshForCurrentUser() {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (!validateAuthForm()) {
+    return;
+  }
   handleAuth(() => signInWithEmailAndPassword(auth, email.value, password.value));
 });
 
+form.addEventListener("invalid", handleInvalidAuthField, true);
+
 createAccount.addEventListener("click", () => {
+  if (!validateAuthForm()) {
+    return;
+  }
   handleAuth(() => createUserWithEmailAndPassword(auth, email.value, password.value));
 });
 
@@ -716,20 +950,30 @@ storeList.addEventListener("click", (event) => {
 });
 
 onAuthStateChanged(auth, async (user) => {
+  const previousUser = currentUser;
   currentUser = user;
+  updateAuthControls(user);
   if (!user) {
     authStatus.textContent = "Signed out";
-    authUid.textContent = "-";
+    authIdentity.textContent = "Not signed in";
     profileStatus.textContent = "Demo preview";
-    signOutButton.disabled = true;
+    if (previousUser) {
+      email.value = "";
+    }
+    password.value = "";
     setMessage("");
     renderDashboard(cloneDemo());
     return;
   }
 
   authStatus.textContent = "Signed in";
-  authUid.textContent = user.uid;
-  signOutButton.disabled = false;
+  authIdentity.textContent = "Private profile";
+  email.value = "";
+  profileStatus.textContent = "Loading";
+  setMessage("Loading profile.");
+  renderDashboard(cloneEmptyCloud({
+    source: "Loading cloud state..."
+  }));
 
   try {
     const result = await ensureLinkedProfile(user);
