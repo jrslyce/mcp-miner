@@ -23,7 +23,19 @@
     "browserContent",
     "appContent",
     "transcript",
-    "rawTranscript"
+    "rawTranscript",
+    "token",
+    "tokens",
+    "idToken",
+    "idTokens",
+    "deviceToken",
+    "deviceTokens",
+    "refreshToken",
+    "refreshTokens",
+    "apiKey",
+    "apiKeys",
+    "secret",
+    "secrets"
   ],
   "collections": {
     "players/{uid}": {
@@ -52,11 +64,17 @@
       "serverOwned": true,
       "fields": ["ownerUid", "deviceId", "deviceName", "status", "privacyClass", "scopes", "createdAt", "updatedAt", "lastUsedAt", "revokedAt", "linkSessionId"]
     },
+    "players/{uid}/entitlements/current": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true,
+      "fields": ["plan", "billingStatus", "provider", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "updatedAt"]
+    },
     "players/{uid}/rewardEvents/{eventId}": {
       "owner": "uid",
       "clientAccess": ["read", "create"],
       "appendOnly": true,
-      "fields": ["ownerUid", "eventId", "eventType", "schemaVersion", "sequence", "timestamp", "sessionId", "turnId", "observedFields", "privacyClass", "source", "signature", "checksum", "clientCreatedAt", "receivedAt", "reducedAt", "rewardControl"]
+      "fields": ["ownerUid", "eventId", "eventType", "schemaVersion", "receiptSchemaVersion", "receiptType", "sequence", "timestamp", "sessionId", "turnId", "observedFields", "privacyClass", "source", "signature", "checksum", "clientCreatedAt", "receivedAt", "reducedAt", "rewardControl"]
     },
     "players/{uid}/gameState/current": {
       "owner": "uid",

@@ -9,6 +9,11 @@ const {
   reduceCloudState
 } = require("./sync");
 const {
+  evaluateSyncThrottle,
+  publicEntitlement,
+  resolveEntitlement
+} = require("./entitlements");
+const {
   DEVICE_TOKEN_PREFIX,
   deviceTokenHash,
   hasDeviceScope,
@@ -171,6 +176,7 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
   const playerRef = db.doc(`players/${uid}`);
   const stateRef = db.doc(`players/${uid}/gameState/current`);
   const syncRef = db.doc(`players/${uid}/syncMetadata/default`);
+  const entitlementRef = db.doc(`players/${uid}/entitlements/current`);
   const eventRefs = events.map((event, index) => {
     const eventId = event && typeof event.eventId === "string" && /^evt_[a-zA-Z0-9_-]+$/.test(event.eventId)
       ? event.eventId
@@ -182,6 +188,7 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
     const result = await db.runTransaction(async (transaction) => {
       const stateSnap = await transaction.get(stateRef);
       const syncSnap = await transaction.get(syncRef);
+      const entitlementSnap = await transaction.get(entitlementRef);
       const eventSnaps = [];
       for (const ref of eventRefs) {
         eventSnaps.push(await transaction.get(ref));
@@ -197,6 +204,45 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         lastSequence: 0
       };
       const sync = syncSnap.exists ? syncSnap.data() : {};
+      const entitlement = resolveEntitlement(entitlementSnap.exists ? entitlementSnap.data() : {});
+      const throttle = evaluateSyncThrottle({
+        entitlement,
+        syncMetadata: sync,
+        now: new Date(receivedAt)
+      });
+
+      if (throttle.throttled) {
+        transaction.set(syncRef, {
+          ownerUid: uid,
+          schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
+          privacyClass: "abstract",
+          updatedAt: receivedAt,
+          lastThrottleAt: receivedAt,
+          nextEligibleSyncAt: throttle.nextEligibleSyncAt,
+          syncCadenceSeconds: entitlement.syncCadenceSeconds,
+          plan: entitlement.plan,
+          billingStatus: entitlement.billingStatus
+        }, { merge: true });
+        touchDeviceWrites(transaction, auth, receivedAt);
+
+        return {
+          ok: false,
+          status: "throttled",
+          accepted: [],
+          duplicates: [],
+          rejected: [],
+          throttle,
+          entitlement: publicEntitlement(entitlement),
+          state: {
+            eventCount: Number(state.eventCount || 0),
+            workScoreTotal: Number(state.workScoreTotal || 0),
+            lastEventId: state.lastEventId || null,
+            lastSequence: Number(sync.lastSequence || state.lastSequence || 0),
+            workEvents: state.workEvents || {}
+          }
+        };
+      }
+
       const existingEventIds = eventSnaps
         .filter((snapshot) => snapshot.exists)
         .map((snapshot) => snapshot.id);
@@ -233,6 +279,13 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
         privacyClass: "abstract",
         updatedAt: receivedAt,
+        lastAcceptedBatchAt: batch.accepted.length > 0 ? receivedAt : sync.lastAcceptedBatchAt || null,
+        nextEligibleSyncAt: batch.accepted.length > 0
+          ? new Date(new Date(receivedAt).getTime() + (entitlement.syncCadenceSeconds * 1000)).toISOString()
+          : sync.nextEligibleSyncAt || null,
+        syncCadenceSeconds: entitlement.syncCadenceSeconds,
+        plan: entitlement.plan,
+        billingStatus: entitlement.billingStatus,
         lastCloudEventId: reducedState.lastEventId || sync.lastCloudEventId || null,
         lastSequence: Math.max(Number(sync.lastSequence || 0), Number(reducedState.lastSequence || 0), Number(batch.lastSequence || 0)),
         acceptedCount: admin.firestore.FieldValue.increment(batch.accepted.length),
@@ -246,6 +299,14 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         accepted: batch.accepted.map((event) => event.eventId),
         duplicates: batch.duplicates,
         rejected: batch.rejected,
+        throttle: {
+          throttled: false,
+          nextEligibleSyncAt: batch.accepted.length > 0
+            ? new Date(new Date(receivedAt).getTime() + (entitlement.syncCadenceSeconds * 1000)).toISOString()
+            : sync.nextEligibleSyncAt || receivedAt,
+          waitSeconds: 0
+        },
+        entitlement: publicEntitlement(entitlement),
         state: {
           eventCount: reducedState.eventCount,
           workScoreTotal: reducedState.workScoreTotal,
@@ -287,10 +348,12 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
 exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
   const auth = await resolveSyncAuth(request, "sync:read");
   const uid = auth.uid;
-  const [stateSnap, syncSnap] = await Promise.all([
+  const [stateSnap, syncSnap, entitlementSnap] = await Promise.all([
     db.doc(`players/${uid}/gameState/current`).get(),
-    db.doc(`players/${uid}/syncMetadata/default`).get()
+    db.doc(`players/${uid}/syncMetadata/default`).get(),
+    db.doc(`players/${uid}/entitlements/current`).get()
   ]);
+  const entitlement = resolveEntitlement(entitlementSnap.exists ? entitlementSnap.data() : {});
   if (auth.authType === "device_token") {
     const now = new Date().toISOString();
     await Promise.all([
@@ -310,7 +373,8 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
     ok: true,
     privacyClass: "abstract",
     state: stateSnap.exists ? stateSnap.data() : null,
-    syncMetadata: syncSnap.exists ? syncSnap.data() : null
+    syncMetadata: syncSnap.exists ? syncSnap.data() : null,
+    entitlement: publicEntitlement(entitlement)
   };
 });
 

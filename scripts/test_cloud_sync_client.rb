@@ -224,6 +224,53 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
         conflict.dig("sync", "account_link", "status") == "sync_error" &&
         conflict.dig("sync", "metadata", "rejected_events").first["reason"] == "stale_sequence"
     end
+
+    engine.with_state do |state|
+      state["cloud_sync_metadata"]["last_pushed_sequence"] = 0
+      state["cloud_auth"]["status"] = "linked"
+    end
+    next_eligible = "2026-05-24T00:01:00.000Z"
+    response_queue << {
+      body: {
+        result: {
+          ok: false,
+          status: "throttled",
+          accepted: [],
+          duplicates: [],
+          rejected: [],
+          throttle: {
+            throttled: true,
+            reason: "sync_cadence",
+            nextEligibleSyncAt: next_eligible,
+            waitSeconds: 30
+          },
+          entitlement: {
+            plan: "free",
+            displayName: "Free",
+            billingStatus: "free",
+            syncCadenceSeconds: 60,
+            maxDevices: 1,
+            historyRetentionDays: 14
+          },
+          state: {
+            eventCount: accepted_ids.length,
+            lastSequence: max_sequence
+          }
+        }
+      }
+    }
+    throttled = tool_payload(run_mcp(state_path, [
+      { jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin } } }
+    ]).last)
+    assert("throttled cloud sync should keep local events queued with plan cadence metadata") do
+      throttled["ok"] == false &&
+        throttled["status"] == "throttled" &&
+        throttled.dig("sync", "metadata", "status") == "throttled" &&
+        throttled.dig("sync", "metadata", "plan") == "free" &&
+        throttled.dig("sync", "metadata", "sync_cadence_seconds") == 60 &&
+        throttled.dig("sync", "metadata", "next_eligible_sync_at") == next_eligible &&
+        throttled.dig("sync", "metadata", "pending_event_count") == first_events.length
+    end
   ensure
     server.shutdown
     thread.join

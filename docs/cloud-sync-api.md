@@ -94,10 +94,22 @@ Reducer writes:
 - `/players/{uid}/rewardEvents/{eventId}` stores the sanitized event.
 - `/players/{uid}/gameState/current` stores aggregate abstract state such as event counts, score totals, work-event counters, last event ID, and last sequence.
 - `/players/{uid}/syncMetadata/default` stores sequence/counter metadata.
+- `/players/{uid}/entitlements/current` optionally stores normalized plan limits. Missing
+  entitlement docs resolve to Free defaults.
+
+Sync cadence:
+
+- Free defaults to one accepted batch per 60 seconds.
+- Pro defaults to a shorter accepted-batch cadence.
+- The cadence changes portal freshness, not reward math. Free and Pro receipts use the same
+  server-side score calculation.
+- Throttled calls return `status: "throttled"` plus `throttle.nextEligibleSyncAt`; the local plugin
+  keeps events queued and retries later.
 
 ### `getSyncState`
 
-Returns the current server-owned `gameState/current` and `syncMetadata/default` documents for the authenticated UID.
+Returns the current server-owned `gameState/current`, `syncMetadata/default`, and public entitlement
+summary for the authenticated UID.
 
 ## Logging
 

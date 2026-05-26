@@ -45,7 +45,19 @@ service cloud.firestore {
         "browserContent",
         "appContent",
         "transcript",
-        "rawTranscript"
+        "rawTranscript",
+        "token",
+        "tokens",
+        "idToken",
+        "idTokens",
+        "deviceToken",
+        "deviceTokens",
+        "refreshToken",
+        "refreshTokens",
+        "apiKey",
+        "apiKeys",
+        "secret",
+        "secrets"
       ];
     }
 
@@ -190,6 +202,8 @@ service cloud.firestore {
           "eventId",
           "eventType",
           "schemaVersion",
+          "receiptSchemaVersion",
+          "receiptType",
           "sequence",
           "timestamp",
           "sessionId",
@@ -207,6 +221,7 @@ service cloud.firestore {
         data.keys().hasAll(["ownerUid", "eventId", "eventType", "schemaVersion", "sequence", "timestamp", "privacyClass", "source", "signature", "checksum"]) &&
         data.eventId == eventId &&
         data.schemaVersion is int &&
+        (!("receiptSchemaVersion" in data) || data.receiptSchemaVersion is int) &&
         data.sequence is int &&
         data.eventType is string &&
         data.eventType.matches("^work_[a-z_]+$") &&
@@ -217,6 +232,7 @@ service cloud.firestore {
         timestampLike(data, "reducedAt") &&
         optionalString(data, "sessionId") &&
         optionalString(data, "turnId") &&
+        optionalString(data, "receiptType") &&
         optionalString(data, "signature") &&
         optionalString(data, "checksum") &&
         optionalMap(data, "observedFields") &&
@@ -289,6 +305,11 @@ service cloud.firestore {
       match /syncDevices/{deviceId} {
         allow read: if isOwner(uid);
         allow create, update, delete: if false;
+      }
+
+      match /entitlements/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
       }
 
       match /rewardEvents/{eventId} {

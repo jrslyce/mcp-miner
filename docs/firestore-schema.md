@@ -11,6 +11,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/players/{uid}/settings/current` | owner | owner read/create/update | Report mode, sync preference, dashboard display preference, App Check debug flag. |
 | `/players/{uid}/syncMetadata/{clientId}` | owner | owner read/create/update | Per-client cursors and conflict metadata. |
 | `/players/{uid}/syncDevices/{deviceId}` | owner | owner read only | Server-owned public metadata for linked Codex devices; device token hashes stay outside owner-readable docs. |
+| `/players/{uid}/entitlements/current` | owner | owner read only | Server-owned Free/Pro plan limits such as sync cadence, device count, and history retention. |
 | `/players/{uid}/rewardEvents/{eventId}` | owner | owner read/create only | Append-only abstract Codex work-event summaries for Functions to validate and reduce. |
 | `/players/{uid}/gameState/current` | owner | owner read only | Cloud-reduced materialized game state, including Space Bucks and schema versions. |
 | `/players/{uid}/inventory/{bucket}` | owner | owner read only | Cloud-reduced inventory buckets for dashboard reads. |
@@ -48,22 +49,27 @@ Reward events are append-only and use deterministic event IDs from the local jou
   "eventId": "evt_abc123",
   "eventType": "work_apply_patch",
   "schemaVersion": 1,
+  "receiptSchemaVersion": 2,
+  "receiptType": "abstract_work",
   "sequence": 42,
   "timestamp": "2026-05-24T00:00:00Z",
   "sessionId": "session_abc",
   "turnId": "turn_def",
   "observedFields": {
-    "changedLines": 42,
-    "filesTouchedCount": 2
+    "score": 8.5,
+    "scoreSource": "server_receipt_v2",
+    "serverCalculated": true
   },
   "privacyClass": "abstract",
   "source": "codex_hook",
   "checksum": "sha256-of-canonical-abstract-payload",
-  "signature": "v1.local-signature-placeholder"
+  "signature": "v2.local-signature-placeholder"
 }
 ```
 
-Allowed reward-event fields intentionally exclude reward deltas and aggregate balances. Functions compute trusted rewards after validation.
+Allowed reward-event fields intentionally exclude reward deltas and aggregate balances. New sync
+clients send schema v2 receipts; Functions compute trusted score/rewards after validation and store
+only the sanitized event.
 
 ## Rejected Private Fields
 
@@ -74,6 +80,7 @@ Rules reject practical top-level private field names on client-writeable documen
 - terminal output and commands
 - file paths, working directories, repo names, and repository names
 - browser content, app content, transcripts, and raw transcripts
+- tokens, API keys, and secrets
 
 Rules cannot understand every possible nested semantic value, so Functions must repeat privacy validation before reducing an event. The local plugin should continue to send only abstract event summaries by default.
 

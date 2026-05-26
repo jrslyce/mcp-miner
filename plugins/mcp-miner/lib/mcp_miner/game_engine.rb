@@ -327,7 +327,13 @@ module McpMiner
         "link_code" => nil,
         "link_url" => nil,
         "link_expires_at" => nil,
-        "device_id" => nil
+        "device_id" => nil,
+        "plan" => "free",
+        "billing_status" => "free",
+        "sync_cadence_seconds" => 60,
+        "max_devices" => 1,
+        "history_retention_days" => 14,
+        "next_eligible_sync_at" => nil
       }
     end
 
@@ -2180,7 +2186,13 @@ module McpMiner
         link_url: optional_string(metadata["link_url"]),
         link_expires_at: optional_string(metadata["link_expires_at"]),
         device_id: optional_string(metadata["device_id"]),
-        device_token_present: !!stored_device_token
+        device_token_present: !!stored_device_token,
+        plan: optional_string(metadata["plan"]) || "free",
+        billing_status: optional_string(metadata["billing_status"]) || "free",
+        sync_cadence_seconds: metadata["sync_cadence_seconds"].to_i,
+        max_devices: metadata["max_devices"].to_i,
+        history_retention_days: metadata["history_retention_days"].to_i,
+        next_eligible_sync_at: optional_string(metadata["next_eligible_sync_at"])
       }
     end
 
@@ -2200,6 +2212,8 @@ module McpMiner
       accepted_ids = Array(payload["accepted"])
       duplicates = Array(payload["duplicates"])
       rejected = Array(payload["rejected"])
+      entitlement = payload["entitlement"].is_a?(Hash) ? payload["entitlement"] : {}
+      throttle = payload["throttle"].is_a?(Hash) ? payload["throttle"] : {}
       sequence_by_id = events.to_h { |event| [event["eventId"], event["sequence"].to_i] }
       duplicate_ids = duplicates.map { |item| safe_string(item["eventId"]) }.reject(&:empty?)
       synced_ids = accepted_ids + duplicate_ids
@@ -2208,8 +2222,36 @@ module McpMiner
       max_synced_sequence = (synced_sequences + duplicate_sequences + [0]).max
       now = Time.now.utc.iso8601
 
+      if payload["status"] == "throttled"
+        with_state do |state|
+          state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+          apply_cloud_entitlement_metadata!(state["cloud_sync_metadata"], entitlement)
+          state["cloud_sync_metadata"]["status"] = "throttled"
+          state["cloud_sync_metadata"]["last_attempt_at"] = now
+          state["cloud_sync_metadata"]["next_retry_at"] = optional_string(throttle["nextEligibleSyncAt"])
+          state["cloud_sync_metadata"]["next_eligible_sync_at"] = optional_string(throttle["nextEligibleSyncAt"])
+          state["cloud_sync_metadata"]["pending_event_ids"] = events.map { |event| event["eventId"] }.last(200)
+          state["cloud_sync_metadata"]["last_error"] = "Cloud sync is waiting for the #{state["cloud_sync_metadata"]["plan"]} cadence window."
+          state["cloud_sync_metadata"]["functions_origin"] = functions_origin
+          state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
+          state["cloud_auth"]["status"] = "linked"
+          state["cloud_auth"]["last_error"] = nil
+        end
+
+        return {
+          ok: false,
+          status: "throttled",
+          queued_event_count: events.length,
+          throttle: throttle,
+          entitlement: entitlement,
+          sync: sync_progress_payload[:sync],
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
       with_state do |state|
         state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+        apply_cloud_entitlement_metadata!(state["cloud_sync_metadata"], entitlement)
         previous_sequence = state["cloud_sync_metadata"]["last_pushed_sequence"].to_i
         next_sequence = [previous_sequence, max_synced_sequence].max
         state["cloud_sync_metadata"]["status"] = rejected.empty? ? "synced" : "conflict"
@@ -2217,6 +2259,7 @@ module McpMiner
         state["cloud_sync_metadata"]["last_attempt_at"] = now
         state["cloud_sync_metadata"]["last_success_at"] = now if rejected.empty?
         state["cloud_sync_metadata"]["next_retry_at"] = nil if rejected.empty?
+        state["cloud_sync_metadata"]["next_eligible_sync_at"] = optional_string(throttle["nextEligibleSyncAt"])
         state["cloud_sync_metadata"]["retry_count"] = rejected.empty? ? 0 : state["cloud_sync_metadata"]["retry_count"].to_i
         state["cloud_sync_metadata"]["duplicate_event_ids"] = (Array(state["cloud_sync_metadata"]["duplicate_event_ids"]) + duplicate_ids).last(100)
         state["cloud_sync_metadata"]["rejected_events"] = rejected.last(100)
@@ -2238,6 +2281,16 @@ module McpMiner
         sync: sync_progress_payload[:sync],
         privacy: PRIVACY_NOTICE
       }
+    end
+
+    def apply_cloud_entitlement_metadata!(metadata, entitlement)
+      return unless entitlement.is_a?(Hash) && !entitlement.empty?
+
+      metadata["plan"] = optional_string(entitlement["plan"]) || metadata["plan"] || "free"
+      metadata["billing_status"] = optional_string(entitlement["billingStatus"]) || metadata["billing_status"] || "free"
+      metadata["sync_cadence_seconds"] = entitlement["syncCadenceSeconds"].to_i if entitlement.key?("syncCadenceSeconds")
+      metadata["max_devices"] = entitlement["maxDevices"].to_i if entitlement.key?("maxDevices")
+      metadata["history_retention_days"] = entitlement["historyRetentionDays"].to_i if entitlement.key?("historyRetentionDays")
     end
 
     def record_cloud_sync_error(error, events, functions_origin)
