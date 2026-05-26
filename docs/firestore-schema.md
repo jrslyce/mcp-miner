@@ -17,10 +17,15 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/players/{uid}/upgrades/current` | owner | owner read only | Cloud-reduced upgrade levels and effects. |
 | `/players/{uid}/orders/{orderId}` | owner | owner read only | Cloud-reduced active and completed order state. |
 | `/players/{uid}/base/current` | owner | owner read only | Cloud-reduced base module and drone state. |
+| `/linkSessions/{sessionId}` | server | none | Short-lived device-link approval sessions created by callable Functions. |
+| `/linkCodes/{code}` | server | none | Atomic one-time code reservations that prevent active link-code collisions. |
+| `/deviceTokens/{tokenHash}` | server | none | Hash-only revocable device token records used by callable Functions. |
 
 ## Client-Write Boundaries
 
 Clients may create profile/settings/sync metadata and append abstract reward events. Clients may not write aggregate balances. In production, Cloud Functions are responsible for validating reward event signatures, dedupe keys, cooldowns, daily soft caps, and reducers before writing game state.
+
+Link sessions, link-code reservations, and device-token hashes are top-level server-owned collections. They are written only by Cloud Functions through the Admin SDK and remain blocked from direct dashboard/plugin Firestore access by the default deny rule.
 
 The owner field must match Firebase Auth:
 

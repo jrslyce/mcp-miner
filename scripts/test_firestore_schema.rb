@@ -33,7 +33,10 @@ expected_paths = [
   "players/{uid}/inventory/{bucket}",
   "players/{uid}/upgrades/current",
   "players/{uid}/orders/{orderId}",
-  "players/{uid}/base/current"
+  "players/{uid}/base/current",
+  "linkSessions/{sessionId}",
+  "linkCodes/{code}",
+  "deviceTokens/{tokenHash}"
 ]
 
 assert("schema should document all V1 Firestore collections") do
@@ -63,6 +66,16 @@ assert("aggregate balances should be server-owned/read-only to clients") do
     rules.include?("match /#{collection}/{docId}") && rules.include?("allow write: if false;")
   end &&
     schema.dig("collections", "players/{uid}/gameState/current", "serverOwned") == true
+end
+
+assert("linking secrets should stay in server-owned top-level collections") do
+  ["linkSessions/{sessionId}", "linkCodes/{code}", "deviceTokens/{tokenHash}"].all? do |path|
+    schema.dig("collections", path, "serverOwned") == true &&
+      schema.dig("collections", path, "clientAccess") == []
+  end &&
+    docs.include?("default deny rule") &&
+    rules.include?("match /{document=**}") &&
+    rules.include?("allow read, write: if false;")
 end
 
 assert("reward events should be append-only abstract Codex hook summaries") do

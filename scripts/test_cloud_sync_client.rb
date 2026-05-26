@@ -219,11 +219,38 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
   ensure
     server.shutdown
     thread.join
+    $requests_seen = requests.length
+  end
+end
+
+Dir.mktmpdir("mcp-miner-cloud-sync-empty") do |dir|
+  state_path = File.join(dir, "state.json")
+  engine = McpMiner::GameEngine.new(root: ROOT, state_path: state_path)
+  engine.write_state(engine.initial_state)
+
+  empty_unauth = tool_payload(run_mcp(state_path, [
+    { jsonrpc: "2.0", id: 20, method: "tools/call", params: { name: "update_settings", arguments: { cloud_sync: true } } },
+    { jsonrpc: "2.0", id: 21, method: "tools/call", params: { name: "sync_cloud", arguments: {} } }
+  ]).last)
+  assert("sync_cloud should not report synced for an unauthenticated empty queue") do
+    empty_unauth["ok"] == false &&
+      empty_unauth["status"] == "unauthenticated" &&
+      empty_unauth["queued_event_count"] == 0
   end
 
-  puts JSON.pretty_generate({
-    ok: true,
-    checks: $checks,
-    requests_seen: requests.length
-  })
+  empty_auth_required = tool_payload(run_mcp(state_path, [
+    { jsonrpc: "2.0", id: 22, method: "tools/call", params: { name: "link_cloud_profile", arguments: { firebase_uid: "firebase_uid_empty" } } },
+    { jsonrpc: "2.0", id: 23, method: "tools/call", params: { name: "sync_cloud", arguments: {} } }
+  ]).last)
+  assert("sync_cloud should not report synced for a linked empty queue without a token") do
+    empty_auth_required["ok"] == false &&
+      empty_auth_required["status"] == "auth_required" &&
+      empty_auth_required["queued_event_count"] == 0
+  end
 end
+
+puts JSON.pretty_generate({
+  ok: true,
+  checks: $checks,
+  requests_seen: $requests_seen
+})

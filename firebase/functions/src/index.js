@@ -11,10 +11,13 @@ const {
 const {
   DEVICE_TOKEN_PREFIX,
   deviceTokenHash,
+  hasDeviceScope,
   newDeviceToken,
   newLinkSession,
   normalizeLinkCode,
   publicLinkSession,
+  requirePendingSession,
+  sanitizeDashboardUrl,
   secretHash,
   validateLinkSession
 } = require("./linking");
@@ -25,7 +28,11 @@ const db = admin.firestore();
 function dashboardUrlFromRequest(request) {
   const requested = request.data && request.data.dashboardUrl;
   const configured = process.env.MCP_MINER_DASHBOARD_URL;
-  return String(requested || configured || "https://mcp-miner.web.app").replace(/\/+$/g, "");
+  try {
+    return sanitizeDashboardUrl(requested, configured);
+  } catch (error) {
+    throw new HttpsError("invalid-argument", error.message);
+  }
 }
 
 function bearerToken(request) {
@@ -56,6 +63,11 @@ async function resolveLinkSessionRef(data) {
     throw new HttpsError("invalid-argument", "A link session ID or code is required.");
   }
 
+  const codeSnap = await db.doc(`linkCodes/${code}`).get();
+  if (codeSnap.exists && codeSnap.data().sessionId) {
+    return db.doc(`linkSessions/${codeSnap.data().sessionId}`);
+  }
+
   const snapshot = await db.collection("linkSessions")
     .where("code", "==", code)
     .where("status", "in", ["pending", "approved"])
@@ -67,7 +79,7 @@ async function resolveLinkSessionRef(data) {
   return snapshot.docs[0].ref;
 }
 
-async function resolveSyncAuth(request) {
+async function resolveSyncAuth(request, requiredScope = null) {
   if (request.auth) {
     return {
       uid: request.auth.uid,
@@ -87,6 +99,9 @@ async function resolveSyncAuth(request) {
   const tokenData = tokenSnap.exists ? tokenSnap.data() : null;
   if (!tokenData || tokenData.status !== "active" || !tokenData.uid || !tokenData.deviceId) {
     throw new HttpsError("unauthenticated", "Linked device token is invalid or revoked.");
+  }
+  if (!hasDeviceScope(tokenData, requiredScope)) {
+    throw new HttpsError("permission-denied", `Linked device token is missing ${requiredScope}.`);
   }
 
   return {
@@ -111,7 +126,7 @@ function touchDeviceWrites(transaction, auth, now) {
 }
 
 exports.ping = onCall({ region: "us-central1" }, async (request) => {
-  const auth = await resolveSyncAuth(request);
+  const auth = await resolveSyncAuth(request, "sync:read");
 
   logger.info("mcp_miner_ping", {
     privacyClass: "abstract",
@@ -130,7 +145,7 @@ exports.ping = onCall({ region: "us-central1" }, async (request) => {
 });
 
 exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => {
-  const auth = await resolveSyncAuth(request);
+  const auth = await resolveSyncAuth(request, "sync:write");
   const uid = auth.uid;
   const events = Array.isArray(request.data && request.data.events) ? request.data.events : [];
   const receivedAt = new Date().toISOString();
@@ -251,7 +266,7 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
 });
 
 exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
-  const auth = await resolveSyncAuth(request);
+  const auth = await resolveSyncAuth(request, "sync:read");
   const uid = auth.uid;
   const [stateSnap, syncSnap] = await Promise.all([
     db.doc(`players/${uid}/gameState/current`).get(),
@@ -282,26 +297,62 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
 
 exports.createLinkSession = onCall({ region: "us-central1" }, async (request) => {
   const now = new Date();
-  const { session, deviceSecret, linkUrl } = newLinkSession({
-    now,
-    dashboardUrl: dashboardUrlFromRequest(request),
-    deviceName: request.data && request.data.deviceName
-  });
-
-  await db.doc(`linkSessions/${session.sessionId}`).set(session);
-
+  let nextSession = null;
+  let nextDeviceSecret = null;
+  let nextLinkUrl = null;
+  const dashboardUrl = dashboardUrlFromRequest(request);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const { session, deviceSecret, linkUrl } = newLinkSession({
+      now,
+      dashboardUrl,
+      deviceName: request.data && request.data.deviceName
+    });
+    const sessionRef = db.doc(`linkSessions/${session.sessionId}`);
+    const codeRef = db.doc(`linkCodes/${session.code}`);
+    const created = await db.runTransaction(async (transaction) => {
+      const codeSnap = await transaction.get(codeRef);
+      const codeData = codeSnap.exists ? codeSnap.data() : null;
+      const activeCollision = codeData &&
+        ["pending", "approved"].includes(codeData.status) &&
+        new Date(codeData.expiresAt).getTime() > now.getTime();
+      if (activeCollision) {
+        return false;
+      }
+      transaction.set(sessionRef, session, { merge: false });
+      transaction.set(codeRef, {
+        code: session.code,
+        sessionId: session.sessionId,
+        status: session.status,
+        privacyClass: "abstract",
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        expiresAt: session.expiresAt
+      }, { merge: false });
+      return true;
+    });
+    if (!created) {
+      continue;
+    }
+    nextSession = session;
+    nextDeviceSecret = deviceSecret;
+    nextLinkUrl = linkUrl;
+    break;
+  }
+  if (!nextSession) {
+    throw new HttpsError("resource-exhausted", "Could not create a unique link code. Try again.");
+  }
   logger.info("mcp_miner_link_session_created", {
     privacyClass: "abstract",
-    sessionId: session.sessionId,
-    expiresAt: session.expiresAt
+    sessionId: nextSession.sessionId,
+    expiresAt: nextSession.expiresAt
   });
 
   return {
     ok: true,
     privacyClass: "abstract",
-    session: publicLinkSession(session),
-    linkUrl,
-    deviceSecret,
+    session: publicLinkSession(nextSession),
+    linkUrl: nextLinkUrl,
+    deviceSecret: nextDeviceSecret,
     message: "Open the link while signed in to MCP Miner to approve this Codex device."
   };
 });
@@ -317,7 +368,7 @@ exports.approveLinkSession = onCall({ region: "us-central1" }, async (request) =
   const result = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ref);
     const session = snapshot.exists ? snapshot.data() : null;
-    const validation = validateLinkSession(session);
+    const validation = requirePendingSession(session);
     if (!validation.ok) {
       throw new HttpsError(validation.reason === "not_found" ? "not-found" : "failed-precondition", `Link session ${validation.reason}.`);
     }
@@ -330,6 +381,11 @@ exports.approveLinkSession = onCall({ region: "us-central1" }, async (request) =
       updatedAt: now
     };
     transaction.set(ref, approved, { merge: true });
+    transaction.set(db.doc(`linkCodes/${session.code}`), {
+      status: "approved",
+      approvedUid: uid,
+      updatedAt: now
+    }, { merge: true });
     transaction.set(db.doc(`players/${uid}`), {
       ownerUid: uid,
       schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
@@ -364,8 +420,8 @@ exports.rejectLinkSession = onCall({ region: "us-central1" }, async (request) =>
   const result = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ref);
     const session = snapshot.exists ? snapshot.data() : null;
-    const validation = validateLinkSession(session);
-    if (!validation.ok && validation.reason !== "already_exchanged") {
+    const validation = requirePendingSession(session);
+    if (!validation.ok) {
       throw new HttpsError(validation.reason === "not_found" ? "not-found" : "failed-precondition", `Link session ${validation.reason}.`);
     }
     const rejected = {
@@ -376,6 +432,11 @@ exports.rejectLinkSession = onCall({ region: "us-central1" }, async (request) =>
       updatedAt: now
     };
     transaction.set(ref, rejected, { merge: true });
+    transaction.set(db.doc(`linkCodes/${session.code}`), {
+      status: "rejected",
+      rejectedUid: request.auth.uid,
+      updatedAt: now
+    }, { merge: true });
     return rejected;
   });
 
@@ -439,6 +500,11 @@ exports.exchangeLinkSession = onCall({ region: "us-central1" }, async (request) 
     transaction.set(ref, {
       status: "exchanged",
       exchangedAt: now,
+      updatedAt: now,
+      deviceId
+    }, { merge: true });
+    transaction.set(db.doc(`linkCodes/${session.code}`), {
+      status: "exchanged",
       updatedAt: now,
       deviceId
     }, { merge: true });

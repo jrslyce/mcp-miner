@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const { eventChecksum } = require("../firebase/functions/src/sync");
+const { deviceTokenHash } = require("../firebase/functions/src/linking");
 
 const API_KEY = process.env.MCP_MINER_FIREBASE_API_KEY || "AIzaSyBwLEA9IdoPSeEV_PRY5zFa5WJbE5NSG4o";
 const PROJECT_ID = process.env.MCP_MINER_FIREBASE_PROJECT || "mcp-miner";
@@ -9,6 +10,9 @@ const FUNCTIONS_ORIGIN = process.env.MCP_MINER_FUNCTIONS_ORIGIN || "https://us-c
 const DASHBOARD_URL = process.env.MCP_MINER_DASHBOARD_URL || "https://mcp-miner.web.app";
 const EMAIL_LOCAL = process.env.MCP_MINER_QA_EMAIL_LOCAL || "jsteffes";
 const EMAIL_DOMAIN = process.env.MCP_MINER_QA_EMAIL_DOMAIN || "gmail.com";
+const RUN_ID = (process.env.MCP_MINER_QA_RUN_ID || new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)).toLowerCase();
+const EXACT_WORD_ADDRESSES = process.env.MCP_MINER_QA_EXACT_WORDS === "1";
+const CLEANUP = process.env.MCP_MINER_QA_CLEANUP === "1";
 const WORDS = (process.env.MCP_MINER_QA_WORDS || "basalt,quartz,cobalt,nickel,orbit,rover,beacon,comet")
   .split(",")
   .map((word) => word.trim().toLowerCase())
@@ -48,7 +52,8 @@ function randomPassword() {
 }
 
 function qaEmail(word) {
-  return `${EMAIL_LOCAL}+${word}@${EMAIL_DOMAIN}`;
+  const suffix = EXACT_WORD_ADDRESSES ? word : `${word}-${RUN_ID}`;
+  return `${EMAIL_LOCAL}+${suffix}@${EMAIL_DOMAIN}`;
 }
 
 async function signUp(email) {
@@ -141,11 +146,38 @@ async function runCycle(word, index) {
     uid: auth.localId,
     linkCode: link.result.session.code,
     deviceId: exchanged.result.deviceId,
+    tokenHash: deviceTokenHash(exchanged.result.deviceToken),
+    sessionId: link.result.session.sessionId,
     acceptedEventId: acceptedEvent.eventId,
     rejectedReason: rejected.result.rejected[0].reason,
     eventCount: state.result.state.eventCount,
     lastSequence: state.result.state.lastSequence
   };
+}
+
+async function cleanupAccounts(results) {
+  const admin = require("../firebase/functions/node_modules/firebase-admin");
+  if (!admin.apps.length) {
+    admin.initializeApp({ projectId: PROJECT_ID });
+  }
+  const auth = admin.auth();
+  const db = admin.firestore();
+  const cleaned = [];
+  for (const result of results) {
+    const cleanupResult = { email: result.email, uid: result.uid, ok: true };
+    try {
+      await db.recursiveDelete(db.doc(`players/${result.uid}`));
+      await db.doc(`deviceTokens/${result.tokenHash}`).delete();
+      await db.doc(`linkSessions/${result.sessionId}`).delete();
+      await db.doc(`linkCodes/${result.linkCode}`).delete();
+      await auth.deleteUser(result.uid);
+    } catch (error) {
+      cleanupResult.ok = false;
+      cleanupResult.error = error.message;
+    }
+    cleaned.push(cleanupResult);
+  }
+  return cleaned;
 }
 
 async function main() {
@@ -157,13 +189,17 @@ async function main() {
   for (const [index, word] of WORDS.entries()) {
     results.push(await runCycle(word, index));
   }
+  const cleanup = CLEANUP ? await cleanupAccounts(results) : [];
 
   console.log(JSON.stringify({
     ok: true,
     projectId: PROJECT_ID,
     dashboardUrl: DASHBOARD_URL,
+    runId: RUN_ID,
+    cleanupEnabled: CLEANUP,
+    cleanup,
     accountCount: results.length,
-    accounts: results
+    accounts: results.map(({ tokenHash, sessionId, linkCode, ...result }) => result)
   }, null, 2));
 }
 

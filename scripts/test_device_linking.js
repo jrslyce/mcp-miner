@@ -4,10 +4,13 @@ const assert = require("assert");
 const {
   DEVICE_TOKEN_PREFIX,
   deviceTokenHash,
+  hasDeviceScope,
   newDeviceToken,
   newLinkSession,
   normalizeLinkCode,
   publicLinkSession,
+  requirePendingSession,
+  sanitizeDashboardUrl,
   secretHash,
   validateLinkSession
 } = require("../firebase/functions/src/linking");
@@ -60,6 +63,24 @@ check("device tokens should be prefixed and stored as hashes", () => {
   return token.startsWith(DEVICE_TOKEN_PREFIX) &&
     deviceTokenHash(token).length === 64 &&
     deviceTokenHash(token) !== token;
+});
+
+check("dashboard URLs should be restricted to MCP Miner and localhost origins", () => {
+  assert.throws(() => sanitizeDashboardUrl("https://example.com/phish"), /not allowed/);
+  return sanitizeDashboardUrl("https://mcp-miner.web.app/path") === "https://mcp-miner.web.app" &&
+    sanitizeDashboardUrl("http://127.0.0.1:5000/path") === "http://127.0.0.1:5000";
+});
+
+check("approval and rejection should require pending sessions", () => {
+  return requirePendingSession(session, new Date("2026-05-25T12:01:00Z")).ok === true &&
+    requirePendingSession({ ...session, status: "approved" }, new Date("2026-05-25T12:01:00Z")).reason === "already_approved" &&
+    requirePendingSession({ ...session, status: "exchanged" }, new Date("2026-05-25T12:01:00Z")).reason === "already_exchanged";
+});
+
+check("device token scopes should be enforced by required action", () => {
+  return hasDeviceScope({ scopes: ["sync:read", "sync:write"] }, "sync:write") === true &&
+    hasDeviceScope({ scopes: ["sync:read"] }, "sync:write") === false &&
+    hasDeviceScope({ scopes: ["sync:read"] }, null) === true;
 });
 
 console.log(JSON.stringify({

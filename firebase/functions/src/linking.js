@@ -5,6 +5,16 @@ const crypto = require("crypto");
 const LINK_SESSION_TTL_MS = 10 * 60 * 1000;
 const DEVICE_TOKEN_PREFIX = "mcpd_";
 const LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const DEFAULT_DASHBOARD_URL = "https://mcp-miner.web.app";
+const ALLOWED_DASHBOARD_HOSTS = new Set([
+  "mcp-miner.web.app",
+  "mcp-miner.firebaseapp.com",
+  "mcpminer.net",
+  "www.mcpminer.net",
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0"
+]);
 
 function base64url(bytes) {
   return Buffer.from(bytes)
@@ -41,12 +51,34 @@ function deviceTokenHash(token) {
   return sha256(`mcp-miner-device-token:${token}`);
 }
 
+function sanitizeDashboardUrl(value, configured = DEFAULT_DASHBOARD_URL) {
+  const raw = String(value || configured || DEFAULT_DASHBOARD_URL).trim();
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (_) {
+    throw new Error("dashboardUrl must be a valid MCP Miner URL.");
+  }
+
+  if (!["https:", "http:"].includes(parsed.protocol)) {
+    throw new Error("dashboardUrl must use http or https.");
+  }
+  if (!ALLOWED_DASHBOARD_HOSTS.has(parsed.hostname)) {
+    throw new Error("dashboardUrl host is not allowed for MCP Miner links.");
+  }
+  if (parsed.protocol !== "https:" && !["localhost", "127.0.0.1", "0.0.0.0"].includes(parsed.hostname)) {
+    throw new Error("dashboardUrl must use https outside localhost.");
+  }
+
+  return parsed.origin;
+}
+
 function newLinkSession({ now = new Date(), dashboardUrl = "https://mcp-miner.web.app", deviceName = "Codex" } = {}) {
   const sessionId = `link_${randomToken(18)}`;
   const deviceSecret = randomToken(32);
   const code = generateLinkCode();
   const expiresAt = new Date(now.getTime() + LINK_SESSION_TTL_MS).toISOString();
-  const cleanDashboardUrl = String(dashboardUrl || "https://mcp-miner.web.app").replace(/\/+$/g, "");
+  const cleanDashboardUrl = sanitizeDashboardUrl(dashboardUrl);
   return {
     session: {
       sessionId,
@@ -54,7 +86,7 @@ function newLinkSession({ now = new Date(), dashboardUrl = "https://mcp-miner.we
       deviceSecretHash: secretHash(deviceSecret),
       status: "pending",
       privacyClass: "abstract",
-      deviceName: String(deviceName || "Codex").slice(0, 80),
+      deviceName: String(deviceName || "Codex").replace(/[\r\n\t]+/g, " ").trim().slice(0, 80) || "Codex",
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
       expiresAt
@@ -84,6 +116,22 @@ function validateLinkSession(session, now = new Date()) {
   return { ok: true };
 }
 
+function requirePendingSession(session, now = new Date()) {
+  const validation = validateLinkSession(session, now);
+  if (!validation.ok) {
+    return validation;
+  }
+  return session.status === "pending" ? { ok: true } : { ok: false, reason: `already_${session.status}` };
+}
+
+function hasDeviceScope(tokenData, requiredScope) {
+  if (!requiredScope) {
+    return true;
+  }
+  const scopes = Array.isArray(tokenData && tokenData.scopes) ? tokenData.scopes : [];
+  return scopes.includes(requiredScope);
+}
+
 function publicLinkSession(session) {
   return {
     sessionId: session.sessionId,
@@ -98,14 +146,19 @@ function publicLinkSession(session) {
 }
 
 module.exports = {
+  ALLOWED_DASHBOARD_HOSTS,
+  DEFAULT_DASHBOARD_URL,
   DEVICE_TOKEN_PREFIX,
   LINK_SESSION_TTL_MS,
   deviceTokenHash,
   generateLinkCode,
+  hasDeviceScope,
   newDeviceToken,
   newLinkSession,
   normalizeLinkCode,
   publicLinkSession,
+  requirePendingSession,
+  sanitizeDashboardUrl,
   secretHash,
   validateLinkSession
 };

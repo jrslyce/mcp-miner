@@ -1020,18 +1020,6 @@ module McpMiner
         }
       end
 
-      if events.empty?
-        update_cloud_sync_metadata("synced", events, functions_origin: functions_origin)
-        return {
-          ok: true,
-          status: "synced",
-          queued_event_count: 0,
-          message: "No new abstract events are waiting to sync.",
-          sync: sync_progress_payload[:sync],
-          privacy: PRIVACY_NOTICE
-        }
-      end
-
       unless uid
         update_cloud_sync_metadata("queued_unauthenticated", events, functions_origin: functions_origin)
         return {
@@ -1051,6 +1039,18 @@ module McpMiner
           status: "auth_required",
           queued_event_count: events.length,
           message: "Queued abstract events locally. Connect your MCP Miner account or provide a device token for this process to push them.",
+          sync: sync_progress_payload[:sync],
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      if events.empty?
+        update_cloud_sync_metadata("synced", events, functions_origin: functions_origin)
+        return {
+          ok: true,
+          status: "synced",
+          queued_event_count: 0,
+          message: "No new abstract events are waiting to sync.",
           sync: sync_progress_payload[:sync],
           privacy: PRIVACY_NOTICE
         }

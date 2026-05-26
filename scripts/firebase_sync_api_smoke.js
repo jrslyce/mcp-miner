@@ -107,6 +107,10 @@ async function main() {
     dashboardUrl: "http://127.0.0.1:5000",
     deviceName: "Sync API Smoke"
   });
+  const badDashboard = await callFunction("createLinkSession", null, {
+    dashboardUrl: "https://example.com/phish",
+    deviceName: "Bad Dashboard"
+  }, false);
   await callFunction("approveLinkSession", auth.idToken, {
     sessionId: link.result.session.sessionId,
     code: link.result.session.code
@@ -115,6 +119,14 @@ async function main() {
     sessionId: link.result.session.sessionId,
     deviceSecret: link.result.deviceSecret
   });
+  const reapprove = await callFunction("approveLinkSession", auth.idToken, {
+    sessionId: link.result.session.sessionId,
+    code: link.result.session.code
+  }, false);
+  const rejectExchanged = await callFunction("rejectLinkSession", auth.idToken, {
+    sessionId: link.result.session.sessionId,
+    code: link.result.session.code
+  }, false);
   const deviceEvent = event({
     eventId: "evt_emulator_sync_device",
     sequence: 2
@@ -139,6 +151,15 @@ async function main() {
   }
   if (!deviceSync.result || deviceSync.result.accepted.length !== 1) {
     throw new Error("device token sync did not accept one event");
+  }
+  if (!badDashboard.error || badDashboard.error.status !== "INVALID_ARGUMENT") {
+    throw new Error("untrusted dashboard URL was not rejected");
+  }
+  if (!reapprove.error || reapprove.error.status !== "FAILED_PRECONDITION") {
+    throw new Error("already-approved/exchanged link session was not protected");
+  }
+  if (!rejectExchanged.error || rejectExchanged.error.status !== "FAILED_PRECONDITION") {
+    throw new Error("exchanged link session rejection was not blocked");
   }
   if (!invalid.result || invalid.result.rejected[0].reason !== "private_fields") {
     throw new Error("private sync event was not rejected");

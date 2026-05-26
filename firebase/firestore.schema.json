@@ -82,6 +82,24 @@
       "owner": "uid",
       "clientAccess": ["read"],
       "serverOwned": true
+    },
+    "linkSessions/{sessionId}": {
+      "owner": "server",
+      "clientAccess": [],
+      "serverOwned": true,
+      "fields": ["sessionId", "code", "deviceSecretHash", "status", "privacyClass", "deviceName", "createdAt", "updatedAt", "expiresAt", "approvedAt", "approvedUid", "rejectedAt", "rejectedUid", "exchangedAt", "deviceId"]
+    },
+    "linkCodes/{code}": {
+      "owner": "server",
+      "clientAccess": [],
+      "serverOwned": true,
+      "fields": ["code", "sessionId", "status", "privacyClass", "createdAt", "updatedAt", "expiresAt", "approvedUid", "rejectedUid", "deviceId"]
+    },
+    "deviceTokens/{tokenHash}": {
+      "owner": "server",
+      "clientAccess": [],
+      "serverOwned": true,
+      "fields": ["uid", "deviceId", "deviceName", "status", "privacyClass", "scopes", "createdAt", "updatedAt", "lastUsedAt", "revokedAt", "linkSessionId"]
     }
   }
 }
