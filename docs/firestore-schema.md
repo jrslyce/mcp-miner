@@ -11,6 +11,8 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/players/{uid}/settings/current` | owner | owner read/create/update | Report mode, sync preference, dashboard display preference, App Check debug flag. |
 | `/players/{uid}/syncMetadata/{clientId}` | owner | owner read/create/update | Per-client cursors and conflict metadata. |
 | `/players/{uid}/syncDevices/{deviceId}` | owner | owner read only | Server-owned public metadata for linked Codex devices; device token hashes stay outside owner-readable docs. |
+| `/players/{uid}/billing/current` | owner | owner read only | Server-owned normalized billing projection from Stripe or the active billing provider. |
+| `/players/{uid}/entitlements/current` | owner | owner read only | Server-owned entitlement projection used by Functions, portal UI, and the local plugin. |
 | `/players/{uid}/rewardEvents/{eventId}` | owner | owner read/create only | Append-only abstract Codex work-event summaries for Functions to validate and reduce. |
 | `/players/{uid}/gameState/current` | owner | owner read only | Cloud-reduced materialized game state, including Space Bucks and schema versions. |
 | `/players/{uid}/inventory/{bucket}` | owner | owner read only | Cloud-reduced inventory buckets for dashboard reads. |
@@ -20,12 +22,42 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/linkSessions/{sessionId}` | server | none | Short-lived device-link approval sessions created by callable Functions. |
 | `/linkCodes/{code}` | server | none | Atomic one-time code reservations that prevent active link-code collisions. |
 | `/deviceTokens/{tokenHash}` | server | none | Hash-only revocable device token records used by callable Functions. |
+| `/billingWebhookEvents/{eventId}` | server | none | Server-only billing event audit records; raw payloads stay outside owner-readable documents. |
 
 ## Client-Write Boundaries
 
 Clients may create profile/settings/sync metadata and append abstract reward events. Clients may not write aggregate balances. In production, Cloud Functions are responsible for validating reward event signatures, dedupe keys, cooldowns, daily soft caps, and reducers before writing game state.
 
 Link sessions, link-code reservations, and device-token hashes are top-level server-owned collections. They are written only by Cloud Functions through the Admin SDK and remain blocked from direct dashboard/plugin Firestore access by the default deny rule.
+
+Billing and entitlement documents under `/players/{uid}` are owner-readable but server-owned. Stripe is the source of truth for paid subscription state; Firestore billing and entitlement documents are projections written by Cloud Functions with the Admin SDK. Clients may read the effective plan and feature limits, but clients cannot directly write `plan`, `billingStatus`, provider IDs, sync cadence, device limits, history retention, or feature flags.
+
+If `/players/{uid}/entitlements/current` is missing, stale, unpaid, canceled beyond the paid period, or otherwise invalid, Functions must evaluate the effective entitlement as Free. `past_due` subscriptions can remain Pro only until the configured grace-period end; canceled subscriptions can remain Pro only through `currentPeriodEnd`.
+
+Normalized entitlement fields:
+
+```json
+{
+  "ownerUid": "firebase-auth-uid",
+  "schemaVersion": 1,
+  "privacyClass": "abstract",
+  "plan": "pro_monthly",
+  "billingStatus": "active",
+  "provider": "stripe",
+  "providerCustomerId": "cus_...",
+  "providerSubscriptionId": "sub_...",
+  "currentPeriodEnd": "2026-06-24T00:00:00.000Z",
+  "cancelAtPeriodEnd": false,
+  "syncCadenceSeconds": 10,
+  "maxDevices": 5,
+  "historyRetentionDays": 365,
+  "features": {
+    "nearRealTimeSync": true,
+    "deviceManagement": true
+  },
+  "updatedAt": "2026-05-24T00:00:00.000Z"
+}
+```
 
 The owner field must match Firebase Auth:
 
@@ -86,5 +118,8 @@ Rules cannot understand every possible nested semantic value, so Functions must 
 - owner can append an abstract reward event
 - reward events with private fields are denied
 - owner cannot directly write `/players/{uid}/gameState/current`
+- Admin SDK can create billing and entitlement projections
+- owner can read, but not write, `/players/{uid}/billing/current`
+- owner can read, but not write, `/players/{uid}/entitlements/current`
 
 This command requires the Firebase CLI and Java runtime because the Firestore emulator is Java-based.

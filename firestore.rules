@@ -291,6 +291,16 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
+      match /billing/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /entitlements/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
       match /rewardEvents/{eventId} {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid) && validRewardEvent(uid, eventId, request.resource.data);

@@ -28,6 +28,8 @@ expected_paths = [
   "players/{uid}/settings/current",
   "players/{uid}/syncMetadata/{clientId}",
   "players/{uid}/syncDevices/{deviceId}",
+  "players/{uid}/billing/current",
+  "players/{uid}/entitlements/current",
   "players/{uid}/rewardEvents/{eventId}",
   "players/{uid}/gameState/current",
   "players/{uid}/inventory/{bucket}",
@@ -36,7 +38,8 @@ expected_paths = [
   "players/{uid}/base/current",
   "linkSessions/{sessionId}",
   "linkCodes/{code}",
-  "deviceTokens/{tokenHash}"
+  "deviceTokens/{tokenHash}",
+  "billingWebhookEvents/{eventId}"
 ]
 
 assert("schema should document all V1 Firestore collections") do
@@ -70,8 +73,19 @@ assert("aggregate balances should be server-owned/read-only to clients") do
     schema.dig("collections", "players/{uid}/gameState/current", "serverOwned") == true
 end
 
+assert("billing and entitlement projections should be server-owned/read-only to clients") do
+  %w[billing entitlements].all? do |collection|
+    rules.include?("match /#{collection}/{docId}") && rules.include?("allow write: if false;")
+  end &&
+    schema.dig("collections", "players/{uid}/billing/current", "serverOwned") == true &&
+    schema.dig("collections", "players/{uid}/billing/current", "sourceOfTruth") == "stripe" &&
+    schema.dig("collections", "players/{uid}/entitlements/current", "serverOwned") == true &&
+    docs.include?("Stripe is the source of truth") &&
+    docs.include?("Functions must evaluate the effective entitlement as Free")
+end
+
 assert("linking secrets should stay in server-owned top-level collections") do
-  ["linkSessions/{sessionId}", "linkCodes/{code}", "deviceTokens/{tokenHash}"].all? do |path|
+  ["linkSessions/{sessionId}", "linkCodes/{code}", "deviceTokens/{tokenHash}", "billingWebhookEvents/{eventId}"].all? do |path|
     schema.dig("collections", path, "serverOwned") == true &&
       schema.dig("collections", path, "clientAccess") == []
   end &&
@@ -92,7 +106,10 @@ assert("emulator rule smoke script should cover allow and deny cases") do
     smoke.include?("owner_profile_allow") &&
     smoke.include?("cross_user_profile_deny") &&
     smoke.include?("private_reward_event_deny") &&
-    smoke.include?("aggregate_game_state_write_deny")
+    smoke.include?("aggregate_game_state_write_deny") &&
+    smoke.include?("admin_entitlement_projection_read_allow") &&
+    smoke.include?("client_entitlement_write_deny") &&
+    smoke.include?("client_billing_write_deny")
 end
 
 puts JSON.pretty_generate({

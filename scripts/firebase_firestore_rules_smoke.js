@@ -118,6 +118,13 @@ async function patchDoc(path, token, fields, expectedStatus = 200) {
   }, expectedStatus);
 }
 
+async function getDoc(path, token, expectedStatus = 200) {
+  return requestJson(documentUrl(path), {
+    method: "GET",
+    headers: authHeaders(token)
+  }, expectedStatus);
+}
+
 async function main() {
   const owner = await signUp("owner");
   const other = await signUp("other");
@@ -185,6 +192,93 @@ async function main() {
     spaceBucks: intField(999999)
   }, 403);
 
+  const entitlementFields = {
+    ownerUid: stringField(owner.localId),
+    schemaVersion: intField(1),
+    privacyClass: stringField("abstract"),
+    plan: stringField("pro_monthly"),
+    billingStatus: stringField("active"),
+    provider: stringField("stripe"),
+    providerCustomerId: stringField("cus_rules_smoke"),
+    providerSubscriptionId: stringField("sub_rules_smoke"),
+    currentPeriodEnd: stringField(now),
+    cancelAtPeriodEnd: boolField(false),
+    syncCadenceSeconds: intField(10),
+    maxDevices: intField(5),
+    historyRetentionDays: intField(365),
+    features: mapField({
+      nearRealTimeSync: boolField(true),
+      manualRefresh: boolField(true),
+      deviceManagement: boolField(true),
+      backupRestore: boolField(true),
+      advancedDashboard: boolField(true),
+      premiumCosmetics: boolField(true),
+      weeklyDigest: boolField(true),
+      exports: boolField(true),
+      priorityBetaAccess: boolField(true)
+    }),
+    updatedAt: stringField(now)
+  };
+  const adminDb = firebaseAdmin().firestore();
+  await adminDb.doc(`players/${owner.localId}/billing/current`).set({
+    ownerUid: owner.localId,
+    schemaVersion: 1,
+    privacyClass: "abstract",
+    plan: "pro_monthly",
+    billingStatus: "active",
+    provider: "stripe",
+    providerCustomerId: "cus_rules_smoke",
+    providerSubscriptionId: "sub_rules_smoke",
+    currentPeriodEnd: now,
+    cancelAtPeriodEnd: false,
+    syncCadenceSeconds: 10,
+    maxDevices: 5,
+    historyRetentionDays: 365,
+    features: {
+      nearRealTimeSync: true,
+      manualRefresh: true,
+      deviceManagement: true,
+      backupRestore: true,
+      advancedDashboard: true,
+      premiumCosmetics: true,
+      weeklyDigest: true,
+      exports: true,
+      priorityBetaAccess: true
+    },
+    updatedAt: now
+  });
+  await adminDb.doc(`players/${owner.localId}/entitlements/current`).set({
+    ownerUid: owner.localId,
+    schemaVersion: 1,
+    privacyClass: "abstract",
+    plan: "pro_monthly",
+    billingStatus: "active",
+    provider: "stripe",
+    providerCustomerId: "cus_rules_smoke",
+    providerSubscriptionId: "sub_rules_smoke",
+    currentPeriodEnd: now,
+    cancelAtPeriodEnd: false,
+    syncCadenceSeconds: 10,
+    maxDevices: 5,
+    historyRetentionDays: 365,
+    features: {
+      nearRealTimeSync: true,
+      manualRefresh: true,
+      deviceManagement: true,
+      backupRestore: true,
+      advancedDashboard: true,
+      premiumCosmetics: true,
+      weeklyDigest: true,
+      exports: true,
+      priorityBetaAccess: true
+    },
+    updatedAt: now
+  });
+  await getDoc(`players/${owner.localId}/entitlements/current`, owner.idToken);
+  await getDoc(`players/${owner.localId}/billing/current`, owner.idToken);
+  await patchDoc(`players/${owner.localId}/entitlements/current`, owner.idToken, entitlementFields, 403);
+  await patchDoc(`players/${owner.localId}/billing/current`, owner.idToken, entitlementFields, 403);
+
   console.log(JSON.stringify({
     ok: true,
     projectId: PROJECT_ID,
@@ -194,7 +288,10 @@ async function main() {
       "cross_user_profile_deny",
       "abstract_reward_event_allow",
       "private_reward_event_deny",
-      "aggregate_game_state_write_deny"
+      "aggregate_game_state_write_deny",
+      "admin_entitlement_projection_read_allow",
+      "client_entitlement_write_deny",
+      "client_billing_write_deny"
     ]
   }, null, 2));
 }

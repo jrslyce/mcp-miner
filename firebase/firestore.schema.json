@@ -52,6 +52,20 @@
       "serverOwned": true,
       "fields": ["ownerUid", "deviceId", "deviceName", "status", "privacyClass", "scopes", "createdAt", "updatedAt", "lastUsedAt", "revokedAt", "linkSessionId"]
     },
+    "players/{uid}/billing/current": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true,
+      "sourceOfTruth": "stripe",
+      "fields": ["ownerUid", "schemaVersion", "privacyClass", "plan", "billingStatus", "provider", "providerCustomerId", "providerSubscriptionId", "currentPeriodEnd", "cancelAtPeriodEnd", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "features", "updatedAt"]
+    },
+    "players/{uid}/entitlements/current": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true,
+      "projectionOf": "players/{uid}/billing/current",
+      "fields": ["ownerUid", "schemaVersion", "privacyClass", "plan", "billingStatus", "provider", "providerCustomerId", "providerSubscriptionId", "currentPeriodEnd", "cancelAtPeriodEnd", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "features", "updatedAt"]
+    },
     "players/{uid}/rewardEvents/{eventId}": {
       "owner": "uid",
       "clientAccess": ["read", "create"],
@@ -100,6 +114,12 @@
       "clientAccess": [],
       "serverOwned": true,
       "fields": ["uid", "deviceId", "deviceName", "status", "privacyClass", "scopes", "createdAt", "updatedAt", "lastUsedAt", "revokedAt", "linkSessionId"]
+    },
+    "billingWebhookEvents/{eventId}": {
+      "owner": "server",
+      "clientAccess": [],
+      "serverOwned": true,
+      "fields": ["provider", "providerEventId", "receivedAt", "processedAt", "status", "rawPayloadStorageRef"]
     }
   }
 }

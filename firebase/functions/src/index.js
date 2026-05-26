@@ -21,6 +21,9 @@ const {
   secretHash,
   validateLinkSession
 } = require("./linking");
+const {
+  evaluateEntitlement
+} = require("./entitlements");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -287,10 +290,13 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
 exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
   const auth = await resolveSyncAuth(request, "sync:read");
   const uid = auth.uid;
-  const [stateSnap, syncSnap] = await Promise.all([
+  const entitlementNow = new Date().toISOString();
+  const [stateSnap, syncSnap, entitlementSnap] = await Promise.all([
     db.doc(`players/${uid}/gameState/current`).get(),
-    db.doc(`players/${uid}/syncMetadata/default`).get()
+    db.doc(`players/${uid}/syncMetadata/default`).get(),
+    db.doc(`players/${uid}/entitlements/current`).get()
   ]);
+  const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now: entitlementNow });
   if (auth.authType === "device_token") {
     const now = new Date().toISOString();
     await Promise.all([
@@ -310,7 +316,8 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
     ok: true,
     privacyClass: "abstract",
     state: stateSnap.exists ? stateSnap.data() : null,
-    syncMetadata: syncSnap.exists ? syncSnap.data() : null
+    syncMetadata: syncSnap.exists ? syncSnap.data() : null,
+    entitlement
   };
 });
 
