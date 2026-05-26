@@ -2,7 +2,7 @@
   "scripts": {
     "validate:data": "ruby scripts/validate_data.rb",
     "test:validator": "ruby scripts/test_validate_data.rb",
-    "validate:plugin": "python3 /Users/jared/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/mcp-miner",
+    "validate:plugin": "ruby scripts/validate_plugin_with_hooks.rb plugins/mcp-miner",
     "firebase:emulators:start": "npx --yes firebase-tools@latest emulators:start --project demo-mcp-miner --import=.firebase/emulator-data --export-on-exit=.firebase/emulator-data",
     "firebase:emulators:smoke": "npx --yes firebase-tools@latest emulators:exec --project demo-mcp-miner --only auth,firestore,functions \"node scripts/firebase_emulator_smoke.js\"",
     "firebase:rules:smoke": "npx --yes firebase-tools@latest emulators:exec --project demo-mcp-miner --only auth,firestore \"node scripts/firebase_firestore_rules_smoke.js\"",

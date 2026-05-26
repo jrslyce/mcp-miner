@@ -57,6 +57,11 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
   ].all? { |id| index.include?(%(id="#{id}")) }
 end
 
+assert("dashboard brand copy should describe the game instead of Firebase infrastructure") do
+  index.include?(%(<p class="eyebrow">Space Mining Idle Game</p>)) &&
+    !index.include?(%(<p class="eyebrow">Firebase dashboard</p>))
+end
+
 assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo mode") do
   %w[
     getAuth
@@ -354,7 +359,17 @@ assert("dashboard styles should be responsive and stable across mobile and deskt
     styles.include?("@media (max-width: 700px)") &&
     styles.include?("grid-template-columns: 340px minmax(0, 1fr)") &&
     styles.include?("grid-template-columns: repeat(4, minmax(0, 1fr))") &&
+    styles.include?("grid-template-columns: repeat(auto-fit, minmax(118px, 1fr))") &&
+    styles.include?(".topbar,\n.workspace-grid,\n.side-rail,\n.main-board") &&
+    styles.include?("grid-template-columns: repeat(auto-fit, minmax(76px, 1fr))") &&
+    styles.include?(".topbar-actions > * {\n    width: 100%;\n    min-width: 0;\n  }") &&
     !styles.include?("letter-spacing: -")
+end
+
+assert("mobile dashboard header should stay compact instead of stacking every control") do
+  styles.include?(".brand-lockup {\n    grid-auto-flow: column;\n    grid-template-columns: auto minmax(0, 1fr);\n    gap: 10px;\n  }") &&
+    styles.include?(".brand-mark {\n    width: 48px;\n    height: 48px;\n  }") &&
+    styles.include?(".topbar-actions {\n    width: 100%;\n    grid-auto-flow: row;\n    grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));\n    gap: 8px;\n    justify-content: stretch;\n  }")
 end
 
 assert("privacy rows should stack on narrow mobile screens") do
@@ -362,8 +377,8 @@ assert("privacy rows should stack on narrow mobile screens") do
     styles.include?(".privacy-list li {\n    grid-template-columns: 1fr;\n    gap: 4px;\n  }")
 end
 
-assert("panel headings should stack on very narrow mobile screens") do
-  styles.include?("@media (max-width: 360px)") &&
+assert("panel headings should stack on narrow mobile screens") do
+  styles.include?("@media (max-width: 430px)") &&
     styles.include?(".panel-heading {\n    grid-template-columns: 1fr;\n    gap: 8px;\n  }") &&
     styles.include?(".panel-heading .pill,\n  .panel-heading .status-dot {\n    justify-self: start;\n  }") &&
     styles.include?("overflow-wrap: anywhere;")

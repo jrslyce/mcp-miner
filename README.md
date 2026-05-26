@@ -2,6 +2,19 @@
 
 MCP Miner is a passive asteroid-mining game for Codex work.
 
+## Codex Hook Trust
+
+After installing the Codex plugin, users must restart Codex and trust the 6 MCP Miner hooks in the Hooks UI (`/hooks` in Codex, or Hooks from settings):
+
+- `sessionStart`
+- `userPromptSubmit`
+- `postToolUse`
+- `subagentStart`
+- `subagentStop`
+- `stop`
+
+Without hook trust, MCP Miner status tools can still load, but passive mining stays at zero because Codex never runs the local Ruby hook commands. See [docs/codex-plugin-install.md](docs/codex-plugin-install.md) for the full install check.
+
 ## Account Linking
 
 Local play works without an account. The web portal does not know a user's Codex or OpenAI account

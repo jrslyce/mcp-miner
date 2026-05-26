@@ -76,15 +76,17 @@ skill_source = File.read(SKILL_FILE)
 install_doc = File.read(INSTALL_DOC)
 
 assert("plugin manifest should preserve the validated top-level shape") do
-  (manifest.keys - %w[name version description author skills interface mcpServers]).empty? &&
+  (manifest.keys - %w[name version description author skills interface mcpServers hooks]).empty? &&
     manifest.fetch("skills") == "./skills/" &&
     manifest.fetch("mcpServers") == "./.mcp.json" &&
+    manifest.fetch("hooks") == "./hooks/hooks.json" &&
     manifest.dig("interface", "defaultPrompt").include?("Show my MCP Miner status")
 end
 
 assert("plugin-relative manifest paths should resolve from plugin root") do
   File.directory?(File.expand_path(manifest.fetch("skills"), PLUGIN_ROOT)) &&
     File.file?(File.expand_path(manifest.fetch("mcpServers"), PLUGIN_ROOT)) &&
+    File.file?(File.expand_path(manifest.fetch("hooks"), PLUGIN_ROOT)) &&
     File.file?(SKILL_FILE)
 end
 
@@ -101,8 +103,10 @@ hook_commands = hooks_config.fetch("hooks").values.flat_map do |entries|
 end
 assert("hook commands should use PLUGIN_ROOT-relative scripts") do
   hook_commands.length >= 5 &&
+    hook_commands.length == 6 &&
     hook_commands.all? { |command| command.include?('$PLUGIN_ROOT/hooks/mcp_miner_hook.rb') } &&
-    File.file?(File.join(PLUGIN_ROOT, "hooks", "mcp_miner_hook.rb"))
+    File.file?(File.join(PLUGIN_ROOT, "hooks", "mcp_miner_hook.rb")) &&
+    hooks_config.dig("hooks", "PostToolUse", 0, "matcher") == ".*"
 end
 
 Dir.mktmpdir("mcp-miner-plugin-install") do |dir|
@@ -144,11 +148,19 @@ assert("skill should document actual privacy behavior") do
     skill_source.include?("Space Bucks")
 end
 
-assert("install docs should cover state path, reset, backup, and smoke commands") do
+assert("install docs should cover state path, hook trust, reset, backup, and smoke commands") do
   install_doc.include?("~/.mcp-miner/state.json") &&
     install_doc.include?("journal.jsonl") &&
     install_doc.include?("reset") &&
     install_doc.include?("backup") &&
+    install_doc.include?("6 MCP Miner hooks") &&
+    install_doc.include?("sessionStart") &&
+    install_doc.include?("userPromptSubmit") &&
+    install_doc.include?("postToolUse") &&
+    install_doc.include?("subagentStart") &&
+    install_doc.include?("subagentStop") &&
+    install_doc.include?("stop") &&
+    install_doc.include?("passive mining stays at zero") &&
     install_doc.include?("npm run test:plugin-install") &&
     install_doc.include?("npm run validate:plugin")
 end
