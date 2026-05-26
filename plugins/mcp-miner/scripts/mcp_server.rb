@@ -7,6 +7,8 @@ require_relative "../lib/mcp_miner/game_engine"
 class McpMinerServer
   PROTOCOL_VERSION = "2024-11-05"
   ROOT = File.expand_path("../../..", __dir__)
+  DASHBOARD_URL = ENV.fetch("MCP_MINER_DASHBOARD_URL", "https://mcp-miner.web.app")
+  STORE_URL = "#{DASHBOARD_URL}#store"
 
   def initialize
     @engine = McpMiner::GameEngine.new(root: ROOT)
@@ -548,18 +550,18 @@ class McpMinerServer
         @engine.claim_milestone_payload(args)
       when "open_dashboard"
         {
-          dashboard_url: "http://localhost:3317/dashboard",
-          status: "reserved",
-          available: false,
-          note: "Dashboard server is not implemented yet; this is the reserved MVP URL.",
+          dashboard_url: DASHBOARD_URL,
+          status: "available",
+          available: true,
+          note: "Hosted dashboard is available for account linking, cloud sync, and portal views.",
           privacy: McpMiner::GameEngine::PRIVACY_NOTICE
         }
       when "open_store"
         {
-          store_url: "http://localhost:3317/dashboard#store",
+          store_url: STORE_URL,
           status: "available",
           available: true,
-          note: "Store catalog and purchases are available through get_store_catalog and purchase_store_item.",
+          note: "Hosted store preview is available; local purchases continue through get_store_catalog and purchase_store_item.",
           privacy: McpMiner::GameEngine::PRIVACY_NOTICE
         }
       else
