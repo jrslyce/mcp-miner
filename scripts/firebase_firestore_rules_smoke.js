@@ -171,7 +171,7 @@ async function main() {
       filesTouchedCount: intField(2)
     })
   };
-  await patchDoc(`players/${owner.localId}/rewardEvents/evt_rules_smoke`, owner.idToken, rewardFields);
+  await patchDoc(`players/${owner.localId}/rewardEvents/evt_rules_smoke`, owner.idToken, rewardFields, 403);
 
   await patchDoc(`players/${owner.localId}/rewardEvents/evt_rules_private`, owner.idToken, {
     ...rewardFields,
@@ -192,7 +192,7 @@ async function main() {
     cases: [
       "owner_profile_allow",
       "cross_user_profile_deny",
-      "abstract_reward_event_allow",
+      "direct_reward_event_write_deny",
       "private_reward_event_deny",
       "aggregate_game_state_write_deny"
     ]

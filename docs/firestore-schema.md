@@ -12,7 +12,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/players/{uid}/syncMetadata/{clientId}` | owner | owner read/create/update | Per-client cursors and conflict metadata. |
 | `/players/{uid}/syncDevices/{deviceId}` | owner | owner read only | Server-owned public metadata for linked Codex devices; device token hashes stay outside owner-readable docs. |
 | `/players/{uid}/entitlements/current` | owner | owner read only | Server-owned Free/Pro plan limits such as sync cadence, device count, and history retention. |
-| `/players/{uid}/rewardEvents/{eventId}` | owner | owner read/create only | Append-only abstract Codex work-event summaries for Functions to validate and reduce. |
+| `/players/{uid}/rewardEvents/{eventId}` | owner | owner read only | Server-owned abstract Codex work-event summaries after Functions validate and reduce receipts. |
 | `/players/{uid}/gameState/current` | owner | owner read only | Cloud-reduced materialized game state, including Space Bucks and schema versions. |
 | `/players/{uid}/inventory/{bucket}` | owner | owner read only | Cloud-reduced inventory buckets for dashboard reads. |
 | `/players/{uid}/upgrades/current` | owner | owner read only | Cloud-reduced upgrade levels and effects. |
@@ -24,7 +24,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 
 ## Client-Write Boundaries
 
-Clients may create profile/settings/sync metadata and append abstract reward events. Clients may not write aggregate balances. In production, Cloud Functions are responsible for validating reward event signatures, dedupe keys, cooldowns, daily soft caps, and reducers before writing game state.
+Clients may create profile/settings/sync metadata. Clients may not write reward events or aggregate balances directly. In production, Cloud Functions are responsible for validating reward event signatures, dedupe keys, cooldowns, daily soft caps, and reducers before writing reward events and game state.
 
 Link sessions, link-code reservations, and device-token hashes are top-level server-owned collections. They are written only by Cloud Functions through the Admin SDK and remain blocked from direct dashboard/plugin Firestore access by the default deny rule.
 
@@ -41,7 +41,7 @@ The owner field must match Firebase Auth:
 
 ## Abstract Reward Event
 
-Reward events are append-only and use deterministic event IDs from the local journal:
+Server-stored reward events are append-only and use deterministic event IDs from the local journal:
 
 ```json
 {
@@ -90,8 +90,8 @@ Rules cannot understand every possible nested semantic value, so Functions must 
 
 - owner can write `/players/{uid}/profile/current`
 - another signed-in user cannot write the owner profile
-- owner can append an abstract reward event
-- reward events with private fields are denied
+- owner cannot directly append an abstract reward event
+- direct reward events with private fields are denied
 - owner cannot directly write `/players/{uid}/gameState/current`
 
 This command requires the Firebase CLI and Java runtime because the Firestore emulator is Java-based.

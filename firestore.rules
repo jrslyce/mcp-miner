@@ -314,8 +314,7 @@ service cloud.firestore {
 
       match /rewardEvents/{eventId} {
         allow read: if isOwner(uid);
-        allow create: if isOwner(uid) && validRewardEvent(uid, eventId, request.resource.data);
-        allow update, delete: if false;
+        allow write: if false;
       }
 
       match /gameState/{docId} {
