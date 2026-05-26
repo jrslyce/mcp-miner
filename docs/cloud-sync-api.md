@@ -44,23 +44,29 @@ Input:
     {
       "eventId": "evt_sync_1",
       "eventType": "work_apply_patch",
-      "schemaVersion": 1,
+      "schemaVersion": 2,
+      "receiptType": "abstract_work",
       "sequence": 1,
       "timestamp": "2026-05-24T00:00:00Z",
       "turnId": "turn_sync",
       "observedFields": {
-        "changedLines": 12,
-        "filesTouchedCount": 2,
-        "score": 8.5
+        "scoreHint": 8.5,
+        "category": "coding",
+        "rewardControlReasons": []
       },
       "privacyClass": "abstract",
       "source": "codex_hook",
-      "signature": "v1.local-placeholder",
+      "signature": "v2.local-placeholder",
       "checksum": "sha256-of-canonical-abstract-payload"
     }
   ]
 }
 ```
+
+Schema v2 entries are receipts, not final reward events. The server calculates the stored
+`observedFields.score` from the receipt's allowed abstract fields and caps score hints by event
+type. Legacy schema v1 events are accepted during rollout, but new plugin clients should send
+schema v2 receipts.
 
 Authentication:
 
@@ -71,14 +77,17 @@ Validation:
 
 - An authenticated Firebase UID is required, either directly from Firebase Auth or indirectly from a linked device token.
 - Device-token sync resolves the token hash to a Firebase Auth UID; writes are still stored under `/players/{uid}`.
-- `schemaVersion` must match the current sync schema.
+- `schemaVersion` must be either the legacy event schema or the current receipt schema.
+- schema v2 receipts must use `receiptType: "abstract_work"` and must not include final client
+  `observedFields.score` values.
 - `privacyClass` must be `abstract`.
 - `source` must be `codex_hook`.
 - `sequence` must be monotonic for new event IDs.
 - `eventId` dedupes repeated submissions.
 - `checksum` must match the canonical abstract payload.
-- `signature` must use the V1 placeholder format until plugin signing is finalized.
-- private field names such as prompts, code, terminal output, commands, paths, repo names, browser/app content, and transcripts are rejected recursively.
+- `signature` must use the V2 receipt placeholder format until plugin signing is finalized.
+- private field names such as prompts, code, terminal output, commands, paths, repo names,
+  browser/app content, transcripts, tokens, API keys, and secrets are rejected recursively.
 
 Reducer writes:
 

@@ -130,7 +130,15 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
     assert("sync_cloud should post abstract events with bearer auth") do
       first_request.dig(:headers, "authorization").first == "Bearer fake-id-token" &&
         first_events.length >= 2 &&
-        first_events.all? { |event| event["privacyClass"] == "abstract" && event["checksum"].to_s.length == 64 && event["signature"].to_s.start_with?("v1.") }
+        first_events.all? do |event|
+          event["schemaVersion"] == 2 &&
+            event["receiptType"] == "abstract_work" &&
+            event["privacyClass"] == "abstract" &&
+            event.dig("observedFields", "scoreHint").is_a?(Numeric) &&
+            !event.dig("observedFields", "score") &&
+            event["checksum"].to_s.length == 64 &&
+            event["signature"].to_s.start_with?("v2.")
+        end
     end
     assert("sync_cloud request should not include raw rewards or private local data") do
       serialized_request = JSON.generate(first_request)

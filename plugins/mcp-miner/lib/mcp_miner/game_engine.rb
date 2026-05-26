@@ -2339,7 +2339,7 @@ module McpMiner
     def cloud_sync_event_for_entry(entry, uid, sequence)
       control = entry["reward_control"].is_a?(Hash) ? entry["reward_control"] : {}
       observed_fields = {
-        "score" => entry["score"].to_f.round(2),
+        "scoreHint" => entry["score"].to_f.round(2),
         "category" => optional_string(control["category"]),
         "rewardControlReasons" => Array(control["reasons"]).map { |reason| safe_string(reason) }.reject(&:empty?)
       }.compact
@@ -2347,7 +2347,8 @@ module McpMiner
         "ownerUid" => uid,
         "eventId" => safe_string(entry["event_id"]),
         "eventType" => safe_string(entry["event_type"]),
-        "schemaVersion" => 1,
+        "schemaVersion" => 2,
+        "receiptType" => "abstract_work",
         "sequence" => sequence,
         "timestamp" => safe_string(entry["timestamp"]),
         "sessionId" => optional_string(entry["session_id"]),
@@ -2355,7 +2356,7 @@ module McpMiner
         "observedFields" => observed_fields,
         "privacyClass" => "abstract",
         "source" => "codex_hook",
-        "signature" => "v1.local.#{Digest::SHA256.hexdigest("#{uid}:#{entry['event_id']}")[0, 16]}"
+        "signature" => "v2.local.#{Digest::SHA256.hexdigest("#{uid}:#{entry['event_id']}")[0, 16]}"
       }.compact
       event["checksum"] = cloud_sync_event_checksum(event)
       event
