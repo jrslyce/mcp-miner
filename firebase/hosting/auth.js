@@ -947,27 +947,69 @@ function renderBilling(rawEntitlement) {
   checkoutMonthly.disabled = !signedIn || verificationRequired || pro;
   checkoutAnnual.disabled = !signedIn || verificationRequired || pro;
   manageBilling.disabled = !signedIn || verificationRequired || !entitlement.providerCustomerId;
+  checkoutMonthly.setAttribute("aria-label", billingActionLabel("monthly", checkoutMonthly.disabled, signedIn, verificationRequired, pro));
+  checkoutAnnual.setAttribute("aria-label", billingActionLabel("annual", checkoutAnnual.disabled, signedIn, verificationRequired, pro));
+  manageBilling.setAttribute("aria-label", billingActionLabel("manage", manageBilling.disabled, signedIn, verificationRequired, pro));
   renderPlanCards(entitlement);
+}
+
+function billingActionLabel(action, disabled, signedIn, verificationRequired, pro) {
+  const labels = {
+    monthly: {
+      enabled: "Start monthly checkout",
+      signIn: "Sign in to start monthly checkout",
+      verify: "Verify email to start monthly checkout",
+      unavailable: "Monthly checkout unavailable for current plan"
+    },
+    annual: {
+      enabled: "Start annual checkout",
+      signIn: "Sign in to start annual checkout",
+      verify: "Verify email to start annual checkout",
+      unavailable: "Annual checkout unavailable for current plan"
+    },
+    manage: {
+      enabled: "Manage billing",
+      signIn: "Sign in to manage billing",
+      verify: "Verify email to manage billing",
+      unavailable: pro ? "Billing portal unavailable for this subscription" : "Billing portal unavailable until checkout completes"
+    }
+  };
+  const actionLabels = labels[action];
+  if (!disabled) {
+    return actionLabels.enabled;
+  }
+  if (!signedIn) {
+    return actionLabels.signIn;
+  }
+  if (verificationRequired) {
+    return actionLabels.verify;
+  }
+  return actionLabels.unavailable;
 }
 
 function planActionState(plan, entitlement, signedIn, verificationRequired) {
   const current = entitlement.plan === plan.id || (entitlement.entitlementStatus !== "pro" && plan.id === "free");
+  const planName = plan.publicName || displayNameFromId(plan.id);
   if (current) {
-    return { label: "Current", disabled: true };
+    return { label: "Current", disabled: true, ariaLabel: `Current plan: ${planName}` };
   }
   if (plan.id === "free") {
-    return { label: "Included", disabled: true };
+    return { label: "Included", disabled: true, ariaLabel: `${planName} included with Free` };
   }
   if (!signedIn) {
-    return { label: "Sign in", disabled: true };
+    return { label: "Sign in", disabled: true, ariaLabel: `Sign in to choose ${planName}` };
   }
   if (verificationRequired) {
-    return { label: "Verify email", disabled: true };
+    return { label: "Verify email", disabled: true, ariaLabel: `Verify email to choose ${planName}` };
   }
   if (entitlement.entitlementStatus === "pro") {
-    return { label: "Manage", disabled: true };
+    return { label: "Manage", disabled: true, ariaLabel: `Manage current ${planName} subscription` };
   }
-  return { label: plan.billingInterval === "annual" ? "Upgrade annual" : "Upgrade monthly", disabled: false };
+  return {
+    label: plan.billingInterval === "annual" ? "Upgrade annual" : "Upgrade monthly",
+    disabled: false,
+    ariaLabel: `Upgrade to ${planName}`
+  };
 }
 
 function renderPlanCards(entitlement) {
@@ -997,7 +1039,7 @@ function renderPlanCards(entitlement) {
           ${annual}
         </div>
         <p class="plan-privacy">${escapeHtml(plan.privacyCopy)}</p>
-        <button type="button" class="button-secondary plan-action" data-plan="${escapeHtml(plan.id)}" ${action.disabled ? "disabled" : ""}>${escapeHtml(action.label)}</button>
+        <button type="button" class="button-secondary plan-action" data-plan="${escapeHtml(plan.id)}" aria-label="${escapeHtml(action.ariaLabel)}" ${action.disabled ? "disabled" : ""}>${escapeHtml(action.label)}</button>
       </article>
     `;
   }).join("");
@@ -2390,6 +2432,17 @@ function cosmeticApplyLabel(item) {
   return "Apply";
 }
 
+function cosmeticApplyAriaLabel(item) {
+  const itemName = item.displayName || displayNameFromId(item.id);
+  if (item.active) {
+    return `${itemName} applied`;
+  }
+  if (item.locked) {
+    return `${itemName} locked: ${displayNameFromId(item.lockedReason || item.availability || "locked")}`;
+  }
+  return `Apply ${itemName}`;
+}
+
 function applyCosmeticTheme(cosmetics) {
   const activeThemeId = cosmetics && cosmetics.applied && cosmetics.applied.active
     ? cosmetics.applied.active.portal_theme
@@ -2434,6 +2487,7 @@ function renderCosmetics(cosmetics) {
       ${(categoryItems || []).map((item) => {
         const stateLabel = cosmeticStateLabel(item);
         const applyLabel = cosmeticApplyLabel(item);
+        const itemName = item.displayName || displayNameFromId(item.id);
         return `
           <article class="cosmetic-row" data-cosmetic-id="${escapeHtml(item.id)}" data-category="${escapeHtml(item.category)}" data-state="${escapeHtml(activeCosmeticPreview === item.id ? "preview" : item.state || "available")}" data-locked="${item.locked ? "true" : "false"}">
             <span class="cosmetic-swatch" style="--cosmetic-swatch: ${escapeHtml(item.swatch || "#66766d")}"></span>
@@ -2444,8 +2498,8 @@ function renderCosmetics(cosmetics) {
             </div>
             <span class="store-state">${escapeHtml(stateLabel)}</span>
             <div class="cosmetic-actions">
-              <button type="button" class="button-secondary cosmetic-preview" data-cosmetic-id="${escapeHtml(item.id)}">Preview</button>
-              <button type="button" class="button-secondary cosmetic-apply" data-cosmetic-id="${escapeHtml(item.id)}" data-category="${escapeHtml(item.category)}" ${!currentUser || !item.canApply || item.active ? "disabled" : ""}>${escapeHtml(applyLabel)}</button>
+              <button type="button" class="button-secondary cosmetic-preview" data-cosmetic-id="${escapeHtml(item.id)}" aria-label="Preview ${escapeHtml(itemName)}">Preview</button>
+              <button type="button" class="button-secondary cosmetic-apply" data-cosmetic-id="${escapeHtml(item.id)}" data-category="${escapeHtml(item.category)}" aria-label="${escapeHtml(cosmeticApplyAriaLabel(item))}" ${!currentUser || !item.canApply || item.active ? "disabled" : ""}>${escapeHtml(applyLabel)}</button>
             </div>
           </article>
         `;
