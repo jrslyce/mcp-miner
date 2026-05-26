@@ -22,12 +22,22 @@ styles = read("firebase/hosting/styles.css")
 asset = read("firebase/hosting/assets/asteroid-scan.svg")
 smoke = read("scripts/firebase_dashboard_smoke.js")
 package = JSON.parse(read("package.json"))
+asteroid_ids = %w[
+  asteroid_starter_rubble
+  asteroid_quartz_belt
+  asteroid_iron_tumblers
+  asteroid_sapphire_debris_field
+  asteroid_ember_rocks
+  asteroid_amethyst_archive_belt
+  asteroid_diamond_class_body
+]
 
-required_panels = %w[auth device-link sync-privacy status asteroid inventory orders upgrades store reports base]
+required_panels = %w[auth device-link sync-privacy status asteroid asteroid-atlas inventory orders upgrades store reports base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
-    index.include?(%(<img class="scan-art" src="/assets/asteroid-scan.svg"))
+    index.include?(%(<img id="asteroid-art" class="scan-art")) &&
+    index.include?(%(<canvas id="asteroid-canvas"))
 end
 
 assert("dashboard should expose concrete status, inventory, order, upgrade, report, sync, and base targets") do
@@ -75,8 +85,9 @@ assert("refresh control should not expose placeholder icon text") do
 end
 
 assert("dashboard images should expose appropriate accessibility text") do
-  index.include?(%(<img class="brand-mark" src="/assets/asteroid-scan.svg" alt="" aria-hidden="true">)) &&
-    index.include?(%(<img class="scan-art" src="/assets/asteroid-scan.svg" alt="Asteroid scan visualization for the current rock">))
+  index.include?(%(<img class="brand-mark" src="/assets/logo.png" alt="" aria-hidden="true">)) &&
+    index.include?(%(<img id="asteroid-art" class="scan-art" src="/assets/asteroids/asteroid_starter_rubble.svg")) &&
+    index.include?(%(alt="Starter Rubble procedural asteroid visualization"))
 end
 
 assert("order payout color should meet contrast on row backgrounds") do
@@ -93,10 +104,20 @@ end
 
 assert("disabled dashboard buttons should use explicit readable colors instead of opacity") do
   styles.include?("button:disabled") &&
-    styles.include?("background: #e9eee9") &&
-    styles.include?("color: #526158") &&
+    styles.include?("background: var(--button-disabled-bg)") &&
+    styles.include?("color: var(--button-disabled-ink)") &&
     styles.include?("opacity: 1") &&
     !styles.include?("opacity: 0.55")
+end
+
+assert("dashboard should support a persistent accessible theme toggle") do
+  index.include?(%(id="theme-toggle")) &&
+    index.include?(%(localStorage.getItem("mcp-miner-theme"))) &&
+    auth_js.include?("const THEME_STORAGE_KEY = \"mcp-miner-theme\"") &&
+    auth_js.include?("function applyTheme(theme)") &&
+    auth_js.include?("themeToggle.setAttribute(\"aria-pressed\"") &&
+    styles.include?(":root[data-theme=\"dark\"]") &&
+    styles.include?("--button-secondary-bg")
 end
 
 assert("signed-in empty cloud profiles should not inherit demo progress") do
@@ -119,6 +140,17 @@ assert("signed-in empty asteroid progress should not render zero-over-zero progr
     auth_js.include?("No asteroid progress synced yet.") &&
     auth_js.include?("asteroidProgressPercent.hidden = !hasAsteroidProgress") &&
     auth_js.include?("progressTrack.hidden = !hasAsteroidProgress")
+end
+
+assert("asteroid class identity should drive generated art and canvas rendering") do
+  auth_js.include?("const ASTEROID_CLASSES = [") &&
+    auth_js.include?("function asteroidClassIdFrom(value)") &&
+    auth_js.include?("function normalizeAsteroid(state)") &&
+    auth_js.include?("asteroidClassId,") &&
+    auth_js.include?("function renderAsteroidArt(asteroid, progress)") &&
+    auth_js.include?("function drawAsteroidCanvas(timestamp = 0)") &&
+    auth_js.include?("function renderAsteroidAtlas(asteroid)") &&
+    auth_js.include?("reducedMotion.matches")
 end
 
 assert("report mode should render as player-readable text") do
@@ -283,6 +315,13 @@ assert("dashboard visual asset should be included as a Firebase Hosting static a
   asset.include?("<svg") &&
     asset.include?("Asteroid scan") &&
     asset.include?("#1f7a5a")
+end
+
+assert("generated asteroid assets and plugin logo should be hosted") do
+  File.exist?(File.join(ROOT, "firebase/hosting/assets/logo.png")) &&
+    File.exist?(File.join(ROOT, "firebase/hosting/assets/asteroids/sprite-sheet.svg")) &&
+    asteroid_ids.all? { |id| File.exist?(File.join(ROOT, "firebase/hosting/assets/asteroids/#{id}.svg")) } &&
+    asteroid_ids.all? { |id| auth_js.include?("/assets/asteroids/#{id}.svg") }
 end
 
 assert("emulator dashboard smoke should exercise hosting and callable sync state") do

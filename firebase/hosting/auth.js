@@ -74,6 +74,7 @@ const DEMO_DASHBOARD = {
     { orderId: "order_demo_2", buyerName: "Orbital Tool Shed", productName: "Refined nickel spool", rewardSpaceBucks: 210, canFulfill: false, missingMaterials: { "refined:mat_nickel": 4 } }
   ],
   asteroid: {
+    asteroidClassId: "asteroid_quartz_belt",
     displayName: "A-17 Noodle Rock",
     mined: 840,
     depletionSize: 1200,
@@ -148,6 +149,7 @@ const EMPTY_CLOUD_DASHBOARD = {
   inventory: [],
   orders: [],
   asteroid: {
+    asteroidClassId: "",
     displayName: "No synced asteroid",
     mined: 0,
     depletionSize: 0,
@@ -192,6 +194,74 @@ const FORM_VALIDATION_MESSAGE = "Check the highlighted email and password fields
 const DASHBOARD_REFRESH_SUCCESS = "Dashboard refreshed.";
 const DASHBOARD_REFRESH_PARTIAL = "Some cloud data could not be refreshed. Showing available owner data.";
 const SYNC_API_REFRESH_PARTIAL = "Cloud sync API did not respond. Showing available owner data.";
+const THEME_STORAGE_KEY = "mcp-miner-theme";
+const ASTEROID_CLASSES = [
+  {
+    id: "asteroid_starter_rubble",
+    displayName: "Starter Rubble",
+    unlockTier: 1,
+    image: "/assets/asteroids/asteroid_starter_rubble.svg",
+    base: "#8d8174",
+    shade: "#544d45",
+    glow: "#42d998"
+  },
+  {
+    id: "asteroid_quartz_belt",
+    displayName: "Quartz Belt",
+    unlockTier: 2,
+    image: "/assets/asteroids/asteroid_quartz_belt.svg",
+    base: "#7d8d98",
+    shade: "#3f505d",
+    glow: "#6ee7ff"
+  },
+  {
+    id: "asteroid_iron_tumblers",
+    displayName: "Iron Tumblers",
+    unlockTier: 3,
+    image: "/assets/asteroids/asteroid_iron_tumblers.svg",
+    base: "#94634f",
+    shade: "#4c3029",
+    glow: "#ffb66e"
+  },
+  {
+    id: "asteroid_sapphire_debris_field",
+    displayName: "Sapphire Debris Field",
+    unlockTier: 3,
+    image: "/assets/asteroids/asteroid_sapphire_debris_field.svg",
+    base: "#536c98",
+    shade: "#202e56",
+    glow: "#6ea8ff"
+  },
+  {
+    id: "asteroid_ember_rocks",
+    displayName: "Ember Rocks",
+    unlockTier: 4,
+    image: "/assets/asteroids/asteroid_ember_rocks.svg",
+    base: "#884839",
+    shade: "#341a1a",
+    glow: "#ff6f3d"
+  },
+  {
+    id: "asteroid_amethyst_archive_belt",
+    displayName: "Amethyst Archive Belt",
+    unlockTier: 4,
+    image: "/assets/asteroids/asteroid_amethyst_archive_belt.svg",
+    base: "#6b5a8e",
+    shade: "#2e214c",
+    glow: "#cf8dff"
+  },
+  {
+    id: "asteroid_diamond_class_body",
+    displayName: "Diamond-Class Body",
+    unlockTier: 5,
+    image: "/assets/asteroids/asteroid_diamond_class_body.svg",
+    base: "#a8bac7",
+    shade: "#485967",
+    glow: "#f8fbff"
+  }
+];
+const ASTEROID_BY_ID = new Map(ASTEROID_CLASSES.map((asteroid) => [asteroid.id, asteroid]));
+const ASTEROID_ID_BY_NAME = new Map(ASTEROID_CLASSES.map((asteroid) => [asteroid.displayName.toLowerCase(), asteroid.id]));
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -216,6 +286,8 @@ const googleSignInButton = document.querySelector("#google-sign-in");
 const signInButton = document.querySelector("#sign-in");
 const createAccount = document.querySelector("#create-account");
 const signOutButton = document.querySelector("#sign-out");
+const themeToggle = document.querySelector("#theme-toggle");
+const themeToggleLabel = document.querySelector("#theme-toggle-label");
 const refreshDashboard = document.querySelector("#refresh-dashboard");
 const authStatus = document.querySelector("#auth-status");
 const authIdentity = document.querySelector("#auth-identity");
@@ -238,6 +310,9 @@ const asteroidName = document.querySelector("#asteroid-name");
 const asteroidProgressLabel = document.querySelector("#asteroid-progress-label");
 const asteroidProgressPercent = document.querySelector("#asteroid-progress-percent");
 const asteroidProgressFill = document.querySelector("#asteroid-progress-fill");
+const asteroidArt = document.querySelector("#asteroid-art");
+const asteroidCanvas = document.querySelector("#asteroid-canvas");
+const asteroidAtlas = document.querySelector("#asteroid-atlas");
 const progressTrack = document.querySelector(".progress-track");
 const cloudDetail = document.querySelector("#cloud-detail");
 const inventoryList = document.querySelector("#inventory-list");
@@ -261,10 +336,37 @@ const pendingLink = {
 
 let currentUser = null;
 let activeDashboard = cloneDemo();
+let activeAsteroidVisual = ASTEROID_CLASSES[0];
+let activeAsteroidProgress = 0;
+let asteroidAnimationStarted = false;
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function setMessage(text, isError = false) {
   message.textContent = text;
-  message.style.color = isError ? "#9a3412" : "#1f7a5a";
+  message.dataset.tone = isError ? "error" : "success";
+}
+
+function preferredTheme() {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY);
+  if (saved === "light" || saved === "dark") {
+    return saved;
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme) {
+  const nextTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = nextTheme;
+  themeToggle.setAttribute("aria-pressed", nextTheme === "dark" ? "true" : "false");
+  themeToggle.setAttribute("aria-label", nextTheme === "dark" ? "Use light mode" : "Use dark mode");
+  themeToggleLabel.textContent = nextTheme === "dark" ? "Light" : "Dark";
+  drawAsteroidCanvas(performance.now());
+}
+
+function toggleTheme() {
+  const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  applyTheme(nextTheme);
 }
 
 function cloneDemo(overrides = {}) {
@@ -469,6 +571,166 @@ function displayNameFromId(id) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function asteroidClassIdFrom(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return ASTEROID_CLASSES[0].id;
+  }
+  if (ASTEROID_BY_ID.has(normalized)) {
+    return normalized;
+  }
+  const lowered = normalized.toLowerCase();
+  return ASTEROID_ID_BY_NAME.get(lowered) || ASTEROID_CLASSES[0].id;
+}
+
+function asteroidClassFor(asteroid) {
+  const classId = asteroid && (asteroid.asteroidClassId || asteroid.asteroid_class_id || asteroid.id || asteroid.classId || asteroid.class_id || asteroid.displayName);
+  return ASTEROID_BY_ID.get(asteroidClassIdFrom(classId)) || ASTEROID_CLASSES[0];
+}
+
+function hashString(value) {
+  let hash = 2166136261;
+  String(value).split("").forEach((char) => {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  });
+  return hash >>> 0;
+}
+
+function seededRandom(seed) {
+  let next = seed >>> 0;
+  return () => {
+    next += 0x6D2B79F5;
+    let value = next;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hexToRgb(hex) {
+  const value = String(hex || "#ffffff").replace("#", "");
+  const number = Number.parseInt(value.length === 3 ? value.split("").map((char) => char + char).join("") : value, 16);
+  return {
+    r: (number >> 16) & 255,
+    g: (number >> 8) & 255,
+    b: number & 255
+  };
+}
+
+function rgba(hex, alpha) {
+  const color = hexToRgb(hex);
+  return `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
+}
+
+function asteroidModel(meta) {
+  const random = seededRandom(hashString(meta.id));
+  const pointCount = 22;
+  const points = Array.from({ length: pointCount }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / pointCount;
+    return {
+      angle,
+      radius: 0.72 + random() * 0.34
+    };
+  });
+  const craters = Array.from({ length: 9 }, () => ({
+    angle: random() * Math.PI * 2,
+    distance: 0.18 + random() * 0.58,
+    radius: 0.035 + random() * 0.055,
+    shade: 0.18 + random() * 0.22
+  }));
+  const sparks = Array.from({ length: 20 }, () => ({
+    x: random(),
+    y: random(),
+    radius: 0.7 + random() * 1.8,
+    alpha: 0.24 + random() * 0.54
+  }));
+  return { points, craters, sparks };
+}
+
+function drawAsteroidCanvas(timestamp = 0) {
+  if (!asteroidCanvas || !activeAsteroidVisual) {
+    return;
+  }
+  const rect = asteroidCanvas.getBoundingClientRect();
+  const size = Math.max(120, Math.round(Math.min(rect.width || 320, rect.height || 320) * window.devicePixelRatio));
+  if (asteroidCanvas.width !== size || asteroidCanvas.height !== size) {
+    asteroidCanvas.width = size;
+    asteroidCanvas.height = size;
+  }
+  const ctx = asteroidCanvas.getContext("2d");
+  const meta = activeAsteroidVisual;
+  const model = asteroidModel(meta);
+  const center = size / 2;
+  const radius = size * 0.28;
+  const rotation = reducedMotion.matches ? 0.35 : timestamp / 4200;
+  const progress = Math.max(0, Math.min(1, activeAsteroidProgress / 100));
+
+  ctx.clearRect(0, 0, size, size);
+  ctx.save();
+  model.sparks.forEach((spark) => {
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255, 255, 255, ${spark.alpha})`;
+    ctx.arc(spark.x * size, spark.y * size, spark.radius * window.devicePixelRatio, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.translate(center, center);
+  ctx.rotate(rotation);
+  ctx.beginPath();
+  model.points.forEach((point, index) => {
+    const phase = point.angle;
+    const squash = 0.78 + Math.cos(rotation + phase) * 0.08;
+    const x = Math.cos(phase) * radius * point.radius;
+    const y = Math.sin(phase) * radius * point.radius * squash;
+    if (index === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+  ctx.closePath();
+  const fill = ctx.createRadialGradient(-radius * 0.36, -radius * 0.42, radius * 0.12, 0, 0, radius * 1.2);
+  fill.addColorStop(0, rgba(meta.glow, 0.74));
+  fill.addColorStop(0.32, meta.base);
+  fill.addColorStop(1, meta.shade);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = rgba(meta.glow, 0.62);
+  ctx.lineWidth = Math.max(1, size * 0.008);
+  ctx.stroke();
+
+  model.craters.forEach((crater) => {
+    const x = Math.cos(crater.angle) * radius * crater.distance;
+    const y = Math.sin(crater.angle) * radius * crater.distance * 0.72;
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(0, 0, 0, ${crater.shade})`;
+    ctx.ellipse(x, y, radius * crater.radius * 1.6, radius * crater.radius, -rotation, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.strokeStyle = rgba(meta.glow, 0.68);
+  ctx.lineWidth = Math.max(3, size * 0.018);
+  ctx.arc(center, center, size * 0.39, Math.PI * 0.58, Math.PI * (0.58 + 1.18 * progress));
+  ctx.stroke();
+}
+
+function startAsteroidAnimation() {
+  if (asteroidAnimationStarted || !asteroidCanvas) {
+    return;
+  }
+  asteroidAnimationStarted = true;
+  const tick = (timestamp) => {
+    drawAsteroidCanvas(timestamp);
+    if (!reducedMotion.matches) {
+      requestAnimationFrame(tick);
+    }
+  };
+  requestAnimationFrame(tick);
+}
+
 function reportModeLabel(mode) {
   return displayNameFromId(mode || "meaningful_turns_only");
 }
@@ -594,8 +856,15 @@ function normalizeAsteroid(state) {
   const depletionSize = numberValue(progress && (progress.depletionSize || progress.depletion_size), mined || 1);
   const percentComplete = depletionSize > 0 ? Math.min(100, Math.round((mined / depletionSize) * 100)) : 0;
   const currentAsteroid = state && (state.currentAsteroid || state.current_asteroid);
+  const displayName = (currentAsteroid && (currentAsteroid.displayName || currentAsteroid.display_name)) ||
+    (progress && (progress.displayName || progress.display_name)) ||
+    "Cloud asteroid";
+  const asteroidClassId = (progress && (progress.asteroidClassId || progress.asteroid_class_id || progress.id)) ||
+    (currentAsteroid && (currentAsteroid.asteroidClassId || currentAsteroid.asteroid_class_id || currentAsteroid.id)) ||
+    asteroidClassIdFrom(displayName);
   return {
-    displayName: (currentAsteroid && (currentAsteroid.displayName || currentAsteroid.display_name)) || "Cloud asteroid",
+    asteroidClassId,
+    displayName,
     mined,
     depletionSize,
     percentComplete,
@@ -736,6 +1005,8 @@ function renderDashboard(data) {
   asteroidProgressFill.style.width = `${progress}%`;
   progressTrack.hidden = !hasAsteroidProgress;
   progressTrack.setAttribute("aria-valuenow", String(progress));
+  renderAsteroidArt(asteroid, progress);
+  renderAsteroidAtlas(asteroid);
 
   renderInventory(inventory);
   renderOrders(data.orders || []);
@@ -745,6 +1016,29 @@ function renderDashboard(data) {
   renderCloudDetail(cloudState, asteroid, data.syncDevices || []);
   renderBase(data.base || {});
   renderPrivacy(data);
+}
+
+function renderAsteroidArt(asteroid, progress) {
+  const meta = asteroidClassFor(asteroid);
+  activeAsteroidVisual = meta;
+  activeAsteroidProgress = progress;
+  asteroidArt.src = meta.image;
+  asteroidArt.alt = `${meta.displayName} procedural asteroid visualization`;
+  asteroidArt.dataset.asteroidId = meta.id;
+  asteroidCanvas.dataset.asteroidId = meta.id;
+  drawAsteroidCanvas(performance.now());
+  startAsteroidAnimation();
+}
+
+function renderAsteroidAtlas(asteroid) {
+  const currentId = asteroidClassFor(asteroid).id;
+  asteroidAtlas.innerHTML = ASTEROID_CLASSES.map((item) => `
+    <article class="asteroid-card" aria-current="${item.id === currentId ? "true" : "false"}">
+      <img src="${item.image}" alt="${escapeHtml(item.displayName)} asteroid class art">
+      <strong>${escapeHtml(item.displayName)}</strong>
+      <span>Tier ${formatNumber(item.unlockTier)}</span>
+    </article>
+  `).join("");
 }
 
 function renderInventory(items) {
@@ -1036,6 +1330,10 @@ signOutButton.addEventListener("click", () => {
   handleAuth(() => signOut(auth));
 });
 
+themeToggle.addEventListener("click", () => {
+  toggleTheme();
+});
+
 refreshDashboard.addEventListener("click", () => {
   refreshForCurrentUser();
 });
@@ -1100,4 +1398,5 @@ onAuthStateChanged(auth, async (user) => {
   await refreshForCurrentUser();
 });
 
+applyTheme(preferredTheme());
 renderDashboard(cloneDemo());

@@ -22,7 +22,9 @@
       "Show my active MCP Miner orders",
       "Open the MCP Miner dashboard"
     ],
-    "brandColor": "#2F7D6D"
+    "brandColor": "#2F7D6D",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png"
   },
   "mcpServers": "./.mcp.json"
 }

@@ -97,12 +97,12 @@ async function main() {
 
   const indexHtml = await requestText(`http://${HOSTING_HOST}/`);
   const dashboardJs = await requestText(`http://${HOSTING_HOST}/auth.js`);
-  const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "sync-privacy"];
+  const requiredPanels = ["status", "inventory", "orders", "asteroid", "asteroid-atlas", "upgrades", "store", "reports", "sync-privacy"];
   const missingPanels = requiredPanels.filter((panel) => !indexHtml.includes(`data-panel="${panel}"`));
   if (missingPanels.length) {
     throw new Error(`dashboard hosting response missing panels: ${missingPanels.join(", ")}`);
   }
-  if (!dashboardJs.includes("getSyncState") || !dashboardJs.includes("DEMO_DASHBOARD")) {
+  if (!dashboardJs.includes("getSyncState") || !dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("ASTEROID_CLASSES")) {
     throw new Error("dashboard module missing Firebase sync or demo-mode support");
   }
 

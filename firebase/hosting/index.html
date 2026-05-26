@@ -4,13 +4,23 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>MCP Miner Dashboard</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png">
+    <link rel="apple-touch-icon" href="/assets/logo.png">
+    <script>
+      (() => {
+        const saved = localStorage.getItem("mcp-miner-theme");
+        const systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = saved === "light" || saved === "dark" ? saved : (systemDark ? "dark" : "light");
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
     <main class="dashboard-shell">
       <header class="topbar">
         <div class="brand-lockup">
-          <img class="brand-mark" src="/assets/asteroid-scan.svg" alt="" aria-hidden="true">
+          <img class="brand-mark" src="/assets/logo.png" alt="" aria-hidden="true">
           <div>
             <p class="eyebrow">Firebase dashboard</p>
             <h1>MCP Miner</h1>
@@ -18,6 +28,9 @@
         </div>
         <div class="topbar-actions">
           <span id="connection-pill" class="pill">Demo mode</span>
+          <button id="theme-toggle" type="button" class="theme-toggle" aria-pressed="false" aria-label="Use dark mode">
+            <span id="theme-toggle-label">Dark</span>
+          </button>
           <button id="refresh-dashboard" type="button" class="button-secondary">
             <span>Refresh</span>
           </button>
@@ -163,7 +176,10 @@
                 <span id="asteroid-name" class="pill">-</span>
               </div>
               <div class="scan-row">
-                <img class="scan-art" src="/assets/asteroid-scan.svg" alt="Asteroid scan visualization for the current rock">
+                <div class="scan-art-shell">
+                  <img id="asteroid-art" class="scan-art" src="/assets/asteroids/asteroid_starter_rubble.svg" alt="Starter Rubble procedural asteroid visualization">
+                  <canvas id="asteroid-canvas" class="asteroid-canvas" width="320" height="320" aria-hidden="true"></canvas>
+                </div>
                 <div class="progress-stack">
                   <div class="progress-meta">
                     <strong id="asteroid-progress-label">0 / 0 mined</strong>
@@ -175,6 +191,16 @@
                   <dl id="cloud-detail" class="inline-stats"></dl>
                 </div>
               </div>
+            </section>
+
+            <section class="panel panel-wide asteroid-atlas-panel" data-panel="asteroid-atlas" aria-labelledby="asteroid-atlas-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Asteroid atlas</p>
+                  <h2 id="asteroid-atlas-title">Known Rock Classes</h2>
+                </div>
+              </div>
+              <div id="asteroid-atlas" class="asteroid-atlas"></div>
             </section>
 
             <section class="panel" data-panel="inventory" aria-labelledby="inventory-title">
