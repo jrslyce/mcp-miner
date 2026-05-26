@@ -40,7 +40,8 @@ expected_paths = [
   "linkSessions/{sessionId}",
   "linkCodes/{code}",
   "deviceTokens/{tokenHash}",
-  "billingWebhookEvents/{eventId}"
+  "billingWebhookEvents/{eventId}",
+  "supportAuditLogs/{auditId}"
 ]
 
 assert("schema should document all V1 Firestore collections") do
@@ -86,7 +87,7 @@ assert("billing and entitlement projections should be server-owned/read-only to 
 end
 
 assert("linking secrets should stay in server-owned top-level collections") do
-  ["linkSessions/{sessionId}", "linkCodes/{code}", "deviceTokens/{tokenHash}", "billingWebhookEvents/{eventId}"].all? do |path|
+  ["linkSessions/{sessionId}", "linkCodes/{code}", "deviceTokens/{tokenHash}", "billingWebhookEvents/{eventId}", "supportAuditLogs/{auditId}"].all? do |path|
     schema.dig("collections", path, "serverOwned") == true &&
       schema.dig("collections", path, "clientAccess") == []
   end &&

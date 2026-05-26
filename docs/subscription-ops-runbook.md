@@ -57,6 +57,24 @@ Server-side fixed-window rate limits are intentionally above normal idle-game us
 Rate-limit state is stored in `operationalRateLimits/{operation_subjectHash}` with hashed subjects
 only. Raw IPs, emails, tokens, prompts, code, paths, and payloads are not stored.
 
+## Support Tooling
+
+Use `scripts/subscription_support_admin.js` for subscription support tasks. The script requires
+Firebase Admin credentials plus `MCP_MINER_SUPPORT_ACTOR` in the form `support:name`,
+`admin:name`, or `release:name`; browser/dashboard users cannot call it.
+
+Supported commands:
+
+- `inspect --uid UID`: exports a support-safe account summary with billing projection, Stripe customer/subscription IDs, evaluated entitlement, linked-device metadata, and sync cursors.
+- `reconcile-stripe --uid UID`: refreshes billing and entitlement from provider-backed Stripe subscription evidence. Unknown Price IDs, missing customers, and UID/customer mismatches do not grant Pro.
+- `refresh-entitlement --uid UID`: rebuilds the entitlement projection from the existing billing projection. Stale billing remains Free.
+- `mark-billing-stale --uid UID --reason REASON`: forces the projection stale so the account evaluates as Free until provider-backed reconciliation succeeds.
+- `revoke-device --uid UID --device-id DEVICE_ID`: revokes a linked device and any matching server-side token records without exposing token hashes.
+
+Every command writes `/supportAuditLogs/{auditId}` with `actor`, `targetUid`, `action`, `result`,
+`reason`, and abstract details. Support summaries and audit details must not include token hashes,
+device secrets, raw Stripe payloads, prompts, code, commands, paths, or transcripts.
+
 ## Budget And Alert Setup
 
 Configure before production launch:
@@ -124,4 +142,3 @@ Launch sizing assumptions:
 - QA accounts are created, then cleaned up after production smoke.
 - Budget and webhook alert screenshots are linked in QA-024.
 - Any bug found during production smoke is filed in Linear before redeploying.
-

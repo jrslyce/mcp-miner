@@ -24,14 +24,17 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/linkCodes/{code}` | server | none | Atomic one-time code reservations that prevent active link-code collisions. |
 | `/deviceTokens/{tokenHash}` | server | none | Hash-only revocable device token records used by callable Functions. |
 | `/billingWebhookEvents/{eventId}` | server | none | Server-only billing event audit records; raw payloads stay outside owner-readable documents. |
+| `/supportAuditLogs/{auditId}` | server | none | Server-only audit trail for support inspection, reconciliation, stale-marking, and device revocation actions. |
 
 ## Client-Write Boundaries
 
 Clients may create profile/settings/sync metadata and append abstract reward events. Clients may not write aggregate balances. In production, Cloud Functions are responsible for validating reward event signatures, dedupe keys, cooldowns, daily soft caps, and reducers before writing game state.
 
-Link sessions, link-code reservations, and device-token hashes are top-level server-owned collections. They are written only by Cloud Functions through the Admin SDK and remain blocked from direct dashboard/plugin Firestore access by the default deny rule.
+Link sessions, link-code reservations, device-token hashes, billing webhook events, and support audit logs are top-level server-owned collections. They are written only by Cloud Functions or Admin SDK support tooling and remain blocked from direct dashboard/plugin Firestore access by the default deny rule.
 
 Billing and entitlement documents under `/players/{uid}` are owner-readable but server-owned. Stripe is the source of truth for paid subscription state; Firestore billing and entitlement documents are projections written by Cloud Functions with the Admin SDK. Clients may read the effective plan and feature limits, but clients cannot directly write `plan`, `billingStatus`, provider IDs, sync cadence, device limits, history retention, or feature flags.
+
+Support tooling may inspect billing projection fields, Stripe customer/subscription IDs, linked-device metadata, and sync cursors through Admin SDK scripts. Every support action writes `/supportAuditLogs/{auditId}` with actor, target UID, action, result, reason, and abstract details. Support summaries intentionally exclude token hashes, device secrets, raw Stripe payloads, prompts, commands, code, paths, and transcript-like content.
 
 Cosmetic selections under `/players/{uid}/cosmetics/current` are also server-owned. Portal clients request cosmetic changes through `applyCosmeticSelection`; Functions re-read the server entitlement and profile ownership before writing the applied selections. Editing client state cannot unlock Pro, retired, beta, or earned cosmetics.
 

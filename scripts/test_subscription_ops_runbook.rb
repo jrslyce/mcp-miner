@@ -84,6 +84,14 @@ assert("runbook should document incident response and support contacts") do
     doc.include?("local play continues")
 end
 
+assert("runbook should document support tooling and audit requirements") do
+  doc.include?("## Support Tooling") &&
+    doc.include?("scripts/subscription_support_admin.js") &&
+    doc.include?("/supportAuditLogs/{auditId}") &&
+    doc.include?("MCP_MINER_SUPPORT_ACTOR") &&
+    doc.include?("Unknown Price IDs")
+end
+
 assert("runbook should document usage assumptions and cost guardrails") do
   doc.include?("100 Free users and 25 Pro users") &&
     doc.include?("sync_cadence_cost_smoke.js") &&

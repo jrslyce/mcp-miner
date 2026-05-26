@@ -57,7 +57,7 @@
       "clientAccess": ["read"],
       "serverOwned": true,
       "sourceOfTruth": "stripe",
-      "fields": ["ownerUid", "schemaVersion", "privacyClass", "plan", "billingStatus", "provider", "providerCustomerId", "providerSubscriptionId", "currentPeriodEnd", "cancelAtPeriodEnd", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "features", "updatedAt"]
+      "fields": ["ownerUid", "schemaVersion", "privacyClass", "plan", "billingStatus", "provider", "providerCustomerId", "providerSubscriptionId", "currentPeriodEnd", "cancelAtPeriodEnd", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "features", "updatedAt", "supportMarkedStaleAt", "supportReconciledAt"]
     },
     "players/{uid}/entitlements/current": {
       "owner": "uid",
@@ -126,6 +126,12 @@
       "clientAccess": [],
       "serverOwned": true,
       "fields": ["provider", "providerEventId", "receivedAt", "processedAt", "status", "rawPayloadStorageRef"]
+    },
+    "supportAuditLogs/{auditId}": {
+      "owner": "server",
+      "clientAccess": [],
+      "serverOwned": true,
+      "fields": ["actor", "targetUid", "action", "result", "reason", "privacyClass", "details", "createdAt"]
     }
   }
 }

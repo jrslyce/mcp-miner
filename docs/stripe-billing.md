@@ -63,3 +63,21 @@ Configure Stripe to send these events to the `stripeWebhook` HTTPS Function:
 Webhook processing verifies the Stripe signature with `STRIPE_WEBHOOK_SECRET`, records each Stripe
 event ID in `billingWebhookEvents/{eventId}`, and ignores duplicate event IDs. Unknown Price IDs or
 missing `firebaseUid` metadata are audited but do not write Pro entitlements.
+
+## Support Reconciliation
+
+Subscription support uses the Admin SDK script `scripts/subscription_support_admin.js`. Set
+`MCP_MINER_SUPPORT_ACTOR=support:name` and run:
+
+```sh
+node scripts/subscription_support_admin.js inspect --uid FIREBASE_UID
+node scripts/subscription_support_admin.js reconcile-stripe --uid FIREBASE_UID
+node scripts/subscription_support_admin.js refresh-entitlement --uid FIREBASE_UID
+node scripts/subscription_support_admin.js mark-billing-stale --uid FIREBASE_UID --reason "provider evidence missing"
+node scripts/subscription_support_admin.js revoke-device --uid FIREBASE_UID --device-id DEVICE_ID
+```
+
+Every command writes `supportAuditLogs/{auditId}` with actor, target UID, action, result, and abstract
+details. The Stripe reconciliation command can only project paid access from provider-backed Stripe
+subscription evidence; missing customers, unknown Price IDs, customer mismatches, and UID mismatches
+fail or no-op without granting Pro.
