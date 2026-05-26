@@ -181,15 +181,21 @@ async function handleStripeWebhookEvent({ event, db, stripe, env = process.env, 
       billing: mapped.billing,
       now
     });
+    const evaluatedEntitlement = evaluateEntitlement(entitlement, { now });
     transaction.set(billingRef, mapped.billing, { merge: true });
-    transaction.set(entitlementRef, evaluateEntitlement(entitlement, { now }), { merge: true });
+    transaction.set(entitlementRef, evaluatedEntitlement, { merge: true });
     return {
       ok: true,
       duplicate: false,
       action: "project",
       uid: mapped.uid,
       plan: mapped.plan,
-      billingStatus: mapped.billing.billingStatus
+      billingStatus: mapped.billing.billingStatus,
+      provider: mapped.billing.provider,
+      providerSubscriptionId: mapped.billing.providerSubscriptionId,
+      currentPeriodEnd: mapped.billing.currentPeriodEnd,
+      entitlementStatus: evaluatedEntitlement.entitlementStatus,
+      accessReason: evaluatedEntitlement.accessReason
     };
   });
   return result;

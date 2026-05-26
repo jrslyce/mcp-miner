@@ -57,9 +57,112 @@ const {
   publicCosmeticCatalog,
   validateCosmeticSelection
 } = require("./cosmetics");
+const {
+  RATE_LIMITS,
+  rateLimitPublicDetails,
+  recordRateLimit
+} = require("./observability");
 
 admin.initializeApp();
 const db = admin.firestore();
+
+function requestIp(request) {
+  const raw = request.rawRequest || {};
+  const forwarded = raw.headers && raw.headers["x-forwarded-for"];
+  if (forwarded) {
+    return String(forwarded).split(",")[0].trim();
+  }
+  return raw.ip || "unknown";
+}
+
+function rateLimitSubjectForAuth(auth) {
+  if (!auth) {
+    return {
+      subject: "anonymous",
+      subjectType: "anonymous"
+    };
+  }
+  if (auth.authType === "device_token") {
+    return {
+      subject: `${auth.uid}:${auth.deviceId}`,
+      subjectType: "device_token"
+    };
+  }
+  return {
+    subject: auth.uid,
+    subjectType: "firebase_uid"
+  };
+}
+
+function rateLimitSubjectForRequest(request) {
+  if (request.auth && request.auth.uid) {
+    return {
+      subject: request.auth.uid,
+      subjectType: "firebase_uid"
+    };
+  }
+  return {
+    subject: requestIp(request),
+    subjectType: "ip"
+  };
+}
+
+async function requireOperationCapacity(operation, subjectInfo, now = new Date().toISOString()) {
+  const policy = RATE_LIMITS[operation];
+  if (!policy) {
+    return null;
+  }
+  const decision = await recordRateLimit({
+    db,
+    operation,
+    subject: subjectInfo.subject,
+    subjectType: subjectInfo.subjectType,
+    policy,
+    now
+  });
+  if (decision.ok) {
+    return decision;
+  }
+  logger.warn("mcp_miner_rate_limit_rejected", {
+    privacyClass: "abstract",
+    operation,
+    subjectType: subjectInfo.subjectType,
+    limit: decision.limit,
+    windowSeconds: decision.windowSeconds,
+    retryAfterSeconds: decision.retryAfterSeconds
+  });
+  throw new HttpsError("resource-exhausted", "Too many MCP Miner requests. Try again after the retry window.", rateLimitPublicDetails(operation, decision));
+}
+
+function logEntitlementRejection(decision, entitlement, context = {}) {
+  if (!decision || decision.ok) {
+    return;
+  }
+  logger.warn("mcp_miner_entitlement_operation_rejected", {
+    privacyClass: "abstract",
+    operation: context.operation || "unknown",
+    authType: context.authType || null,
+    uidPresent: context.uidPresent !== false,
+    reason: decision.reason || "entitlement_limit",
+    plan: entitlement && entitlement.plan ? entitlement.plan : "free",
+    billingStatus: entitlement && entitlement.billingStatus ? entitlement.billingStatus : "missing",
+    entitlementStatus: entitlement && entitlement.entitlementStatus ? entitlement.entitlementStatus : "free",
+    maxDevices: decision.maxDevices || null,
+    activeDevices: decision.activeDevices || null,
+    cadenceSeconds: decision.cadenceSeconds || null,
+    retryAfterSeconds: decision.retryAfterSeconds || null
+  });
+}
+
+function logBillingError(operation, uidPresent, error, extra = {}) {
+  logger.warn("mcp_miner_billing_error", {
+    privacyClass: "abstract",
+    operation,
+    uidPresent,
+    code: error && error.code ? error.code : "internal",
+    ...extra
+  });
+}
 
 function dashboardUrlFromRequest(request) {
   const requested = request.data && request.data.dashboardUrl;
@@ -185,10 +288,11 @@ function entitlementLimitMessage(decision, entitlement) {
   return "MCP Miner plan entitlement limit reached.";
 }
 
-function throwEntitlementDecision(decision, entitlement) {
+function throwEntitlementDecision(decision, entitlement, context = {}) {
   if (decision.ok) {
     return;
   }
+  logEntitlementRejection(decision, entitlement, context);
   throw new HttpsError("resource-exhausted", entitlementLimitMessage(decision, entitlement), {
     reason: decision.reason,
     entitlement: publicEntitlement(entitlement),
@@ -211,8 +315,9 @@ function publicSyncCadence(status) {
   };
 }
 
-function requireBackupEntitlement(entitlement) {
+function requireBackupEntitlement(entitlement, context = {}) {
   if (!entitlement || !entitlement.features || entitlement.features.backupRestore !== true) {
+    logEntitlementRejection({ ok: false, reason: "plan_limit_backup_restore" }, entitlement, context);
     throw new HttpsError("resource-exhausted", "Cloud backup and restore is a Pro benefit. Local play continues on Free.", {
       reason: "plan_limit_backup_restore",
       entitlement: publicEntitlement(entitlement)
@@ -238,8 +343,9 @@ function publicBackupMetadata(snapshot) {
   };
 }
 
-function requireExportEntitlement(entitlement) {
+function requireExportEntitlement(entitlement, context = {}) {
   if (!entitlement || !entitlement.features || entitlement.features.exports !== true) {
+    logEntitlementRejection({ ok: false, reason: "plan_limit_exports" }, entitlement, context);
     throw new HttpsError("resource-exhausted", "History exports are a Pro benefit.", {
       reason: "plan_limit_exports",
       entitlement: publicEntitlement(entitlement)
@@ -370,7 +476,7 @@ async function readActiveDevicesInTransaction(transaction, uid, currentDeviceId 
   return activeDevicesFromSnapshot(snapshot, currentDeviceId);
 }
 
-function enforceActiveDeviceAccess({ entitlement, activeDevices, auth }) {
+function enforceActiveDeviceAccess({ entitlement, activeDevices, auth, operation }) {
   if (!auth || auth.authType !== "device_token") {
     return;
   }
@@ -378,7 +484,11 @@ function enforceActiveDeviceAccess({ entitlement, activeDevices, auth }) {
     entitlement,
     activeDevices,
     deviceId: auth.deviceId
-  }), entitlement);
+  }), entitlement, {
+    operation: operation || "device_token_access",
+    authType: auth.authType,
+    uidPresent: true
+  });
 }
 
 function syncCursorId(auth) {
@@ -495,6 +605,7 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
   const uid = auth.uid;
   const events = Array.isArray(request.data && request.data.events) ? request.data.events : [];
   const receivedAt = new Date().toISOString();
+  await requireOperationCapacity("syncRewardEvents", rateLimitSubjectForAuth(auth), receivedAt);
   const playerRef = db.doc(`players/${uid}`);
   const stateRef = db.doc(`players/${uid}/gameState/current`);
   const defaultSyncRef = db.doc(`players/${uid}/syncMetadata/default`);
@@ -519,7 +630,7 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
       for (const ref of eventRefs) {
         eventSnaps.push(await transaction.get(ref));
       }
-      enforceActiveDeviceAccess({ entitlement, activeDevices, auth });
+      enforceActiveDeviceAccess({ entitlement, activeDevices, auth, operation: "syncRewardEvents" });
 
       const state = stateSnap.exists ? stateSnap.data() : {
         ownerUid: uid,
@@ -547,7 +658,11 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         lastAcceptedBatchAt: cursorSync.lastAcceptedBatchAt,
         now: receivedAt,
         acceptedCount: batch.accepted.length
-      }), entitlement);
+      }), entitlement, {
+        operation: "syncRewardEvents",
+        authType: auth.authType,
+        uidPresent: true
+      });
 
       let reducedState = {
         ...state,
@@ -661,8 +776,10 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
     logger.warn("mcp_miner_sync_reward_events_rejected", {
       privacyClass: "abstract",
       uidPresent: true,
+      authType: auth.authType,
       requestedCount: events.length,
-      code: error.code || "invalid-argument"
+      code: error.code || "invalid-argument",
+      reason: error.details && error.details.reason ? error.details.reason : null
     });
     if (error instanceof HttpsError) {
       throw error;
@@ -688,7 +805,8 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
   enforceActiveDeviceAccess({
     entitlement,
     activeDevices: activeDevicesFromSnapshot(activeDevicesSnap, auth.deviceId),
-    auth
+    auth,
+    operation: "getSyncState"
   });
   if (auth.authType === "device_token") {
     const now = new Date().toISOString();
@@ -848,17 +966,29 @@ exports.applyCosmeticSelection = onCall({ region: "us-central1" }, async (reques
 
 exports.exportDashboardHistory = onCall({ region: "us-central1" }, async (request) => {
   const auth = await resolveSyncAuth(request, "sync:read");
+  const now = new Date().toISOString();
+  await requireOperationCapacity("exportDashboardHistory", rateLimitSubjectForAuth(auth), now);
   const requestedUid = request.data && request.data.uid ? String(request.data.uid) : null;
   if (requestedUid && requestedUid !== auth.uid) {
     throw new HttpsError("permission-denied", "History exports are owner-scoped.");
   }
-  const now = new Date().toISOString();
   const entitlementSnap = await db.doc(`players/${auth.uid}/entitlements/current`).get();
   const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
-  requireExportEntitlement(entitlement);
+  requireExportEntitlement(entitlement, {
+    operation: "exportDashboardHistory",
+    authType: auth.authType,
+    uidPresent: true
+  });
   const format = request.data && request.data.format === "csv" ? "csv" : "json";
   const analytics = await loadAnalyticsData(auth.uid, entitlement, now);
   const exported = exportDashboardAnalytics(analytics, format);
+  logger.info("mcp_miner_dashboard_history_exported", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    authType: auth.authType,
+    format: exported.format,
+    rowCount: exported.rowCount || 0
+  });
   return {
     ok: true,
     privacyClass: "abstract",
@@ -887,9 +1017,14 @@ exports.getCloudBackupStatus = onCall({ region: "us-central1" }, async (request)
 exports.createCloudBackup = onCall({ region: "us-central1" }, async (request) => {
   const auth = await resolveSyncAuth(request, "sync:write");
   const now = new Date().toISOString();
+  await requireOperationCapacity("createCloudBackup", rateLimitSubjectForAuth(auth), now);
   const entitlementSnap = await db.doc(`players/${auth.uid}/entitlements/current`).get();
   const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
-  requireBackupEntitlement(entitlement);
+  requireBackupEntitlement(entitlement, {
+    operation: "createCloudBackup",
+    authType: auth.authType,
+    uidPresent: true
+  });
 
   let payload;
   try {
@@ -927,16 +1062,21 @@ exports.createCloudBackup = onCall({ region: "us-central1" }, async (request) =>
 
 exports.restoreCloudBackup = onCall({ region: "us-central1" }, async (request) => {
   const auth = await resolveSyncAuth(request, "sync:read");
+  const now = new Date().toISOString();
+  await requireOperationCapacity("restoreCloudBackup", rateLimitSubjectForAuth(auth), now);
   if (!request.data || request.data.confirm !== true) {
     throw new HttpsError("failed-precondition", "Restore requires explicit confirmation.");
   }
-  const now = new Date().toISOString();
   const [entitlementSnap, backupSnap] = await Promise.all([
     db.doc(`players/${auth.uid}/entitlements/current`).get(),
     db.doc(`players/${auth.uid}/cloudBackups/current`).get()
   ]);
   const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
-  requireBackupEntitlement(entitlement);
+  requireBackupEntitlement(entitlement, {
+    operation: "restoreCloudBackup",
+    authType: auth.authType,
+    uidPresent: true
+  });
   if (!backupSnap.exists) {
     throw new HttpsError("not-found", "No MCP Miner cloud backup is available for this account.");
   }
@@ -983,11 +1123,17 @@ exports.createCheckoutSession = onCall({ region: "us-central1" }, async (request
   requireVerifiedFirebaseAuth(request);
   const uid = request.auth.uid;
   const data = request.data || {};
+  const now = new Date().toISOString();
+  await requireOperationCapacity("createCheckoutSession", rateLimitSubjectForRequest(request), now);
 
   try {
     assertUidMatchesRequest(data, uid);
     const dashboardUrl = dashboardUrlFromRequest(request);
-    const now = new Date().toISOString();
+    logger.info("mcp_miner_stripe_checkout_start", {
+      privacyClass: "abstract",
+      uidPresent: true,
+      plan: data.plan || null
+    });
     const stripe = createStripeClient();
     const billingRef = db.doc(`players/${uid}/billing/current`);
     const entitlementRef = db.doc(`players/${uid}/entitlements/current`);
@@ -1025,6 +1171,9 @@ exports.createCheckoutSession = onCall({ region: "us-central1" }, async (request
       url: result.url
     };
   } catch (error) {
+    logBillingError("createCheckoutSession", true, error, {
+      plan: data.plan || null
+    });
     rethrowBillingError(error);
   }
 });
@@ -1036,10 +1185,16 @@ exports.createCustomerPortalSession = onCall({ region: "us-central1" }, async (r
   requireVerifiedFirebaseAuth(request);
   const uid = request.auth.uid;
   const data = request.data || {};
+  const now = new Date().toISOString();
+  await requireOperationCapacity("createCustomerPortalSession", rateLimitSubjectForRequest(request), now);
 
   try {
     assertUidMatchesRequest(data, uid);
     const dashboardUrl = dashboardUrlFromRequest(request);
+    logger.info("mcp_miner_stripe_customer_portal_start", {
+      privacyClass: "abstract",
+      uidPresent: true
+    });
     const stripe = createStripeClient();
     const billingSnap = await db.doc(`players/${uid}/billing/current`).get();
     const customerId = stripeCustomerIdFromBilling(billingSnap.exists ? billingSnap.data() : null);
@@ -1058,6 +1213,7 @@ exports.createCustomerPortalSession = onCall({ region: "us-central1" }, async (r
       url: result.url
     };
   } catch (error) {
+    logBillingError("createCustomerPortalSession", true, error);
     rethrowBillingError(error);
   }
 });
@@ -1087,6 +1243,19 @@ exports.stripeWebhook = onRequest({ region: "us-central1" }, async (request, res
       action: result.action,
       duplicate: result.duplicate === true
     });
+    if (result.action === "project" && result.uid) {
+      logger.info("mcp_miner_entitlement_projection_changed", {
+        privacyClass: "abstract",
+        provider: "stripe",
+        uidPresent: true,
+        eventId: event.id,
+        plan: result.plan || null,
+        billingStatus: result.billingStatus || null,
+        entitlementStatus: result.entitlementStatus || null,
+        accessReason: result.accessReason || null,
+        currentPeriodEnd: result.currentPeriodEnd || null
+      });
+    }
     response.json({ ok: true, received: true, eventId: event.id, action: result.action, duplicate: result.duplicate === true });
   } catch (error) {
     logger.warn("mcp_miner_stripe_webhook_rejected", {
@@ -1099,6 +1268,7 @@ exports.stripeWebhook = onRequest({ region: "us-central1" }, async (request, res
 
 exports.createLinkSession = onCall({ region: "us-central1" }, async (request) => {
   const now = new Date();
+  await requireOperationCapacity("createLinkSession", rateLimitSubjectForRequest(request), now.toISOString());
   const linkPolicy = evaluateEntitlement(null, { now: now.toISOString() });
   let nextSession = null;
   let nextDeviceSecret = null;
@@ -1166,6 +1336,7 @@ exports.approveLinkSession = onCall({ region: "us-central1" }, async (request) =
     throw new HttpsError("unauthenticated", "Sign in before approving a Codex device.");
   }
   requireVerifiedFirebaseAuth(request);
+  await requireOperationCapacity("approveLinkSession", rateLimitSubjectForRequest(request), new Date().toISOString());
 
   const ref = await resolveLinkSessionRef(request.data || {});
   const uid = request.auth.uid;
@@ -1183,7 +1354,11 @@ exports.approveLinkSession = onCall({ region: "us-central1" }, async (request) =
       entitlement,
       activeDevices,
       creatingNew: true
-    }), entitlement);
+    }), entitlement, {
+      operation: "approveLinkSession",
+      authType: "firebase",
+      uidPresent: true
+    });
 
     const approved = {
       ...session,
@@ -1266,6 +1441,10 @@ exports.exchangeLinkSession = onCall({ region: "us-central1" }, async (request) 
   if (!sessionId || !deviceSecret) {
     throw new HttpsError("invalid-argument", "sessionId and deviceSecret are required.");
   }
+  await requireOperationCapacity("exchangeLinkSession", {
+    subject: String(sessionId),
+    subjectType: "link_session"
+  }, new Date().toISOString());
 
   const ref = db.doc(`linkSessions/${String(sessionId)}`);
   const now = new Date().toISOString();
@@ -1294,7 +1473,11 @@ exports.exchangeLinkSession = onCall({ region: "us-central1" }, async (request) 
       entitlement,
       activeDevices,
       creatingNew: true
-    }), entitlement);
+    }), entitlement, {
+      operation: "exchangeLinkSession",
+      authType: "link_session",
+      uidPresent: true
+    });
 
     transaction.set(db.doc(`deviceTokens/${hash}`), {
       uid,

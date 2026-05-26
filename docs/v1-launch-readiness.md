@@ -10,7 +10,7 @@ This checklist records the V1 privacy, security, and launch-readiness pass for M
 | Optional Firebase linking/sync | Ready for emulator validation | `test:auth-linking`, `test:cloud-sync-client`, `test:cloud-sync-api`, `test:firestore-schema`, and `test:firebase-integration` cover static and local client behavior. Java-backed emulator smoke commands are listed below. |
 | Dashboard/store privacy | Ready | `test:dashboard`, `test:store`, `test:firebase-integration`, and this readiness test verify the dashboard/store surfaces only abstract owner-scoped game data. |
 | Security rules and sync API | Ready | Firestore schema/static checks, Cloud Functions static checks, sync API tests, and privacy denylist scans pass in `npm run check`. |
-| Subscription launch QA | Ready for matrix validation | `docs/subscription-qa-matrix.md` is the launch gate for billing, entitlements, sync limits, downgrade, and security; `test:subscription-qa` verifies row coverage and blocker rules. |
+| Subscription launch QA | Ready for matrix validation | `docs/subscription-qa-matrix.md` is the launch gate for billing, entitlements, sync limits, downgrade, and security; `docs/subscription-ops-runbook.md` covers observability, budget alerts, rate limits, deploy, and rollback; `test:subscription-qa` and `test:subscription-ops` verify coverage. |
 | Plugin packaging | Ready | `validate:plugin` and `test:plugin-install` verify manifest shape, hooks, MCP server launch, skill/tool alignment, and install docs. |
 | V2 non-goals | Documented | GDD sections 22-24 and this document keep V2-only work out of V1 launch scope. |
 
@@ -27,6 +27,7 @@ Run the focused readiness check:
 ```sh
 npm run test:v1-readiness
 npm run test:subscription-qa
+npm run test:subscription-ops
 ```
 
 Run Java-backed Firebase Emulator Suite smokes before production launch on a machine with Java:

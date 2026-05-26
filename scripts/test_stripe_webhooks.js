@@ -164,6 +164,9 @@ function fakeDb() {
     const first = await handleStripeWebhookEvent({ event: stripeEvent, db, stripe: fakeStripe(), env, now });
     const second = await handleStripeWebhookEvent({ event: stripeEvent, db, stripe: fakeStripe(), env, now });
     return first.action === "project" &&
+      first.entitlementStatus === "pro" &&
+      first.accessReason === "active" &&
+      first.currentPeriodEnd === "2026-06-23T00:00:00.000Z" &&
       second.duplicate === true &&
       db.store.has("players/firebase_uid_123/billing/current") &&
       db.store.has("players/firebase_uid_123/entitlements/current");
