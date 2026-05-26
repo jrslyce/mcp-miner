@@ -46,6 +46,12 @@
       "clientAccess": ["read", "create", "update"],
       "fields": ["ownerUid", "schemaVersion", "updatedAt", "privacyClass", "clientId", "clientVersion", "lastLocalEventId", "lastCloudEventId", "lastPulledAt", "lastPushedAt", "conflictState"]
     },
+    "players/{uid}/syncDevices/{deviceId}": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true,
+      "fields": ["ownerUid", "deviceId", "deviceName", "status", "privacyClass", "scopes", "createdAt", "updatedAt", "lastUsedAt", "revokedAt", "linkSessionId"]
+    },
     "players/{uid}/rewardEvents/{eventId}": {
       "owner": "uid",
       "clientAccess": ["read", "create"],

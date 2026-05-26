@@ -8,18 +8,115 @@ const {
   prepareSyncBatch,
   reduceCloudState
 } = require("./sync");
+const {
+  DEVICE_TOKEN_PREFIX,
+  deviceTokenHash,
+  newDeviceToken,
+  newLinkSession,
+  normalizeLinkCode,
+  publicLinkSession,
+  secretHash,
+  validateLinkSession
+} = require("./linking");
 
 admin.initializeApp();
 const db = admin.firestore();
 
-exports.ping = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "MCP Miner sync endpoints require Firebase Auth.");
+function dashboardUrlFromRequest(request) {
+  const requested = request.data && request.data.dashboardUrl;
+  const configured = process.env.MCP_MINER_DASHBOARD_URL;
+  return String(requested || configured || "https://mcp-miner.web.app").replace(/\/+$/g, "");
+}
+
+function bearerToken(request) {
+  const header = request.rawRequest && request.rawRequest.headers && request.rawRequest.headers.authorization;
+  const match = String(header || "").match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : null;
+}
+
+function deviceTokenFromRequest(request) {
+  const headers = request.rawRequest && request.rawRequest.headers ? request.rawRequest.headers : {};
+  const explicit = headers["x-mcp-miner-device-token"] || headers["x-mcp-miner-sync-token"];
+  if (explicit) {
+    return String(explicit).trim();
   }
+
+  const token = bearerToken(request);
+  return token && token.startsWith(DEVICE_TOKEN_PREFIX) ? token : null;
+}
+
+async function resolveLinkSessionRef(data) {
+  const sessionId = typeof data.sessionId === "string" ? data.sessionId.trim() : "";
+  if (sessionId) {
+    return db.doc(`linkSessions/${sessionId}`);
+  }
+
+  const code = normalizeLinkCode(data.code || data.linkCode);
+  if (!code) {
+    throw new HttpsError("invalid-argument", "A link session ID or code is required.");
+  }
+
+  const snapshot = await db.collection("linkSessions")
+    .where("code", "==", code)
+    .where("status", "in", ["pending", "approved"])
+    .limit(1)
+    .get();
+  if (snapshot.empty) {
+    throw new HttpsError("not-found", "Link session not found.");
+  }
+  return snapshot.docs[0].ref;
+}
+
+async function resolveSyncAuth(request) {
+  if (request.auth) {
+    return {
+      uid: request.auth.uid,
+      authType: "firebase",
+      deviceId: null,
+      tokenHash: null
+    };
+  }
+
+  const token = deviceTokenFromRequest(request);
+  if (!token || !token.startsWith(DEVICE_TOKEN_PREFIX)) {
+    throw new HttpsError("unauthenticated", "MCP Miner sync requires Firebase Auth or a linked device token.");
+  }
+
+  const hash = deviceTokenHash(token);
+  const tokenSnap = await db.doc(`deviceTokens/${hash}`).get();
+  const tokenData = tokenSnap.exists ? tokenSnap.data() : null;
+  if (!tokenData || tokenData.status !== "active" || !tokenData.uid || !tokenData.deviceId) {
+    throw new HttpsError("unauthenticated", "Linked device token is invalid or revoked.");
+  }
+
+  return {
+    uid: tokenData.uid,
+    authType: "device_token",
+    deviceId: tokenData.deviceId,
+    tokenHash: hash
+  };
+}
+
+function touchDeviceWrites(transaction, auth, now) {
+  if (!auth || auth.authType !== "device_token") {
+    return;
+  }
+  transaction.set(db.doc(`deviceTokens/${auth.tokenHash}`), {
+    lastUsedAt: now
+  }, { merge: true });
+  transaction.set(db.doc(`players/${auth.uid}/syncDevices/${auth.deviceId}`), {
+    lastUsedAt: now,
+    status: "active"
+  }, { merge: true });
+}
+
+exports.ping = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request);
 
   logger.info("mcp_miner_ping", {
     privacyClass: "abstract",
     uidPresent: true,
+    authType: auth.authType,
     emulator: process.env.FUNCTIONS_EMULATOR === "true"
   });
 
@@ -27,16 +124,14 @@ exports.ping = onCall({ region: "us-central1" }, async (request) => {
     ok: true,
     service: "mcp-miner",
     privacyClass: "abstract",
-    uid: request.auth.uid
+    authType: auth.authType,
+    uid: auth.uid
   };
 });
 
 exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "MCP Miner sync requires Firebase Auth.");
-  }
-
-  const uid = request.auth.uid;
+  const auth = await resolveSyncAuth(request);
+  const uid = auth.uid;
   const events = Array.isArray(request.data && request.data.events) ? request.data.events : [];
   const receivedAt = new Date().toISOString();
   const playerRef = db.doc(`players/${uid}`);
@@ -110,6 +205,7 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         duplicateCount: admin.firestore.FieldValue.increment(batch.duplicates.length),
         rejectedCount: admin.firestore.FieldValue.increment(batch.rejected.length)
       }, { merge: true });
+      touchDeviceWrites(transaction, auth, receivedAt);
 
       return {
         ok: true,
@@ -129,6 +225,7 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
     logger.info("mcp_miner_sync_reward_events", {
       privacyClass: "abstract",
       uidPresent: true,
+      authType: auth.authType,
       requestedCount: events.length,
       acceptedCount: result.accepted.length,
       duplicateCount: result.duplicates.length,
@@ -154,19 +251,24 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
 });
 
 exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "MCP Miner sync state requires Firebase Auth.");
-  }
-
-  const uid = request.auth.uid;
+  const auth = await resolveSyncAuth(request);
+  const uid = auth.uid;
   const [stateSnap, syncSnap] = await Promise.all([
     db.doc(`players/${uid}/gameState/current`).get(),
     db.doc(`players/${uid}/syncMetadata/default`).get()
   ]);
+  if (auth.authType === "device_token") {
+    const now = new Date().toISOString();
+    await Promise.all([
+      db.doc(`deviceTokens/${auth.tokenHash}`).set({ lastUsedAt: now }, { merge: true }),
+      db.doc(`players/${uid}/syncDevices/${auth.deviceId}`).set({ lastUsedAt: now, status: "active" }, { merge: true })
+    ]);
+  }
 
   logger.info("mcp_miner_get_sync_state", {
     privacyClass: "abstract",
     uidPresent: true,
+    authType: auth.authType,
     hasState: stateSnap.exists
   });
 
@@ -175,5 +277,206 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
     privacyClass: "abstract",
     state: stateSnap.exists ? stateSnap.data() : null,
     syncMetadata: syncSnap.exists ? syncSnap.data() : null
+  };
+});
+
+exports.createLinkSession = onCall({ region: "us-central1" }, async (request) => {
+  const now = new Date();
+  const { session, deviceSecret, linkUrl } = newLinkSession({
+    now,
+    dashboardUrl: dashboardUrlFromRequest(request),
+    deviceName: request.data && request.data.deviceName
+  });
+
+  await db.doc(`linkSessions/${session.sessionId}`).set(session);
+
+  logger.info("mcp_miner_link_session_created", {
+    privacyClass: "abstract",
+    sessionId: session.sessionId,
+    expiresAt: session.expiresAt
+  });
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    session: publicLinkSession(session),
+    linkUrl,
+    deviceSecret,
+    message: "Open the link while signed in to MCP Miner to approve this Codex device."
+  };
+});
+
+exports.approveLinkSession = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in before approving a Codex device.");
+  }
+
+  const ref = await resolveLinkSessionRef(request.data || {});
+  const uid = request.auth.uid;
+  const now = new Date().toISOString();
+  const result = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const session = snapshot.exists ? snapshot.data() : null;
+    const validation = validateLinkSession(session);
+    if (!validation.ok) {
+      throw new HttpsError(validation.reason === "not_found" ? "not-found" : "failed-precondition", `Link session ${validation.reason}.`);
+    }
+
+    const approved = {
+      ...session,
+      status: "approved",
+      approvedUid: uid,
+      approvedAt: now,
+      updatedAt: now
+    };
+    transaction.set(ref, approved, { merge: true });
+    transaction.set(db.doc(`players/${uid}`), {
+      ownerUid: uid,
+      schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
+      privacyClass: "abstract",
+      cloudSyncEnabled: true,
+      updatedAt: now
+    }, { merge: true });
+    return approved;
+  });
+
+  logger.info("mcp_miner_link_session_approved", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    sessionId: result.sessionId
+  });
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    session: publicLinkSession(result),
+    message: "Codex device approved. Return to Codex to complete linking."
+  };
+});
+
+exports.rejectLinkSession = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in before rejecting a Codex device.");
+  }
+
+  const ref = await resolveLinkSessionRef(request.data || {});
+  const now = new Date().toISOString();
+  const result = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const session = snapshot.exists ? snapshot.data() : null;
+    const validation = validateLinkSession(session);
+    if (!validation.ok && validation.reason !== "already_exchanged") {
+      throw new HttpsError(validation.reason === "not_found" ? "not-found" : "failed-precondition", `Link session ${validation.reason}.`);
+    }
+    const rejected = {
+      ...session,
+      status: "rejected",
+      rejectedUid: request.auth.uid,
+      rejectedAt: now,
+      updatedAt: now
+    };
+    transaction.set(ref, rejected, { merge: true });
+    return rejected;
+  });
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    session: publicLinkSession(result)
+  };
+});
+
+exports.exchangeLinkSession = onCall({ region: "us-central1" }, async (request) => {
+  const sessionId = request.data && request.data.sessionId;
+  const deviceSecret = request.data && request.data.deviceSecret;
+  if (!sessionId || !deviceSecret) {
+    throw new HttpsError("invalid-argument", "sessionId and deviceSecret are required.");
+  }
+
+  const ref = db.doc(`linkSessions/${String(sessionId)}`);
+  const now = new Date().toISOString();
+  const token = newDeviceToken();
+  const hash = deviceTokenHash(token);
+  const deviceId = `device_${hash.slice(0, 20)}`;
+
+  const result = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const session = snapshot.exists ? snapshot.data() : null;
+    const validation = validateLinkSession(session);
+    if (!validation.ok) {
+      throw new HttpsError(validation.reason === "not_found" ? "not-found" : "failed-precondition", `Link session ${validation.reason}.`);
+    }
+    if (session.status !== "approved" || !session.approvedUid) {
+      throw new HttpsError("failed-precondition", "Link session has not been approved yet.");
+    }
+    if (session.deviceSecretHash !== secretHash(deviceSecret)) {
+      throw new HttpsError("permission-denied", "Device secret did not match this link session.");
+    }
+
+    const uid = session.approvedUid;
+    transaction.set(db.doc(`deviceTokens/${hash}`), {
+      uid,
+      deviceId,
+      status: "active",
+      privacyClass: "abstract",
+      scopes: ["sync:read", "sync:write"],
+      createdAt: now,
+      updatedAt: now,
+      lastUsedAt: null
+    }, { merge: false });
+    transaction.set(db.doc(`players/${uid}/syncDevices/${deviceId}`), {
+      ownerUid: uid,
+      deviceId,
+      deviceName: session.deviceName || "Codex",
+      status: "active",
+      privacyClass: "abstract",
+      scopes: ["sync:read", "sync:write"],
+      createdAt: now,
+      updatedAt: now,
+      lastUsedAt: null,
+      linkSessionId: session.sessionId
+    }, { merge: false });
+    transaction.set(ref, {
+      status: "exchanged",
+      exchangedAt: now,
+      updatedAt: now,
+      deviceId
+    }, { merge: true });
+
+    return { uid, deviceId };
+  });
+
+  logger.info("mcp_miner_link_session_exchanged", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    deviceId: result.deviceId
+  });
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    uid: result.uid,
+    deviceId: result.deviceId,
+    deviceToken: token,
+    tokenType: "mcp_miner_device",
+    scopes: ["sync:read", "sync:write"],
+    message: "MCP Miner account linked. Store this device token locally; it will not be shown again."
+  };
+});
+
+exports.revokeDeviceToken = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request);
+  if (auth.authType !== "device_token") {
+    throw new HttpsError("failed-precondition", "Only linked device tokens can revoke themselves through this endpoint.");
+  }
+  const now = new Date().toISOString();
+  await Promise.all([
+    db.doc(`deviceTokens/${auth.tokenHash}`).set({ status: "revoked", updatedAt: now, revokedAt: now }, { merge: true }),
+    db.doc(`players/${auth.uid}/syncDevices/${auth.deviceId}`).set({ status: "revoked", updatedAt: now, revokedAt: now }, { merge: true })
+  ]);
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    status: "revoked"
   };
 });

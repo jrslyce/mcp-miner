@@ -40,13 +40,17 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 - `purchase_base_module`: spend Space Bucks/materials to build or repair one base module level.
 - `get_settings`: report mode, cloud-sync preference, and privacy posture.
 - `get_account_link_status`: inspect optional Firebase Auth linking state.
+- `start_account_link`: create a short-lived web approval code/URL for connecting this Codex device.
+- `complete_account_link`: exchange an approved link session for a local revocable device token.
 - `link_cloud_profile`: link local progress to a Firebase Auth UID without storing credentials.
 - `unlink_cloud_profile`: return to local-only play.
+- `disconnect_account`: remove the local device token and return to local-only play.
 - `get_reward_controls`: privacy-safe cooldown, soft-cap, dedupe, and diversity diagnostics for rewarded work.
 - `get_milestone_status`: current asteroid milestone progress and claim support status.
 - `get_catalog_summary`: counts of loaded materials, recipes, machines, asteroids, upgrades, and hazards.
 - `update_settings`: change report mode or cloud sync preference.
 - `sync_progress`: local/offline sync state, queued events, account link state, and retry/conflict metadata.
+- `get_sync_status`: same intent as `sync_progress`; use when the user asks if cloud sync is connected.
 - `sync_cloud`: push queued abstract journal events to the configured Firebase Cloud Functions sync API.
 - `claim_milestone`: disabled local stub until milestone rewards are defined.
 - `open_dashboard`: return dashboard URL.

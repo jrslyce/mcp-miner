@@ -1,0 +1,173 @@
+"use strict";
+
+const crypto = require("crypto");
+const { eventChecksum } = require("../firebase/functions/src/sync");
+
+const API_KEY = process.env.MCP_MINER_FIREBASE_API_KEY || "AIzaSyBwLEA9IdoPSeEV_PRY5zFa5WJbE5NSG4o";
+const PROJECT_ID = process.env.MCP_MINER_FIREBASE_PROJECT || "mcp-miner";
+const FUNCTIONS_ORIGIN = process.env.MCP_MINER_FUNCTIONS_ORIGIN || "https://us-central1-mcp-miner.cloudfunctions.net";
+const DASHBOARD_URL = process.env.MCP_MINER_DASHBOARD_URL || "https://mcp-miner.web.app";
+const EMAIL_LOCAL = process.env.MCP_MINER_QA_EMAIL_LOCAL || "jsteffes";
+const EMAIL_DOMAIN = process.env.MCP_MINER_QA_EMAIL_DOMAIN || "gmail.com";
+const WORDS = (process.env.MCP_MINER_QA_WORDS || "basalt,quartz,cobalt,nickel,orbit,rover,beacon,comet")
+  .split(",")
+  .map((word) => word.trim().toLowerCase())
+  .filter(Boolean);
+
+if (process.env.MCP_MINER_LIVE_QA !== "1") {
+  throw new Error("Refusing to run production QA without MCP_MINER_LIVE_QA=1.");
+}
+
+async function requestJson(url, options, expectedStatus = 200) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "content-type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : {};
+  if (response.status !== expectedStatus) {
+    throw new Error(`${options.method || "GET"} ${url} expected ${expectedStatus}, got ${response.status}: ${text}`);
+  }
+  return body;
+}
+
+function authHeaders(token) {
+  if (!token) {
+    return {};
+  }
+  return token.startsWith("mcpd_")
+    ? { "x-mcp-miner-device-token": token }
+    : { authorization: `Bearer ${token}` };
+}
+
+function randomPassword() {
+  return `${crypto.randomBytes(18).toString("base64url")}Aa1!`;
+}
+
+function qaEmail(word) {
+  return `${EMAIL_LOCAL}+${word}@${EMAIL_DOMAIN}`;
+}
+
+async function signUp(email) {
+  return requestJson(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password: randomPassword(),
+      returnSecureToken: true
+    })
+  });
+}
+
+async function callFunction(name, token, data, expectedStatus = 200) {
+  return requestJson(`${FUNCTIONS_ORIGIN}/${name}`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({ data })
+  }, expectedStatus);
+}
+
+function syncEvent(word, uid, sequence, privateFields = {}) {
+  const event = {
+    ownerUid: uid,
+    eventId: `evt_live_qa_${word}_${Date.now()}_${sequence}`,
+    eventType: "work_live_qa",
+    schemaVersion: 1,
+    sequence,
+    timestamp: new Date().toISOString(),
+    sessionId: `session_live_qa_${word}`,
+    turnId: `turn_live_qa_${word}`,
+    observedFields: {
+      score: 6.25,
+      category: "live_qa",
+      cycle: word,
+      ...privateFields
+    },
+    privacyClass: "abstract",
+    source: "codex_hook",
+    signature: "v1.live-qa"
+  };
+  event.checksum = eventChecksum(event);
+  return event;
+}
+
+async function runCycle(word, index) {
+  const email = qaEmail(word);
+  const auth = await signUp(email);
+  const link = await callFunction("createLinkSession", null, {
+    dashboardUrl: DASHBOARD_URL,
+    deviceName: `Live QA ${index + 1} ${word}`
+  });
+  await callFunction("approveLinkSession", auth.idToken, {
+    sessionId: link.result.session.sessionId,
+    code: link.result.session.code
+  });
+  const exchanged = await callFunction("exchangeLinkSession", null, {
+    sessionId: link.result.session.sessionId,
+    deviceSecret: link.result.deviceSecret
+  });
+
+  if (!exchanged.result.deviceToken || !exchanged.result.deviceToken.startsWith("mcpd_")) {
+    throw new Error(`${email} did not receive an MCP Miner device token`);
+  }
+  if (exchanged.result.uid !== auth.localId) {
+    throw new Error(`${email} exchanged UID did not match Firebase Auth UID`);
+  }
+
+  const acceptedEvent = syncEvent(word, auth.localId, 1);
+  const sync = await callFunction("syncRewardEvents", exchanged.result.deviceToken, { events: [acceptedEvent] });
+  const privateEvent = syncEvent(word, auth.localId, 2, { prompt: "must be rejected" });
+  const rejected = await callFunction("syncRewardEvents", exchanged.result.deviceToken, { events: [privateEvent] });
+  const state = await callFunction("getSyncState", exchanged.result.deviceToken, {});
+
+  if (!sync.result.accepted || sync.result.accepted[0] !== acceptedEvent.eventId) {
+    throw new Error(`${email} abstract event was not accepted`);
+  }
+  if (!rejected.result.rejected || rejected.result.rejected[0].reason !== "private_fields") {
+    throw new Error(`${email} private prompt field was not rejected`);
+  }
+  if (!state.result.state || state.result.state.eventCount < 1 || state.result.state.lastSequence < 1) {
+    throw new Error(`${email} cloud state was not reduced`);
+  }
+
+  return {
+    ok: true,
+    issueIndex: index + 1,
+    word,
+    email,
+    uid: auth.localId,
+    linkCode: link.result.session.code,
+    deviceId: exchanged.result.deviceId,
+    acceptedEventId: acceptedEvent.eventId,
+    rejectedReason: rejected.result.rejected[0].reason,
+    eventCount: state.result.state.eventCount,
+    lastSequence: state.result.state.lastSequence
+  };
+}
+
+async function main() {
+  if (WORDS.length !== 8) {
+    throw new Error(`Expected exactly 8 QA words, got ${WORDS.length}.`);
+  }
+
+  const results = [];
+  for (const [index, word] of WORDS.entries()) {
+    results.push(await runCycle(word, index));
+  }
+
+  console.log(JSON.stringify({
+    ok: true,
+    projectId: PROJECT_ID,
+    dashboardUrl: DASHBOARD_URL,
+    accountCount: results.length,
+    accounts: results
+  }, null, 2));
+}
+
+main().catch((error) => {
+  console.error(error.stack || error.message);
+  process.exit(1);
+});

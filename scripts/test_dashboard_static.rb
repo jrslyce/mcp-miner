@@ -23,7 +23,7 @@ asset = read("firebase/hosting/assets/asteroid-scan.svg")
 smoke = read("scripts/firebase_dashboard_smoke.js")
 package = JSON.parse(read("package.json"))
 
-required_panels = %w[auth sync-privacy status asteroid inventory orders upgrades store reports base]
+required_panels = %w[auth device-link sync-privacy status asteroid inventory orders upgrades store reports base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -50,6 +50,8 @@ end
 assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo mode") do
   %w[
     getAuth
+    GoogleAuthProvider
+    signInWithPopup
     signInWithEmailAndPassword
     createUserWithEmailAndPassword
     getFirestore
@@ -58,6 +60,9 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     connectFunctionsEmulator
     DEMO_DASHBOARD
     EMPTY_CLOUD_DASHBOARD
+    renderDeviceLink
+    approveLinkSession
+    rejectLinkSession
     renderStore
     getSyncState
     ensureLinkedProfile
@@ -95,7 +100,8 @@ assert("disabled dashboard buttons should use explicit readable colors instead o
 end
 
 assert("signed-in empty cloud profiles should not inherit demo progress") do
-  auth_js.include?("No synced game state yet") &&
+  auth_js.include?("Cloud profile ready") &&
+    auth_js.include?("Waiting for Codex sync") &&
     auth_js.include?("cloneEmptyCloud") &&
     auth_js.include?("hasCloudState") &&
     !auth_js.include?("Firebase profile plus demo economy preview")
@@ -104,8 +110,8 @@ end
 assert("signed-in auth transitions should clear the demo dashboard before async cloud reads finish") do
   auth_js.include?("profileStatus.textContent = \"Loading\"") &&
     auth_js.include?("setMessage(\"Loading profile.\")") &&
-    auth_js.include?("renderDashboard(cloneEmptyCloud({\n    source: \"Loading cloud state...\"\n  }))") &&
-    auth_js.index("renderDashboard(cloneEmptyCloud({\n    source: \"Loading cloud state...\"\n  }))") < auth_js.index("const result = await ensureLinkedProfile(user)")
+    auth_js.include?("renderDashboard(cloneEmptyCloud({\n    source: \"Checking cloud sync...\"\n  }))") &&
+    auth_js.index("renderDashboard(cloneEmptyCloud({\n    source: \"Checking cloud sync...\"\n  }))") < auth_js.index("const result = await ensureLinkedProfile(user)")
 end
 
 assert("signed-in empty asteroid progress should not render zero-over-zero progress") do
@@ -141,6 +147,8 @@ end
 
 assert("auth buttons should reflect signed-in and signed-out states") do
   auth_js.include?("function updateAuthControls(user)") &&
+    index.include?(%(id="google-sign-in")) &&
+    auth_js.include?("googleSignInButton.disabled = signedIn") &&
     auth_js.include?("signInButton.disabled = signedIn") &&
     auth_js.include?("createAccount.disabled = signedIn") &&
     auth_js.include?("signOutButton.disabled = !signedIn")
@@ -218,7 +226,7 @@ assert("signed-in dashboard refresh should warn when cloud reads are partial") d
     auth_js.include?("const DASHBOARD_REFRESH_PARTIAL = \"Some cloud data could not be refreshed. Showing available owner data.\"") &&
     auth_js.include?("const SYNC_API_REFRESH_PARTIAL = \"Cloud sync API did not respond. Showing available owner data.\"") &&
     auth_js.include?("function refreshWarning(reads)") &&
-    auth_js.include?("failedIndexes.includes(9)") &&
+    auth_js.include?("failedIndexes.includes(10)") &&
     auth_js.include?("if (data.refreshWarning)") &&
     auth_js.include?("setMessage(data.refreshWarning, true)") &&
     auth_js.include?("setMessage(DASHBOARD_REFRESH_SUCCESS)")

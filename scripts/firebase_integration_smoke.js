@@ -34,7 +34,12 @@ async function requestText(url, expectedStatus = 200) {
 }
 
 function authHeaders(idToken) {
-  return idToken ? { authorization: `Bearer ${idToken}` } : {};
+  if (!idToken) {
+    return {};
+  }
+  return idToken.startsWith("mcpd_")
+    ? { "x-mcp-miner-device-token": idToken }
+    : { authorization: `Bearer ${idToken}` };
 }
 
 function callableUrl(name) {
@@ -143,12 +148,33 @@ async function main() {
   }, 403);
   await getDoc(`players/${owner.localId}/profile/current`, other.idToken, 403);
 
+  const link = await callFunction("createLinkSession", null, {
+    dashboardUrl: `http://${HOSTING_HOST}`,
+    deviceName: "Integration Codex"
+  });
+  const approved = await callFunction("approveLinkSession", owner.idToken, {
+    sessionId: link.result.session.sessionId,
+    code: link.result.session.code
+  });
+  const exchanged = await callFunction("exchangeLinkSession", null, {
+    sessionId: link.result.session.sessionId,
+    deviceSecret: link.result.deviceSecret
+  });
+  if (!approved.result || approved.result.session.status !== "approved") {
+    throw new Error("device link session was not approved");
+  }
+  if (!exchanged.result || !exchanged.result.deviceToken || !exchanged.result.deviceToken.startsWith("mcpd_")) {
+    throw new Error("device link session did not return a device token");
+  }
+
   await callFunction("getSyncState", null, {}, 401);
   const acceptedEvent = syncEvent(owner.localId, { sequence: 1 });
   const sync = await callFunction("syncRewardEvents", owner.idToken, { events: [acceptedEvent] });
   const duplicate = await callFunction("syncRewardEvents", owner.idToken, { events: [acceptedEvent] });
+  const deviceEvent = syncEvent(owner.localId, { sequence: 2 });
+  const deviceSync = await callFunction("syncRewardEvents", exchanged.result.deviceToken, { events: [deviceEvent] });
   const privateEvent = syncEvent(owner.localId, {
-    sequence: 2,
+    sequence: 3,
     observedFields: {
       prompt: "private"
     }
@@ -160,7 +186,7 @@ async function main() {
 
   const indexHtml = await requestText(`http://${HOSTING_HOST}/`);
   const dashboardJs = await requestText(`http://${HOSTING_HOST}/auth.js`);
-  const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "sync-privacy"];
+  const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "device-link", "sync-privacy"];
   const missingPanels = requiredPanels.filter((panel) => !indexHtml.includes(`data-panel="${panel}"`));
   if (missingPanels.length) {
     throw new Error(`dashboard hosting response missing panels: ${missingPanels.join(", ")}`);
@@ -175,10 +201,13 @@ async function main() {
   if (!duplicate.result || duplicate.result.duplicates.length !== 1) {
     throw new Error("duplicate sync event was not idempotent");
   }
+  if (!deviceSync.result || deviceSync.result.accepted[0] !== deviceEvent.eventId) {
+    throw new Error("device-token sync event was not accepted");
+  }
   if (!rejected.result || rejected.result.rejected[0].reason !== "private_fields") {
     throw new Error("private sync event was not rejected");
   }
-  if (!state.result || !state.result.state || state.result.state.eventCount < 1) {
+  if (!state.result || !state.result.state || state.result.state.eventCount < 2) {
     throw new Error("dashboard sync state read did not include reduced state");
   }
 
@@ -191,14 +220,18 @@ async function main() {
       "owner_profile_created",
       "signed_out_profile_write_denied",
       "cross_user_profile_read_denied",
+      "device_link_session_created",
+      "device_link_session_approved",
+      "device_link_session_exchanged",
       "no_auth_sync_state_denied",
       "valid_sync_accepted",
+      "device_token_sync_accepted",
       "duplicate_sync_idempotent",
       "private_sync_rejected",
       "dashboard_state_read",
       "hosting_dashboard_served"
     ],
-    accepted: sync.result.accepted.length,
+    accepted: sync.result.accepted.length + deviceSync.result.accepted.length,
     duplicateCount: duplicate.result.duplicates.length,
     rejectedReason: rejected.result.rejected[0].reason,
     hostingPanels: requiredPanels

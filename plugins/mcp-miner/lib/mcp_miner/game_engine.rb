@@ -4,6 +4,7 @@ require "digest"
 require "fileutils"
 require "json"
 require "net/http"
+require "socket"
 require "time"
 require "uri"
 require "yaml"
@@ -13,6 +14,8 @@ module McpMiner
     STATE_DIR = File.join(Dir.home, ".mcp-miner")
     DEFAULT_STATE_PATH = File.join(STATE_DIR, "state.json")
     DEFAULT_JOURNAL_FILENAME = "journal.jsonl"
+    DEFAULT_FUNCTIONS_ORIGIN = "https://us-central1-mcp-miner.cloudfunctions.net"
+    DEFAULT_DASHBOARD_URL = "https://mcp-miner.web.app"
     CURRENT_STATE_SCHEMA_VERSION = 1
     MAX_DEDUPE_KEYS = 300
     REPORT_PREFIX = "MCP Miner:"
@@ -30,6 +33,7 @@ module McpMiner
     VALID_CLOUD_AUTH_STATUSES = %w[
       off
       unauthenticated
+      link_pending
       linked
       sync_error
     ].freeze
@@ -74,7 +78,7 @@ module McpMiner
       work_scoring: ["work_scoring.yaml", "work_events"]
     }.freeze
 
-    attr_reader :root, :state_path, :journal_path
+    attr_reader :root, :state_path, :journal_path, :auth_path
 
     def self.locate_repo_root(candidates = [])
       all_candidates = [
@@ -91,14 +95,16 @@ module McpMiner
       root
     end
 
-    def initialize(root: self.class.locate_repo_root, state_path: ENV["MCP_MINER_STATE_PATH"], journal_path: ENV["MCP_MINER_JOURNAL_PATH"])
+    def initialize(root: self.class.locate_repo_root, state_path: ENV["MCP_MINER_STATE_PATH"], journal_path: ENV["MCP_MINER_JOURNAL_PATH"], auth_path: ENV["MCP_MINER_AUTH_PATH"])
       @root = root
       @data_dir = File.join(root, "data")
       @state_path = state_path || DEFAULT_STATE_PATH
       @journal_path = journal_path || File.join(File.dirname(@state_path), DEFAULT_JOURNAL_FILENAME)
+      @auth_path = auth_path || File.join(File.dirname(@state_path), "auth.json")
       @data = load_data
       FileUtils.mkdir_p(File.dirname(@state_path))
       FileUtils.mkdir_p(File.dirname(@journal_path))
+      FileUtils.mkdir_p(File.dirname(@auth_path))
     end
 
     def state
@@ -316,7 +322,12 @@ module McpMiner
         "duplicate_event_ids" => [],
         "rejected_events" => [],
         "last_error" => nil,
-        "functions_origin" => nil
+        "functions_origin" => nil,
+        "link_session_id" => nil,
+        "link_code" => nil,
+        "link_url" => nil,
+        "link_expires_at" => nil,
+        "device_id" => nil
       }
     end
 
@@ -952,8 +963,10 @@ module McpMiner
       sync_status =
         if !current_state["cloud_sync"]
           "off"
+        elsif account_link[:status] == "link_pending"
+          "link_pending"
         elsif account_link[:status] == "linked"
-          "linked_sync_pending"
+          stored_device_token ? "linked_device_ready" : "linked_sync_pending"
         elsif account_link[:status] == "sync_error"
           "sync_error"
         else
@@ -976,7 +989,7 @@ module McpMiner
           latest_state_schema_version: CURRENT_STATE_SCHEMA_VERSION,
           last_migration: current_state["last_migration"],
           last_recovery: current_state["last_recovery"],
-          note: sync_status == "linked_sync_pending" ? "Firebase Auth is linked; run sync_cloud with a Firebase ID token to push queued abstract events." : "Cloud sync remains optional; local progression works without sign-in."
+          note: sync_status == "linked_device_ready" ? "MCP Miner account is linked with a local device token; sync_cloud can push queued abstract events." : "Cloud sync remains optional; local progression works without sign-in."
         },
         privacy: PRIVACY_NOTICE
       }
@@ -988,8 +1001,12 @@ module McpMiner
       metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
       entries = read_journal_entries
       events = build_cloud_sync_events(entries, uid || "unlinked", last_sequence: metadata["last_pushed_sequence"].to_i)
-      token = optional_string(args["id_token"]) || optional_string(ENV["MCP_MINER_FIREBASE_ID_TOKEN"])
-      functions_origin = optional_string(args["functions_origin"]) || optional_string(ENV["MCP_MINER_FIREBASE_FUNCTIONS_ORIGIN"]) || metadata["functions_origin"] || "http://127.0.0.1:5001/demo-mcp-miner/us-central1"
+      token = optional_string(args["device_token"]) ||
+              optional_string(args["id_token"]) ||
+              stored_device_token ||
+              optional_string(ENV["MCP_MINER_DEVICE_TOKEN"]) ||
+              optional_string(ENV["MCP_MINER_FIREBASE_ID_TOKEN"])
+      functions_origin = configured_functions_origin(args, metadata)
 
       if !current_state["cloud_sync"]
         update_cloud_sync_metadata("off", events, functions_origin: functions_origin)
@@ -998,6 +1015,18 @@ module McpMiner
           status: "off",
           queued_event_count: events.length,
           message: "Cloud sync is disabled; local progress remains queued only on this machine.",
+          sync: sync_progress_payload[:sync],
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      if events.empty?
+        update_cloud_sync_metadata("synced", events, functions_origin: functions_origin)
+        return {
+          ok: true,
+          status: "synced",
+          queued_event_count: 0,
+          message: "No new abstract events are waiting to sync.",
           sync: sync_progress_payload[:sync],
           privacy: PRIVACY_NOTICE
         }
@@ -1021,7 +1050,7 @@ module McpMiner
           ok: false,
           status: "auth_required",
           queued_event_count: events.length,
-          message: "Queued abstract events locally. Provide a Firebase ID token for this process to push them.",
+          message: "Queued abstract events locally. Connect your MCP Miner account or provide a device token for this process to push them.",
           sync: sync_progress_payload[:sync],
           privacy: PRIVACY_NOTICE
         }
@@ -1043,24 +1072,151 @@ module McpMiner
                  "linked"
                elsif auth["status"] == "sync_error"
                  "sync_error"
+               elsif auth["status"] == "link_pending"
+                 "link_pending"
                else
                  "unauthenticated"
                end
+      metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
       {
         account_link: {
           provider: "firebase",
           status: status,
           uid: status == "linked" || status == "sync_error" ? optional_string(auth["uid"]) : nil,
+          device_id: optional_string(metadata["device_id"]),
           linked_at: optional_string(auth["linked_at"]),
           updated_at: optional_string(auth["updated_at"]),
           last_error: status == "sync_error" ? optional_string(auth["last_error"]) : nil,
           cloud_sync_enabled: !!current_state["cloud_sync"],
-          required_credentials: "Firebase Auth only; no OpenAI credentials or API keys are used for game auth.",
-          dashboard_url: "http://localhost:3317/dashboard",
-          privacy: "Stores Firebase Auth UID and MCP Miner profile metadata only."
+          link_session: {
+            session_id: optional_string(metadata["link_session_id"]),
+            code: optional_string(metadata["link_code"]),
+            url: optional_string(metadata["link_url"]),
+            expires_at: optional_string(metadata["link_expires_at"])
+          },
+          required_credentials: "MCP Miner web sign-in plus a revocable local device token; no OpenAI credentials or API keys are used for game auth.",
+          dashboard_url: DEFAULT_DASHBOARD_URL,
+          privacy: "Stores Firebase Auth UID, device ID, and MCP Miner profile metadata in state. The device token is stored separately in the local auth file."
         },
         privacy: PRIVACY_NOTICE
       }
+    end
+
+    def start_account_link_payload(args = {})
+      metadata = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+      functions_origin = configured_functions_origin(args, metadata)
+      dashboard_url = optional_string(args["dashboard_url"]) || optional_string(ENV["MCP_MINER_DASHBOARD_URL"]) || DEFAULT_DASHBOARD_URL
+      device_name = optional_string(args["device_name"]) || "Codex on #{Socket.gethostname rescue 'local machine'}"
+      result = call_cloud_function(functions_origin, "createLinkSession", nil, {
+        dashboardUrl: dashboard_url,
+        deviceName: device_name
+      })
+      payload = result["result"].is_a?(Hash) ? result["result"] : result
+      session = payload["session"] || {}
+      device_secret = safe_string(payload["deviceSecret"])
+      raise "Link session response did not include a device secret" if device_secret.empty?
+
+      now = Time.now.utc.iso8601
+      write_auth_credentials(read_auth_credentials.merge(
+        "link_session_id" => session["sessionId"],
+        "device_secret" => device_secret,
+        "device_token" => nil,
+        "device_id" => nil,
+        "uid" => nil,
+        "updated_at" => now
+      ))
+
+      with_state do |current_state|
+        current_state["cloud_sync"] = true
+        current_state["profile"] = default_profile.merge(current_state["profile"] || {})
+        current_state["profile"]["cloud_sync"] = true
+        current_state["cloud_auth"] = default_cloud_auth.merge(
+          "status" => "link_pending",
+          "updated_at" => now,
+          "last_error" => nil
+        )
+        current_state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
+        current_state["cloud_sync_metadata"]["status"] = "link_pending"
+        current_state["cloud_sync_metadata"]["functions_origin"] = functions_origin
+        current_state["cloud_sync_metadata"]["link_session_id"] = session["sessionId"]
+        current_state["cloud_sync_metadata"]["link_code"] = session["code"]
+        current_state["cloud_sync_metadata"]["link_url"] = payload["linkUrl"]
+        current_state["cloud_sync_metadata"]["link_expires_at"] = session["expiresAt"]
+
+        {
+          ok: true,
+          status: "link_pending",
+          link: {
+            code: session["code"],
+            url: payload["linkUrl"],
+            expires_at: session["expiresAt"],
+            message: payload["message"]
+          },
+          account_link: account_link_status_payload(current_state)[:account_link],
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
+    def complete_account_link_payload(args = {})
+      credentials = read_auth_credentials
+      session_id = optional_string(args["session_id"]) || optional_string(credentials["link_session_id"])
+      device_secret = optional_string(args["device_secret"]) || optional_string(credentials["device_secret"])
+      raise "No pending link session found. Run start_account_link first." unless session_id && device_secret
+
+      metadata = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+      functions_origin = configured_functions_origin(args, metadata)
+      result = call_cloud_function(functions_origin, "exchangeLinkSession", nil, {
+        sessionId: session_id,
+        deviceSecret: device_secret
+      })
+      payload = result["result"].is_a?(Hash) ? result["result"] : result
+      uid = safe_string(payload["uid"])
+      device_id = safe_string(payload["deviceId"])
+      device_token = safe_string(payload["deviceToken"])
+      raise "Link exchange did not return a Firebase UID" if uid.empty?
+      raise "Link exchange did not return a device token" if device_token.empty?
+
+      now = Time.now.utc.iso8601
+      write_auth_credentials({
+        "provider" => "mcp_miner_device",
+        "uid" => uid,
+        "device_id" => device_id,
+        "device_token" => device_token,
+        "linked_at" => now,
+        "updated_at" => now
+      })
+
+      with_state do |current_state|
+        profile = default_profile.merge(current_state["profile"] || {})
+        profile["cloud_sync"] = true
+        current_state["profile"] = profile
+        current_state["cloud_sync"] = true
+        current_state["cloud_auth"] = default_cloud_auth.merge(
+          "status" => "linked",
+          "uid" => uid,
+          "linked_at" => now,
+          "updated_at" => now,
+          "last_error" => nil
+        )
+        current_state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
+        current_state["cloud_sync_metadata"]["status"] = "linked"
+        current_state["cloud_sync_metadata"]["functions_origin"] = functions_origin
+        current_state["cloud_sync_metadata"]["device_id"] = device_id
+        current_state["cloud_sync_metadata"]["link_session_id"] = nil
+        current_state["cloud_sync_metadata"]["link_code"] = nil
+        current_state["cloud_sync_metadata"]["link_url"] = nil
+        current_state["cloud_sync_metadata"]["link_expires_at"] = nil
+
+        {
+          ok: true,
+          status: "linked",
+          account_link: account_link_status_payload(current_state)[:account_link],
+          sync: sync_progress_payload(current_state)[:sync],
+          token_storage: "local_auth_file",
+          privacy: PRIVACY_NOTICE
+        }
+      end
     end
 
     def link_cloud_profile_payload(args)
@@ -1100,6 +1256,7 @@ module McpMiner
 
     def unlink_cloud_profile_payload(_args = {})
       now = Time.now.utc.iso8601
+      clear_auth_credentials
       with_state do |current_state|
         previous_uid = optional_string(current_state.dig("cloud_auth", "uid"))
         current_state["cloud_sync"] = false
@@ -1118,6 +1275,26 @@ module McpMiner
           privacy: PRIVACY_NOTICE
         }
       end
+    end
+
+    def disconnect_account_payload(args = {})
+      credentials = read_auth_credentials
+      token = optional_string(credentials["device_token"])
+      functions_origin = configured_functions_origin(args, state["cloud_sync_metadata"] || {})
+      revoke_status = "not_requested"
+
+      if token && args["revoke"] != false
+        begin
+          call_cloud_function(functions_origin, "revokeDeviceToken", token, {})
+          revoke_status = "revoked"
+        rescue StandardError => e
+          revoke_status = "revoke_failed: #{safe_string(e.message)[0, 120]}"
+        end
+      end
+
+      payload = unlink_cloud_profile_payload(args)
+      payload[:revoke_status] = revoke_status
+      payload
     end
 
     def reward_controls_payload(current_state = state)
@@ -1997,7 +2174,13 @@ module McpMiner
         duplicate_event_ids: Array(metadata["duplicate_event_ids"]).last(25),
         rejected_events: Array(metadata["rejected_events"]).last(25),
         last_error: optional_string(metadata["last_error"]),
-        functions_origin: optional_string(metadata["functions_origin"])
+        functions_origin: optional_string(metadata["functions_origin"]),
+        link_session_id: optional_string(metadata["link_session_id"]),
+        link_code: optional_string(metadata["link_code"]),
+        link_url: optional_string(metadata["link_url"]),
+        link_expires_at: optional_string(metadata["link_expires_at"]),
+        device_id: optional_string(metadata["device_id"]),
+        device_token_present: !!stored_device_token
       }
     end
 
@@ -2089,7 +2272,13 @@ module McpMiner
       uri = URI("#{functions_origin.sub(%r{/+$}, '')}/#{function_name}")
       request = Net::HTTP::Post.new(uri)
       request["Content-Type"] = "application/json"
-      request["Authorization"] = "Bearer #{id_token}"
+      if id_token && !id_token.empty?
+        if id_token.start_with?("mcpd_")
+          request["X-MCP-Miner-Device-Token"] = id_token
+        else
+          request["Authorization"] = "Bearer #{id_token}"
+        end
+      end
       request.body = JSON.generate({ data: payload })
 
       response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https", read_timeout: 10, open_timeout: 5) do |http|
@@ -2100,6 +2289,40 @@ module McpMiner
       raise "Cloud sync rejected: #{body.dig('error', 'message')}" if body["error"]
 
       body
+    end
+
+    def configured_functions_origin(args = {}, metadata = {})
+      optional_string(args["functions_origin"]) ||
+        optional_string(ENV["MCP_MINER_FIREBASE_FUNCTIONS_ORIGIN"]) ||
+        optional_string(metadata["functions_origin"]) ||
+        DEFAULT_FUNCTIONS_ORIGIN
+    end
+
+    def read_auth_credentials
+      return {} unless File.exist?(auth_path)
+
+      JSON.parse(File.read(auth_path))
+    rescue JSON::ParserError
+      {}
+    end
+
+    def write_auth_credentials(credentials)
+      FileUtils.mkdir_p(File.dirname(auth_path))
+      tmp_path = "#{auth_path}.tmp"
+      File.open(tmp_path, File::WRONLY | File::CREAT | File::TRUNC, 0o600) do |file|
+        file.write(JSON.pretty_generate(credentials))
+      end
+      File.rename(tmp_path, auth_path)
+      File.chmod(0o600, auth_path)
+      credentials
+    end
+
+    def clear_auth_credentials
+      File.delete(auth_path) if File.exist?(auth_path)
+    end
+
+    def stored_device_token
+      optional_string(read_auth_credentials["device_token"])
     end
 
     def build_cloud_sync_events(entries, uid, last_sequence:)

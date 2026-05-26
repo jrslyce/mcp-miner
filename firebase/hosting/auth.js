@@ -3,8 +3,10 @@ import {
   createUserWithEmailAndPassword,
   connectAuthEmulator,
   getAuth,
+  GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 import {
@@ -114,8 +116,8 @@ const DEMO_DASHBOARD = {
 };
 
 const EMPTY_CLOUD_DASHBOARD = {
-  mode: "Firebase profile",
-  source: "No synced game state yet",
+  mode: "Cloud profile ready",
+  source: "Waiting for Codex sync",
   hasCloudState: false,
   profile: {
     displayName: "Local Prospector",
@@ -174,10 +176,14 @@ const AUTH_ERROR_MESSAGES = {
   "auth/email-already-in-use": "That email already has an MCP Miner account. Try signing in.",
   "auth/invalid-credential": "Email or password did not match an MCP Miner account.",
   "auth/invalid-email": "Enter a valid email address.",
+  "auth/operation-not-allowed": "That sign-in method is not enabled for this MCP Miner project.",
+  "auth/popup-closed-by-user": "Google sign-in was closed before it finished.",
+  "auth/popup-blocked": "Allow popups for MCP Miner, then try Google sign-in again.",
   "auth/missing-email": "Enter your email address.",
   "auth/missing-password": "Enter your password.",
   "auth/network-request-failed": "Network connection failed. Try again in a moment.",
   "auth/too-many-requests": "Too many attempts. Wait a moment, then try again.",
+  "auth/unauthorized-domain": "This domain is not authorized for MCP Miner sign-in yet.",
   "auth/user-not-found": "Email or password did not match an MCP Miner account.",
   "auth/weak-password": "Use a password with at least 6 characters.",
   "auth/wrong-password": "Email or password did not match an MCP Miner account."
@@ -189,6 +195,8 @@ const SYNC_API_REFRESH_PARTIAL = "Cloud sync API did not respond. Showing availa
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
 const db = getFirestore(app);
 const functions = getFunctions(app, "us-central1");
 const localHostnames = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
@@ -204,6 +212,7 @@ if (useEmulators && !window.__MCP_MINER_EMULATORS_CONNECTED) {
 const form = document.querySelector("#auth-form");
 const email = document.querySelector("#email");
 const password = document.querySelector("#password");
+const googleSignInButton = document.querySelector("#google-sign-in");
 const signInButton = document.querySelector("#sign-in");
 const createAccount = document.querySelector("#create-account");
 const signOutButton = document.querySelector("#sign-out");
@@ -238,6 +247,17 @@ const storeBalance = document.querySelector("#store-balance");
 const storeList = document.querySelector("#store-list");
 const reportsList = document.querySelector("#reports-list");
 const baseDetail = document.querySelector("#base-detail");
+const deviceLinkPanel = document.querySelector("[data-panel=\"device-link\"]");
+const deviceLinkStatus = document.querySelector("#device-link-status");
+const deviceLinkSummary = document.querySelector("#device-link-summary");
+const deviceLinkCode = document.querySelector("#device-link-code");
+const approveDeviceLink = document.querySelector("#approve-device-link");
+const rejectDeviceLink = document.querySelector("#reject-device-link");
+const linkParams = new URLSearchParams(window.location.search);
+const pendingLink = {
+  sessionId: linkParams.get("sessionId") || "",
+  code: linkParams.get("linkCode") || linkParams.get("code") || ""
+};
 
 let currentUser = null;
 let activeDashboard = cloneDemo();
@@ -259,9 +279,70 @@ function updateAuthControls(user) {
   const signedIn = Boolean(user);
   email.disabled = signedIn;
   password.disabled = signedIn;
+  googleSignInButton.disabled = signedIn;
   signInButton.disabled = signedIn;
   createAccount.disabled = signedIn;
   signOutButton.disabled = !signedIn;
+}
+
+function hasPendingLink() {
+  return Boolean(pendingLink.sessionId || pendingLink.code);
+}
+
+function renderDeviceLink(user, status = "waiting") {
+  if (!hasPendingLink()) {
+    deviceLinkPanel.hidden = true;
+    return;
+  }
+
+  const signedIn = Boolean(user);
+  deviceLinkPanel.hidden = false;
+  deviceLinkCode.textContent = pendingLink.code || "From link";
+  approveDeviceLink.disabled = !signedIn || status === "approved" || status === "rejected";
+  rejectDeviceLink.disabled = !signedIn || status === "approved" || status === "rejected";
+
+  if (!signedIn) {
+    deviceLinkStatus.textContent = "Sign in";
+    deviceLinkSummary.textContent = "Sign in to approve this Codex device. Approval syncs only abstract MCP Miner game progress.";
+    return;
+  }
+
+  if (status === "approved") {
+    deviceLinkStatus.textContent = "Approved";
+    deviceLinkSummary.textContent = "Device approved. Return to Codex and run complete_account_link.";
+    return;
+  }
+
+  if (status === "rejected") {
+    deviceLinkStatus.textContent = "Rejected";
+    deviceLinkSummary.textContent = "Device link rejected. Codex will not receive a sync token.";
+    return;
+  }
+
+  deviceLinkStatus.textContent = "Ready";
+  deviceLinkSummary.textContent = "Approve this Codex device to sync Chonks, inventory, orders, upgrades, and abstract event counts. Prompts, code, commands, paths, repo names, terminal output, browser content, OpenAI account data, and transcripts are not synced.";
+}
+
+async function submitDeviceLink(action) {
+  if (!currentUser || !hasPendingLink()) {
+    renderDeviceLink(currentUser);
+    return;
+  }
+
+  const callable = httpsCallable(functions, action === "approve" ? "approveLinkSession" : "rejectLinkSession");
+  approveDeviceLink.disabled = true;
+  rejectDeviceLink.disabled = true;
+  try {
+    await callable({
+      sessionId: pendingLink.sessionId,
+      code: pendingLink.code
+    });
+    renderDeviceLink(currentUser, action === "approve" ? "approved" : "rejected");
+    setMessage(action === "approve" ? "Codex device approved." : "Codex device rejected.");
+  } catch (error) {
+    renderDeviceLink(currentUser);
+    setMessage(error.message || "Device link update failed.", true);
+  }
 }
 
 function profilePayload(user) {
@@ -465,6 +546,20 @@ function normalizeOrderRows(snapshot) {
   return rows.slice(0, 6);
 }
 
+function normalizeDeviceRows(snapshot) {
+  const rows = [];
+  snapshot.forEach((entry) => {
+    const data = entry.data();
+    rows.push({
+      deviceId: data.deviceId || data.device_id || entry.id,
+      deviceName: data.deviceName || data.device_name || "Codex device",
+      status: data.status || "linked",
+      lastUsedAt: data.lastUsedAt || data.last_used_at || null
+    });
+  });
+  return rows.filter((device) => device.status !== "revoked").slice(0, 8);
+}
+
 function normalizeUpgradeRows(data) {
   if (!data) {
     return [];
@@ -536,7 +631,7 @@ function refreshWarning(reads) {
   if (!failedIndexes.length) {
     return "";
   }
-  if (failedIndexes.includes(9)) {
+  if (failedIndexes.includes(10)) {
     return SYNC_API_REFRESH_PARTIAL;
   }
   return DASHBOARD_REFRESH_PARTIAL;
@@ -554,6 +649,7 @@ async function loadDashboardForUser(user) {
     getDoc(doc(db, "players", user.uid, "base", "current")),
     getDocs(query(collection(db, "players", user.uid, "inventory"), limit(12))),
     getDocs(query(collection(db, "players", user.uid, "orders"), limit(8))),
+    getDocs(query(collection(db, "players", user.uid, "syncDevices"), limit(8))),
     getSyncState({})
   ]);
 
@@ -564,11 +660,12 @@ async function loadDashboardForUser(user) {
   const directSyncExists = docExists(reads, 4);
   const directState = docsData(reads, 3) || {};
   const directSync = docsData(reads, 4) || {};
-  const callable = reads[9] && reads[9].status === "fulfilled" ? reads[9].value.data : {};
+  const callable = reads[10] && reads[10].status === "fulfilled" ? reads[10].value.data : {};
   const cloudState = callable.state || directState;
   const syncMetadata = callable.syncMetadata || directSync;
   const inventory = normalizeInventoryRows(queryResult(reads, 7) || { forEach() {} }, cloudState);
   const orders = normalizeOrderRows(queryResult(reads, 8) || { forEach() {} });
+  const syncDevices = normalizeDeviceRows(queryResult(reads, 9) || { forEach() {} });
   const upgrades = normalizeUpgradeRows(docsData(reads, 5));
   const base = docsData(reads, 6) || {};
   const hasCloudState = directStateExists ||
@@ -581,7 +678,7 @@ async function loadDashboardForUser(user) {
     cloudState.eventCount !== undefined ||
     cloudState.lastSequence !== undefined;
   const fallback = cloneEmptyCloud({
-    source: hasCloudState ? "Firebase owner data" : "No synced game state yet",
+    source: hasCloudState ? "Synced from Codex" : "Waiting for Codex sync",
     hasCloudState,
     refreshWarning: refreshWarning(reads)
   });
@@ -597,6 +694,7 @@ async function loadDashboardForUser(user) {
   fallback.syncMetadata = { ...fallback.syncMetadata, ...syncMetadata };
   fallback.inventory = inventory.length ? inventory : fallback.inventory;
   fallback.orders = orders.length ? orders : fallback.orders;
+  fallback.syncDevices = syncDevices;
   fallback.asteroid = cloudState.asteroidProgress || cloudState.asteroid_progress || cloudState.currentAsteroid || cloudState.current_asteroid ? normalizeAsteroid(cloudState) : fallback.asteroid;
   fallback.upgrades = upgrades.length ? upgrades : fallback.upgrades;
   fallback.store = cloudState.store || fallback.store;
@@ -616,8 +714,8 @@ function renderDashboard(data) {
   const hasCloudState = Boolean(data.hasCloudState);
   const conflictState = syncMetadata.conflictState || syncMetadata.conflict_state || (numberValue(syncMetadata.rejectedCount || syncMetadata.rejected_count) > 0 ? "needs review" : "none");
 
-  connectionPill.textContent = currentUser ? "Firebase profile" : "Demo mode";
-  dashboardMode.textContent = data.mode || (currentUser ? "Firebase profile" : "Signed-out demo");
+  connectionPill.textContent = currentUser ? "Signed in" : "Demo mode";
+  dashboardMode.textContent = data.mode || (currentUser ? "Cloud profile ready" : "Signed-out demo");
   dashboardSource.textContent = data.source || "Local demo snapshot";
   lastUpdated.textContent = timestampLabel(cloudState.updatedAt || syncMetadata.updatedAt || new Date());
   metricSpaceBucks.textContent = formatNumber(data.player && data.player.spaceBucks);
@@ -644,7 +742,7 @@ function renderDashboard(data) {
   renderUpgrades(data.upgrades || []);
   renderStore(data);
   renderReports(data.reports || []);
-  renderCloudDetail(cloudState, asteroid);
+  renderCloudDetail(cloudState, asteroid, data.syncDevices || []);
   renderBase(data.base || {});
   renderPrivacy(data);
 }
@@ -858,11 +956,12 @@ function renderReports(reports) {
   `).join("");
 }
 
-function renderCloudDetail(cloudState, asteroid) {
+function renderCloudDetail(cloudState, asteroid, syncDevices = []) {
   cloudDetail.innerHTML = `
     <div><dt>Work score</dt><dd>${formatNumber(cloudState.workScoreTotal || 0)}</dd></div>
     <div><dt>Last event</dt><dd>${escapeHtml(eventLabel(cloudState))}</dd></div>
     <div><dt>Rare find</dt><dd>${escapeHtml(asteroid.rareFindChance || "n/a")}</dd></div>
+    <div><dt>Linked devices</dt><dd>${formatNumber(syncDevices.length)}</dd></div>
   `;
 }
 
@@ -929,12 +1028,24 @@ createAccount.addEventListener("click", () => {
   handleAuth(() => createUserWithEmailAndPassword(auth, email.value, password.value));
 });
 
+googleSignInButton.addEventListener("click", () => {
+  handleAuth(() => signInWithPopup(auth, googleProvider));
+});
+
 signOutButton.addEventListener("click", () => {
   handleAuth(() => signOut(auth));
 });
 
 refreshDashboard.addEventListener("click", () => {
   refreshForCurrentUser();
+});
+
+approveDeviceLink.addEventListener("click", () => {
+  submitDeviceLink("approve");
+});
+
+rejectDeviceLink.addEventListener("click", () => {
+  submitDeviceLink("reject");
 });
 
 storeList.addEventListener("click", (event) => {
@@ -953,6 +1064,7 @@ onAuthStateChanged(auth, async (user) => {
   const previousUser = currentUser;
   currentUser = user;
   updateAuthControls(user);
+  renderDeviceLink(user);
   if (!user) {
     authStatus.textContent = "Signed out";
     authIdentity.textContent = "Not signed in";
@@ -972,13 +1084,14 @@ onAuthStateChanged(auth, async (user) => {
   profileStatus.textContent = "Loading";
   setMessage("Loading profile.");
   renderDashboard(cloneEmptyCloud({
-    source: "Loading cloud state..."
+    source: "Checking cloud sync..."
   }));
 
   try {
     const result = await ensureLinkedProfile(user);
     profileStatus.textContent = result;
     setMessage("Profile linked.");
+    renderDeviceLink(user);
   } catch (error) {
     profileStatus.textContent = "Link error";
     setMessage(error.message || "Profile link failed.", true);

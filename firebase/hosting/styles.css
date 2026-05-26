@@ -135,6 +135,14 @@ h2 {
   padding: 18px;
 }
 
+.panel[hidden] {
+  display: none;
+}
+
+.link-panel .compact-list dd {
+  font-weight: 750;
+}
+
 .panel-heading {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
@@ -229,6 +237,19 @@ button:hover:not(:disabled) {
 .button-secondary {
   background: white;
   color: var(--accent);
+}
+
+.google-auth {
+  width: 100%;
+  margin-bottom: 14px;
+  border-color: #cfd8d3;
+  background: white;
+  color: var(--ink);
+}
+
+.google-auth:hover:not(:disabled) {
+  border-color: #b4c3bd;
+  background: #f8fbf9;
 }
 
 button:disabled {

@@ -1,8 +1,38 @@
 # Cloud Functions Sync API
 
-MCP Miner cloud sync uses callable Cloud Functions so Firebase Auth is the identity boundary. The API accepts only privacy-safe abstract event summaries from linked players and reduces accepted events into server-owned cloud state.
+MCP Miner cloud sync uses callable Cloud Functions. Firebase Auth is the web identity boundary, and a browser-approved per-device sync token is the Codex plugin identity boundary. The API accepts only privacy-safe abstract event summaries from linked players and reduces accepted events into server-owned cloud state.
 
 ## Callable Functions
+
+### `createLinkSession`
+
+Called by the local Codex plugin without Firebase Auth. It creates a 10-minute pending link session
+and returns:
+
+- `session.sessionId`
+- `session.code`
+- `linkUrl`
+- `deviceSecret`
+
+The plugin stores `deviceSecret` locally until the session is approved or expires. The server stores
+only a hash of the secret.
+
+### `approveLinkSession`
+
+Called by the signed-in web portal with Firebase Auth. It binds the pending session to
+`request.auth.uid`. The portal copy must state that approving a device syncs only abstract game
+state, not Codex/OpenAI account data or private work content.
+
+### `exchangeLinkSession`
+
+Called by the local Codex plugin after approval. It validates the session ID and device secret, then
+returns a one-time-visible device sync token. The backend stores only a token hash. The plugin stores
+the token in the local auth file and uses it for future sync calls.
+
+### `revokeDeviceToken`
+
+Called by a linked plugin device with its current device token. It revokes that local device without
+deleting the player's web account or local save.
 
 ### `syncRewardEvents`
 
@@ -32,9 +62,15 @@ Input:
 }
 ```
 
+Authentication:
+
+- Firebase Auth ID token from the web app or emulator in the standard `Authorization` header; or
+- MCP Miner device token from an approved Codex link session in `x-mcp-miner-device-token`.
+
 Validation:
 
-- Firebase Auth is required; writes are stored under `/players/{uid}`.
+- An authenticated Firebase UID is required, either directly from Firebase Auth or indirectly from a linked device token.
+- Device-token sync resolves the token hash to a Firebase Auth UID; writes are still stored under `/players/{uid}`.
 - `schemaVersion` must match the current sync schema.
 - `privacyClass` must be `abstract`.
 - `source` must be `codex_hook`.

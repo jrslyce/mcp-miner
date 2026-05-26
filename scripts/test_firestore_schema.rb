@@ -27,6 +27,7 @@ expected_paths = [
   "players/{uid}/profile/current",
   "players/{uid}/settings/current",
   "players/{uid}/syncMetadata/{clientId}",
+  "players/{uid}/syncDevices/{deviceId}",
   "players/{uid}/rewardEvents/{eventId}",
   "players/{uid}/gameState/current",
   "players/{uid}/inventory/{bucket}",

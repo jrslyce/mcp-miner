@@ -44,6 +44,9 @@ assert("integration smoke should cover functions sync and private field rejectio
   %w[
     syncRewardEvents
     getSyncState
+    createLinkSession
+    approveLinkSession
+    exchangeLinkSession
     valid_sync_accepted
     duplicate_sync_idempotent
     private_sync_rejected
@@ -55,6 +58,7 @@ assert("integration smoke should cover dashboard hosting and no-auth/offline pos
   %w[
     HOSTING_HOST
     DEMO_DASHBOARD
+    device-link
     connectFunctionsEmulator
     no_auth_sync_state_denied
   ].all? { |needle| integration.include?(needle) } &&

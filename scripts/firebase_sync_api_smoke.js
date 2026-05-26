@@ -81,9 +81,11 @@ function event(overrides = {}) {
 async function callFunction(name, idToken, data, expectedOk = true) {
   return requestJson(`http://${FUNCTIONS_HOST}/${PROJECT_ID}/us-central1/${name}`, {
     method: "POST",
-    headers: {
-      authorization: `Bearer ${idToken}`
-    },
+    headers: idToken
+      ? (idToken.startsWith("mcpd_")
+        ? { "x-mcp-miner-device-token": idToken }
+        : { authorization: `Bearer ${idToken}` })
+      : {},
     body: JSON.stringify({ data })
   }, expectedOk);
 }
@@ -101,9 +103,26 @@ async function main() {
   const valid = event();
   const first = await callFunction("syncRewardEvents", auth.idToken, { events: [valid] });
   const duplicate = await callFunction("syncRewardEvents", auth.idToken, { events: [valid] });
+  const link = await callFunction("createLinkSession", null, {
+    dashboardUrl: "http://127.0.0.1:5000",
+    deviceName: "Sync API Smoke"
+  });
+  await callFunction("approveLinkSession", auth.idToken, {
+    sessionId: link.result.session.sessionId,
+    code: link.result.session.code
+  });
+  const exchanged = await callFunction("exchangeLinkSession", null, {
+    sessionId: link.result.session.sessionId,
+    deviceSecret: link.result.deviceSecret
+  });
+  const deviceEvent = event({
+    eventId: "evt_emulator_sync_device",
+    sequence: 2
+  });
+  const deviceSync = await callFunction("syncRewardEvents", exchanged.result.deviceToken, { events: [deviceEvent] });
   const privateEvent = event({
     eventId: "evt_emulator_sync_private",
-    sequence: 2,
+    sequence: 3,
     observedFields: {
       prompt: "private"
     }
@@ -118,10 +137,13 @@ async function main() {
   if (!duplicate.result || duplicate.result.duplicates.length !== 1) {
     throw new Error("duplicate sync was not idempotent");
   }
+  if (!deviceSync.result || deviceSync.result.accepted.length !== 1) {
+    throw new Error("device token sync did not accept one event");
+  }
   if (!invalid.result || invalid.result.rejected[0].reason !== "private_fields") {
     throw new Error("private sync event was not rejected");
   }
-  if (!state.result || state.result.state.eventCount !== 1) {
+  if (!state.result || state.result.state.eventCount !== 2) {
     throw new Error("sync state was not reduced");
   }
 
@@ -131,7 +153,8 @@ async function main() {
     accepted: first.result.accepted,
     duplicateCount: duplicate.result.duplicates.length,
     invalidReason: invalid.result.rejected[0].reason,
-    eventCount: state.result.state.eventCount
+    eventCount: state.result.state.eventCount,
+    deviceTokenAccepted: deviceSync.result.accepted.length
   }, null, 2));
 }
 

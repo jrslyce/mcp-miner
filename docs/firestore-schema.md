@@ -10,6 +10,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/players/{uid}/profile/current` | owner | owner read/create/update | Miner profile fields and avatar/customization references. |
 | `/players/{uid}/settings/current` | owner | owner read/create/update | Report mode, sync preference, dashboard display preference, App Check debug flag. |
 | `/players/{uid}/syncMetadata/{clientId}` | owner | owner read/create/update | Per-client cursors and conflict metadata. |
+| `/players/{uid}/syncDevices/{deviceId}` | owner | owner read only | Server-owned public metadata for linked Codex devices; device token hashes stay outside owner-readable docs. |
 | `/players/{uid}/rewardEvents/{eventId}` | owner | owner read/create only | Append-only abstract Codex work-event summaries for Functions to validate and reduce. |
 | `/players/{uid}/gameState/current` | owner | owner read only | Cloud-reduced materialized game state, including Space Bucks and schema versions. |
 | `/players/{uid}/inventory/{bucket}` | owner | owner read only | Cloud-reduced inventory buckets for dashboard reads. |

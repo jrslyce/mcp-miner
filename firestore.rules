@@ -210,6 +210,33 @@ service cloud.firestore {
         optionalMap(data, "rewardControl");
     }
 
+    function validSyncDevice(uid, data) {
+      return abstractOwned(uid, data) &&
+        data.keys().hasOnly([
+          "ownerUid",
+          "deviceId",
+          "deviceName",
+          "status",
+          "privacyClass",
+          "scopes",
+          "createdAt",
+          "updatedAt",
+          "lastUsedAt",
+          "revokedAt",
+          "linkSessionId"
+        ]) &&
+        data.keys().hasAll(["ownerUid", "deviceId", "status", "privacyClass"]) &&
+        optionalString(data, "deviceId") &&
+        optionalString(data, "deviceName") &&
+        optionalString(data, "status") &&
+        optionalList(data, "scopes") &&
+        timestampLike(data, "createdAt") &&
+        timestampLike(data, "updatedAt") &&
+        timestampLike(data, "lastUsedAt") &&
+        timestampLike(data, "revokedAt") &&
+        optionalString(data, "linkSessionId");
+    }
+
     match /_emulatorSmoke/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
@@ -244,6 +271,11 @@ service cloud.firestore {
         allow create, update: if isOwner(uid) &&
           validSyncMetadata(uid, request.resource.data);
         allow delete: if false;
+      }
+
+      match /syncDevices/{deviceId} {
+        allow read: if isOwner(uid);
+        allow create, update, delete: if false;
       }
 
       match /rewardEvents/{eventId} {

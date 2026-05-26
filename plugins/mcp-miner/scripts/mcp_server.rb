@@ -253,6 +253,36 @@ class McpMinerServer
         inputSchema: object_schema({})
       },
       {
+        name: "start_account_link",
+        description: "Start a privacy-safe MCP Miner web account link session and return a short-lived approval URL/code.",
+        inputSchema: object_schema({
+          functions_origin: {
+            type: "string"
+          },
+          dashboard_url: {
+            type: "string"
+          },
+          device_name: {
+            type: "string"
+          }
+        })
+      },
+      {
+        name: "complete_account_link",
+        description: "Complete an approved MCP Miner account link session and store the local device token securely.",
+        inputSchema: object_schema({
+          session_id: {
+            type: "string"
+          },
+          device_secret: {
+            type: "string"
+          },
+          functions_origin: {
+            type: "string"
+          }
+        })
+      },
+      {
         name: "link_cloud_profile",
         description: "Link the local MCP Miner profile to a Firebase Auth UID without storing credentials.",
         inputSchema: object_schema({
@@ -268,6 +298,18 @@ class McpMinerServer
         name: "unlink_cloud_profile",
         description: "Unlink the local MCP Miner profile from Firebase Auth and keep local-only progress enabled.",
         inputSchema: object_schema({})
+      },
+      {
+        name: "disconnect_account",
+        description: "Disconnect the local MCP Miner device token and return to local-only progress.",
+        inputSchema: object_schema({
+          revoke: {
+            type: "boolean"
+          },
+          functions_origin: {
+            type: "string"
+          }
+        })
       },
       {
         name: "get_reward_controls",
@@ -303,9 +345,17 @@ class McpMinerServer
         inputSchema: object_schema({})
       },
       {
+        name: "get_sync_status",
+        description: "Alias for sync_progress; report local/offline sync state, queued event counts, and account-link status.",
+        inputSchema: object_schema({})
+      },
+      {
         name: "sync_cloud",
         description: "Push queued privacy-safe MCP Miner journal events to the configured Cloud Functions sync API.",
         inputSchema: object_schema({
+          device_token: {
+            type: "string"
+          },
           id_token: {
             type: "string"
           },
@@ -393,10 +443,16 @@ class McpMinerServer
         @engine.settings_payload
       when "get_account_link_status"
         @engine.account_link_status_payload
+      when "start_account_link"
+        @engine.start_account_link_payload(args)
+      when "complete_account_link"
+        @engine.complete_account_link_payload(args)
       when "link_cloud_profile"
         @engine.link_cloud_profile_payload(args)
       when "unlink_cloud_profile"
         @engine.unlink_cloud_profile_payload(args)
+      when "disconnect_account"
+        @engine.disconnect_account_payload(args)
       when "get_reward_controls"
         @engine.reward_controls_payload
       when "get_milestone_status"
@@ -406,6 +462,8 @@ class McpMinerServer
       when "update_settings"
         @engine.update_settings(args)
       when "sync_progress"
+        @engine.sync_progress_payload
+      when "get_sync_status"
         @engine.sync_progress_payload
       when "sync_cloud"
         @engine.sync_cloud_payload(args)
