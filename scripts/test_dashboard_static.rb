@@ -183,10 +183,13 @@ end
 assert("auth buttons should reflect signed-in and signed-out states") do
   auth_js.include?("function updateAuthControls(user)") &&
     index.include?(%(id="google-sign-in")) &&
+    index.include?(%(id="topbar-sign-out")) &&
     auth_js.include?("googleSignInButton.disabled = signedIn") &&
     auth_js.include?("signInButton.disabled = signedIn") &&
     auth_js.include?("createAccount.disabled = signedIn") &&
-    auth_js.include?("signOutButton.disabled = !signedIn")
+    auth_js.include?("signOutButton.disabled = !signedIn") &&
+    auth_js.include?("topbarSignOutButton.hidden = !signedIn") &&
+    auth_js.include?("topbarSignOutButton.disabled = !signedIn")
 end
 
 assert("password auth should require email verification before cloud sync and device linking") do

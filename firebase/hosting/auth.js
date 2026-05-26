@@ -292,6 +292,7 @@ const googleSignInButton = document.querySelector("#google-sign-in");
 const signInButton = document.querySelector("#sign-in");
 const createAccount = document.querySelector("#create-account");
 const signOutButton = document.querySelector("#sign-out");
+const topbarSignOutButton = document.querySelector("#topbar-sign-out");
 const sendVerificationEmailButton = document.querySelector("#send-verification-email");
 const themeToggle = document.querySelector("#theme-toggle");
 const themeToggleLabel = document.querySelector("#theme-toggle-label");
@@ -436,6 +437,8 @@ function updateAuthControls(user) {
   signInButton.disabled = signedIn;
   createAccount.disabled = signedIn;
   signOutButton.disabled = !signedIn;
+  topbarSignOutButton.hidden = !signedIn;
+  topbarSignOutButton.disabled = !signedIn;
   updateVerificationControls(user);
 }
 
@@ -544,6 +547,10 @@ async function createPasswordAccount() {
     updateAuthControls(credential.user);
     setMessage(EMAIL_VERIFICATION_FAILED, true);
   }
+}
+
+async function signOutCurrentUser() {
+  await signOut(auth);
 }
 
 function profilePayload(user) {
@@ -1437,7 +1444,11 @@ sendVerificationEmailButton.addEventListener("click", () => {
 });
 
 signOutButton.addEventListener("click", () => {
-  handleAuth(() => signOut(auth));
+  handleAuth(() => signOutCurrentUser());
+});
+
+topbarSignOutButton.addEventListener("click", () => {
+  handleAuth(() => signOutCurrentUser());
 });
 
 themeToggle.addEventListener("click", () => {

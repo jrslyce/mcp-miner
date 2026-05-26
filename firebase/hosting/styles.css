@@ -318,6 +318,10 @@ button:disabled {
   background: var(--button-secondary-hover);
 }
 
+.topbar-sign-out {
+  min-width: 86px;
+}
+
 .pill,
 .status-dot {
   display: inline-flex;
