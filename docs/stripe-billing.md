@@ -38,6 +38,9 @@ monthly amount and 11x annual amount.
 
 Run this only after test-mode Stripe secrets and Price IDs are configured:
 
+The broader launch gate lives in `docs/subscription-qa-matrix.md`; Stripe rows QA-003 through
+QA-007 must have evidence before production launch.
+
 - Successful card payment creates a Checkout Session and returns to `?billing=success`.
 - 3DS/authentication-required card completes the authentication flow without granting Pro before webhook projection.
 - Failed card payment returns to Checkout failure behavior and leaves entitlements Free.
