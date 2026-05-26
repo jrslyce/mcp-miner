@@ -57,6 +57,11 @@ Server-side fixed-window rate limits are intentionally above normal idle-game us
 Rate-limit state is stored in `operationalRateLimits/{operation_subjectHash}` with hashed subjects
 only. Raw IPs, emails, tokens, prompts, code, paths, and payloads are not stored.
 
+For repeated release smoke passes, keep the default eight-account live QA sweep for the first pass,
+then reduce follow-up passes with `MCP_MINER_QA_WORDS=basalt MCP_MINER_QA_EXPECTED_WORD_COUNT=1`.
+That still covers account creation, linking, sync, privacy rejection, and cleanup without weakening
+the production `createLinkSession` cap.
+
 ## Support Tooling
 
 Use `scripts/subscription_support_admin.js` for subscription support tasks. The script requires
