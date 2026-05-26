@@ -40,6 +40,10 @@ const {
   handleStripeWebhookEvent,
   verifyStripeWebhookEvent
 } = require("./stripe_webhooks");
+const {
+  backupConflict,
+  sanitizeBackupPayload
+} = require("./backups");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -191,6 +195,33 @@ function publicSyncCadence(status) {
     nextEligibleSyncAt: status.nextEligibleSyncAt || null,
     retryAfterSeconds: status.retryAfterSeconds || 0,
     canAcceptNow: status.canAcceptNow !== false
+  };
+}
+
+function requireBackupEntitlement(entitlement) {
+  if (!entitlement || !entitlement.features || entitlement.features.backupRestore !== true) {
+    throw new HttpsError("resource-exhausted", "Cloud backup and restore is a Pro benefit. Local play continues on Free.", {
+      reason: "plan_limit_backup_restore",
+      entitlement: publicEntitlement(entitlement)
+    });
+  }
+}
+
+function publicBackupMetadata(snapshot) {
+  if (!snapshot || !snapshot.exists) {
+    return null;
+  }
+  const data = snapshot.data() || {};
+  return {
+    backupId: snapshot.id,
+    schemaVersion: data.schemaVersion || 1,
+    privacyClass: "abstract",
+    createdAt: data.createdAt || null,
+    updatedAt: data.updatedAt || null,
+    sourceDeviceId: data.sourceDeviceId || null,
+    sourceUpdatedAt: data.sourceUpdatedAt || null,
+    checksum: data.checksum || null,
+    byteSize: data.byteSize || 0
   };
 }
 
@@ -552,6 +583,115 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
       lastAcceptedBatchAt: cursorSync.lastAcceptedBatchAt,
       now: entitlementNow
     }))
+  };
+});
+
+exports.getCloudBackupStatus = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request, "sync:read");
+  const now = new Date().toISOString();
+  const [entitlementSnap, backupSnap] = await Promise.all([
+    db.doc(`players/${auth.uid}/entitlements/current`).get(),
+    db.doc(`players/${auth.uid}/cloudBackups/current`).get()
+  ]);
+  const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    eligible: entitlement.features && entitlement.features.backupRestore === true,
+    entitlement: publicEntitlement(entitlement),
+    backup: publicBackupMetadata(backupSnap)
+  };
+});
+
+exports.createCloudBackup = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request, "sync:write");
+  const now = new Date().toISOString();
+  const entitlementSnap = await db.doc(`players/${auth.uid}/entitlements/current`).get();
+  const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+  requireBackupEntitlement(entitlement);
+
+  let payload;
+  try {
+    payload = sanitizeBackupPayload(request.data && request.data.backup);
+  } catch (error) {
+    throw new HttpsError("invalid-argument", error.message || "Invalid MCP Miner backup payload.");
+  }
+
+  const backupDoc = {
+    ownerUid: auth.uid,
+    schemaVersion: payload.schemaVersion,
+    privacyClass: "abstract",
+    sourceDeviceId: auth.deviceId || (request.data && request.data.deviceId) || null,
+    sourceUpdatedAt: request.data && request.data.localUpdatedAt ? String(request.data.localUpdatedAt) : now,
+    payload,
+    checksum: payload.checksum,
+    byteSize: payload.byteSize,
+    createdAt: now,
+    updatedAt: now
+  };
+  await db.doc(`players/${auth.uid}/cloudBackups/current`).set(backupDoc, { merge: true });
+  logger.info("mcp_miner_cloud_backup_created", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    authType: auth.authType,
+    byteSize: payload.byteSize
+  });
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    backup: publicBackupMetadata({ id: "current", exists: true, data: () => backupDoc })
+  };
+});
+
+exports.restoreCloudBackup = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request, "sync:read");
+  if (!request.data || request.data.confirm !== true) {
+    throw new HttpsError("failed-precondition", "Restore requires explicit confirmation.");
+  }
+  const now = new Date().toISOString();
+  const [entitlementSnap, backupSnap] = await Promise.all([
+    db.doc(`players/${auth.uid}/entitlements/current`).get(),
+    db.doc(`players/${auth.uid}/cloudBackups/current`).get()
+  ]);
+  const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+  requireBackupEntitlement(entitlement);
+  if (!backupSnap.exists) {
+    throw new HttpsError("not-found", "No MCP Miner cloud backup is available for this account.");
+  }
+  const backup = backupSnap.data() || {};
+  let restorePayload;
+  try {
+    restorePayload = sanitizeBackupPayload(backup.payload && backup.payload.sections ? backup.payload.sections : backup.payload);
+    const storedChecksum = backup.checksum || (backup.payload && backup.payload.checksum);
+    if (storedChecksum && restorePayload.checksum !== storedChecksum) {
+      throw new Error("Stored backup checksum mismatch.");
+    }
+  } catch (error) {
+    throw new HttpsError("data-loss", "Stored MCP Miner cloud backup failed safety validation.", {
+      reason: "backup_validation_failed"
+    });
+  }
+  const conflict = backupConflict({
+    localUpdatedAt: request.data.localUpdatedAt || null,
+    cloudUpdatedAt: backup.sourceUpdatedAt || backup.updatedAt || backup.createdAt,
+    sourceDeviceId: backup.sourceDeviceId || null,
+    targetDeviceId: auth.deviceId || null
+  });
+  logger.info("mcp_miner_cloud_backup_restore_requested", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    authType: auth.authType,
+    freshness: conflict.freshness,
+    deviceRelation: conflict.deviceRelation
+  });
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    backup: publicBackupMetadata(backupSnap),
+    conflict,
+    payload: restorePayload
   };
 });
 

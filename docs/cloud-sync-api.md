@@ -110,17 +110,31 @@ Reducer writes:
 
 Returns the current server-owned `gameState/current`, aggregate `syncMetadata/default`, the caller's `deviceSyncMetadata`, and the evaluated entitlement for the authenticated UID.
 
+### `getCloudBackupStatus`
+
+Returns the evaluated entitlement and current cloud backup metadata for the authenticated UID. Free users receive `eligible: false`; local play is unchanged and no local save data is uploaded by this status call.
+
+### `createCloudBackup`
+
+Creates or replaces `/players/{uid}/cloudBackups/current` for Pro-entitled users. The callable accepts only allowlisted abstract backup sections: `profile`, `progress`, `inventory`, `orders`, `upgrades`, `base`, `cosmetics`, `settings`, and `syncMetadata`.
+
+The sanitizer rejects prompt fields, code, commands, terminal output, file paths, repo names, browser/app content, transcripts, and workspace-looking values. Stored metadata includes schema version, checksum, byte size, source device ID, and source local update time.
+
+### `restoreCloudBackup`
+
+Returns the current backup payload only after `confirm: true`. Restore checks the same Pro entitlement as creation and returns conflict metadata for local-newer, cloud-newer, same-age, same-device, and cross-device cases. The server never writes a local Codex save; the plugin applies the restore only after user confirmation and preserves a rollback copy.
+
 ## Logging
 
 Cloud Logging entries include operational metadata only: privacy class, UID presence, requested event count, accepted count, duplicate count, rejected count, and error code. Logs do not include prompt text, source code, terminal output, commands, paths, repo names, browser/app content, or transcripts.
 
 ## Emulator Smoke
 
-`npm run firebase:sync:smoke` starts Auth, Firestore, and Functions emulators and covers authenticated sync, duplicate idempotency, invalid private fields, and state reduction. It requires the Firebase CLI and Java runtime because Firestore is Java-based.
+`npm run firebase:sync:smoke` starts Auth, Firestore, and Functions emulators and covers authenticated sync, duplicate idempotency, invalid private fields, and state reduction. `npm run firebase:backup:smoke` covers Pro backup/restore, Free denial, explicit restore confirmation, and private backup field rejection. Both require the Firebase CLI and Java runtime because Firestore is Java-based.
 
 ## Plugin Client
 
-The local plugin exposes `sync_cloud`, which converts local journal reward entries into the canonical abstract event format and posts them to `syncRewardEvents`.
+The local plugin exposes `sync_cloud`, which converts local journal reward entries into the canonical abstract event format and posts them to `syncRewardEvents`. It also exposes `get_backup_status`, `create_cloud_backup`, and `restore_cloud_backup` for Pro backup workflows.
 
 Local metadata records:
 
@@ -133,3 +147,5 @@ Local metadata records:
 - configured Functions origin
 
 If sync is disabled, unauthenticated, offline, or missing a Firebase ID token, local events stay queued and gameplay progress remains local. Duplicate responses are treated as success because cloud event IDs are idempotent. Rejected stale/private events set local conflict metadata and leave local rewards untouched.
+
+Backup restore requires `confirm: true`; if local progress is newer than the cloud backup, the plugin also requires `allow_overwrite: true`. A timestamped `state.json.backup-before-cloud-restore-*` file is written before applying cloud sections.
