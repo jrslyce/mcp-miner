@@ -157,6 +157,10 @@ assert("dashboard should render cosmetic preview, apply, locked, and mobile-safe
     auth_js.include?("Cosmetics are visual only and do not affect mining rewards, Space Bucks, or orders.") &&
     auth_js.include?("data-state=\"${escapeHtml(activeCosmeticPreview === item.id ? \"preview\"") &&
     auth_js.include?("data-locked=\"${item.locked ? \"true\" : \"false\"}") &&
+    auth_js.include?("cosmeticApplyAriaLabel") &&
+    auth_js.include?("Preview ${escapeHtml(itemName)}") &&
+    auth_js.include?("${itemName} applied") &&
+    auth_js.include?("${itemName} locked: ${displayNameFromId(item.lockedReason || item.availability || \"locked\")}") &&
     styles.include?(".cosmetics-list") &&
     styles.include?(".cosmetic-row") &&
     styles.include?(":root[data-cosmetic-theme=\"nebula\"]") &&
@@ -188,6 +192,13 @@ end
 assert("dashboard subscription UX should expose plan cards without Stripe internals") do
   index.include?(%(id="plan-cards")) &&
     auth_js.include?("planActionState") &&
+    auth_js.include?("billingActionLabel") &&
+    auth_js.include?("Sign in to start monthly checkout") &&
+    auth_js.include?("Sign in to start annual checkout") &&
+    auth_js.include?("Sign in to manage billing") &&
+    auth_js.include?("Current plan: ${planName}") &&
+    auth_js.include?("Sign in to choose ${planName}") &&
+    auth_js.include?(%(aria-label="${escapeHtml(action.ariaLabel)}")) &&
     auth_js.include?("Opening secure billing.") &&
     auth_js.include?("Cancellation scheduled.") &&
     auth_js.include?("Payment needs attention.") &&
