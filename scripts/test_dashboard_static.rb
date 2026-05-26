@@ -32,7 +32,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth device-link sync-privacy status asteroid asteroid-atlas inventory orders upgrades store reports base]
+required_panels = %w[auth billing device-link sync-privacy status asteroid asteroid-atlas inventory orders upgrades store reports base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -52,6 +52,10 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     store-balance
     reports-list
     sync-status
+    billing-status
+    checkout-monthly
+    checkout-annual
+    manage-billing
     privacy-list
     base-detail
   ].all? { |id| index.include?(%(id="#{id}")) }
@@ -76,6 +80,8 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     approveLinkSession
     rejectLinkSession
     renderStore
+    createCheckoutSession
+    createCustomerPortalSession
     getSyncState
     ensureLinkedProfile
     requiresEmailVerification
@@ -295,6 +301,16 @@ assert("dashboard reads should stay owner-scoped under players/{uid}") do
   auth_js.scan(/doc\(db, "players", user\.uid/).length >= 7 &&
     auth_js.include?('collection(db, "players", user.uid, "inventory")') &&
     auth_js.include?('collection(db, "players", user.uid, "orders")')
+end
+
+assert("billing panel should show annual copy and webhook-safe checkout state") do
+  index.include?("12 months for 11") &&
+    auth_js.include?("Pro unlocks only after Stripe confirms the subscription webhook.") &&
+    auth_js.include?("openBillingSession(\"createCheckoutSession\", { plan: \"pro_monthly\" })") &&
+    auth_js.include?("openBillingSession(\"createCheckoutSession\", { plan: \"pro_annual\" })") &&
+    auth_js.include?("openBillingSession(\"createCustomerPortalSession\")") &&
+    auth_js.include?("checkoutMonthly.disabled = !signedIn || verificationRequired || pro") &&
+    auth_js.include?("manageBilling.disabled = !signedIn || verificationRequired || !entitlement.providerCustomerId")
 end
 
 private_needles = %w[

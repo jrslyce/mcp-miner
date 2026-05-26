@@ -169,6 +169,15 @@ async function main() {
   privateEvent.checksum = checksum(privateEvent);
   const invalid = await callFunction("syncRewardEvents", auth.idToken, { events: [privateEvent] });
   const state = await callFunction("getSyncState", auth.idToken, {});
+  const checkoutForOtherUser = await callFunction("createCheckoutSession", auth.idToken, {
+    uid: "different_firebase_uid",
+    plan: "pro_monthly",
+    dashboardUrl: "http://127.0.0.1:5000"
+  }, false);
+  const checkoutMissingSecret = await callFunction("createCheckoutSession", auth.idToken, {
+    plan: "pro_monthly",
+    dashboardUrl: "http://127.0.0.1:5000"
+  }, false);
 
   if (!first.result || first.result.accepted.length !== 1) {
     throw new Error("valid sync did not accept one event");
@@ -194,6 +203,12 @@ async function main() {
   if (!state.result || state.result.state.eventCount !== 2) {
     throw new Error("sync state was not reduced");
   }
+  if (!checkoutForOtherUser.error || checkoutForOtherUser.error.status !== "PERMISSION_DENIED") {
+    throw new Error("checkout UID mismatch was not denied");
+  }
+  if (!checkoutMissingSecret.error || checkoutMissingSecret.error.status !== "FAILED_PRECONDITION") {
+    throw new Error("checkout without Stripe secret did not fail closed");
+  }
 
   console.log(JSON.stringify({
     ok: true,
@@ -202,7 +217,9 @@ async function main() {
     duplicateCount: duplicate.result.duplicates.length,
     invalidReason: invalid.result.rejected[0].reason,
     eventCount: state.result.state.eventCount,
-    deviceTokenAccepted: deviceSync.result.accepted.length
+    deviceTokenAccepted: deviceSync.result.accepted.length,
+    billingUidMismatch: checkoutForOtherUser.error.status,
+    billingMissingSecret: checkoutMissingSecret.error.status
   }, null, 2));
 }
 

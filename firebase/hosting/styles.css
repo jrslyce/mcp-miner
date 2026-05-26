@@ -298,6 +298,10 @@ button:hover:not(:disabled) {
   margin-top: 10px;
 }
 
+.billing-actions {
+  margin-top: 14px;
+}
+
 button:disabled {
   cursor: not-allowed;
   border-color: var(--line);

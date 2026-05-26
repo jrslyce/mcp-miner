@@ -36,6 +36,22 @@ const firebaseConfig = window.MCP_MINER_FIREBASE_CONFIG || {
   appId: "1:000000000000:web:mcpminerlocal"
 };
 
+const FREE_ENTITLEMENT = {
+  plan: "free",
+  billingStatus: "free",
+  entitlementStatus: "free",
+  providerCustomerId: null,
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
+  syncCadenceSeconds: 60,
+  maxDevices: 1,
+  historyRetentionDays: 7,
+  features: {
+    nearRealTimeSync: false,
+    deviceManagement: false
+  }
+};
+
 const DEMO_DASHBOARD = {
   mode: "Signed-out demo",
   source: "Local demo snapshot",
@@ -115,7 +131,8 @@ const DEMO_DASHBOARD = {
     moduleCount: 2,
     droneLevel: 1,
     storageBonus: "1.10x"
-  }
+  },
+  entitlement: FREE_ENTITLEMENT
 };
 
 const EMPTY_CLOUD_DASHBOARD = {
@@ -173,7 +190,8 @@ const EMPTY_CLOUD_DASHBOARD = {
     moduleCount: 0,
     droneLevel: 0,
     storageBonus: "1.00x"
-  }
+  },
+  entitlement: FREE_ENTITLEMENT
 };
 
 const AUTH_ERROR_MESSAGES = {
@@ -331,6 +349,14 @@ const storeBalance = document.querySelector("#store-balance");
 const storeList = document.querySelector("#store-list");
 const reportsList = document.querySelector("#reports-list");
 const baseDetail = document.querySelector("#base-detail");
+const billingStatus = document.querySelector("#billing-status");
+const billingSummary = document.querySelector("#billing-summary");
+const billingPlan = document.querySelector("#billing-plan");
+const billingDevices = document.querySelector("#billing-devices");
+const billingSync = document.querySelector("#billing-sync");
+const checkoutMonthly = document.querySelector("#checkout-monthly");
+const checkoutAnnual = document.querySelector("#checkout-annual");
+const manageBilling = document.querySelector("#manage-billing");
 const deviceLinkPanel = document.querySelector("[data-panel=\"device-link\"]");
 const deviceLinkStatus = document.querySelector("#device-link-status");
 const deviceLinkSummary = document.querySelector("#device-link-summary");
@@ -440,6 +466,54 @@ function updateAuthControls(user) {
   topbarSignOutButton.hidden = !signedIn;
   topbarSignOutButton.disabled = !signedIn;
   updateVerificationControls(user);
+}
+
+function planLabel(plan) {
+  const labels = {
+    free: "Free",
+    pro_monthly: "Pro Monthly",
+    pro_annual: "Pro Annual"
+  };
+  return labels[plan] || displayNameFromId(plan || "free");
+}
+
+function normalizedEntitlement(entitlement) {
+  return {
+    ...FREE_ENTITLEMENT,
+    ...(entitlement || {}),
+    features: {
+      ...FREE_ENTITLEMENT.features,
+      ...((entitlement && entitlement.features) || {})
+    }
+  };
+}
+
+function billingSummaryText(entitlement) {
+  if (entitlement.entitlementStatus === "pro") {
+    const renewal = entitlement.cancelAtPeriodEnd ? "ends" : "renews";
+    const period = entitlement.currentPeriodEnd ? ` ${renewal} ${timestampLabel(entitlement.currentPeriodEnd)}` : "";
+    return `${planLabel(entitlement.plan)}${period}. Up to ${formatNumber(entitlement.maxDevices)} Codex devices with near-real-time sync.`;
+  }
+  if (entitlement.billingStatus === "checkout_pending") {
+    return "Checkout started. Pro unlocks only after Stripe confirms the subscription webhook.";
+  }
+  return "Free sync batches every minute for one Codex device.";
+}
+
+function renderBilling(rawEntitlement) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const signedIn = Boolean(currentUser);
+  const verificationRequired = requiresEmailVerification(currentUser);
+  const pro = entitlement.entitlementStatus === "pro";
+  billingStatus.textContent = pro ? "Pro" : "Free";
+  billingPlan.textContent = planLabel(entitlement.plan);
+  billingDevices.textContent = `${formatNumber(entitlement.maxDevices)} Codex`;
+  billingSync.textContent = entitlement.features.nearRealTimeSync ? "Near real time" : `${formatNumber(entitlement.syncCadenceSeconds)} sec`;
+  billingSummary.textContent = billingSummaryText(entitlement);
+  billingSummary.dataset.tone = pro ? "success" : "";
+  checkoutMonthly.disabled = !signedIn || verificationRequired || pro;
+  checkoutAnnual.disabled = !signedIn || verificationRequired || pro;
+  manageBilling.disabled = !signedIn || verificationRequired || !entitlement.providerCustomerId;
 }
 
 function hasPendingLink() {
@@ -1067,6 +1141,7 @@ async function loadDashboardForUser(user) {
   fallback.settings = { ...fallback.settings, ...settings, cloudSyncEnabled: settings.cloudSyncEnabled ?? player.cloudSyncEnabled ?? true };
   fallback.cloudState = { ...fallback.cloudState, ...cloudState };
   fallback.syncMetadata = { ...fallback.syncMetadata, ...syncMetadata };
+  fallback.entitlement = normalizedEntitlement(callable.entitlement);
   fallback.inventory = inventory.length ? inventory : fallback.inventory;
   fallback.orders = orders.length ? orders : fallback.orders;
   fallback.syncDevices = syncDevices;
@@ -1122,6 +1197,7 @@ function renderDashboard(data) {
   renderCloudDetail(cloudState, asteroid, data.syncDevices || []);
   renderBase(data.base || {});
   renderPrivacy(data);
+  renderBilling(data.entitlement);
 }
 
 function renderAsteroidArt(asteroid, progress) {
@@ -1418,6 +1494,37 @@ async function refreshForCurrentUser() {
   }
 }
 
+async function openBillingSession(callableName, payload = {}) {
+  if (!currentUser) {
+    setMessage("Sign in before managing MCP Miner Pro.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+
+  checkoutMonthly.disabled = true;
+  checkoutAnnual.disabled = true;
+  manageBilling.disabled = true;
+  try {
+    const callable = httpsCallable(functions, callableName);
+    const result = await callable({
+      ...payload,
+      uid: currentUser.uid,
+      dashboardUrl: window.location.origin
+    });
+    const url = result && result.data && result.data.url;
+    if (!url) {
+      throw new Error("Stripe did not return a billing URL.");
+    }
+    window.location.assign(url);
+  } catch (error) {
+    setMessage(error.message || "Stripe billing session failed.", true);
+    renderBilling(activeDashboard && activeDashboard.entitlement);
+  }
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!validateAuthForm()) {
@@ -1457,6 +1564,18 @@ themeToggle.addEventListener("click", () => {
 
 refreshDashboard.addEventListener("click", () => {
   refreshForCurrentUser();
+});
+
+checkoutMonthly.addEventListener("click", () => {
+  openBillingSession("createCheckoutSession", { plan: "pro_monthly" });
+});
+
+checkoutAnnual.addEventListener("click", () => {
+  openBillingSession("createCheckoutSession", { plan: "pro_annual" });
+});
+
+manageBilling.addEventListener("click", () => {
+  openBillingSession("createCustomerPortalSession");
 });
 
 approveDeviceLink.addEventListener("click", () => {

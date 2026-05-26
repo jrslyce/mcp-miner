@@ -90,6 +90,40 @@
             <p id="auth-message" class="message" role="status" aria-live="polite"></p>
           </section>
 
+          <section class="panel billing-panel" data-panel="billing" aria-labelledby="billing-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Pro sync</p>
+                <h2 id="billing-title">Subscription</h2>
+              </div>
+              <span id="billing-status" class="pill">Free</span>
+            </div>
+            <p id="billing-summary" class="message">Free sync batches every minute for one Codex device.</p>
+            <dl class="compact-list">
+              <div>
+                <dt>Plan</dt>
+                <dd id="billing-plan">Free</dd>
+              </div>
+              <div>
+                <dt>Devices</dt>
+                <dd id="billing-devices">1 Codex</dd>
+              </div>
+              <div>
+                <dt>Sync</dt>
+                <dd id="billing-sync">60 sec</dd>
+              </div>
+              <div>
+                <dt>Annual</dt>
+                <dd>12 months for 11</dd>
+              </div>
+            </dl>
+            <div class="actions billing-actions">
+              <button id="checkout-monthly" type="button">Monthly</button>
+              <button id="checkout-annual" type="button" class="button-secondary">Annual</button>
+              <button id="manage-billing" type="button" class="button-secondary">Manage</button>
+            </div>
+          </section>
+
           <section class="panel link-panel" data-panel="device-link" aria-labelledby="device-link-title" hidden>
             <div class="panel-heading">
               <div>

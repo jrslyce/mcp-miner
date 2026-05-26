@@ -3,6 +3,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
+const { FieldValue } = require("firebase-admin/firestore");
 const {
   CURRENT_SYNC_SCHEMA_VERSION,
   prepareSyncBatch,
@@ -24,6 +25,13 @@ const {
 const {
   evaluateEntitlement
 } = require("./entitlements");
+const {
+  assertUidMatchesRequest,
+  createCheckoutSession,
+  createCustomerPortalSession,
+  createStripeClient,
+  stripeCustomerIdFromBilling
+} = require("./billing");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -71,6 +79,21 @@ function requireVerifiedFirebaseAuth(request) {
   if (requiresVerifiedPasswordEmail(request)) {
     throw new HttpsError("permission-denied", "Verify your email before using MCP Miner cloud sync.");
   }
+}
+
+function rethrowBillingError(error) {
+  if (error instanceof HttpsError) {
+    throw error;
+  }
+  const code = typeof error.code === "string" ? error.code : "internal";
+  const allowed = new Set([
+    "invalid-argument",
+    "failed-precondition",
+    "permission-denied",
+    "unauthenticated",
+    "internal"
+  ]);
+  throw new HttpsError(allowed.has(code) ? code : "internal", error.message || "Stripe billing failed.");
 }
 
 async function resolveLinkSessionRef(data) {
@@ -238,9 +261,9 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         updatedAt: receivedAt,
         lastCloudEventId: reducedState.lastEventId || sync.lastCloudEventId || null,
         lastSequence: Math.max(Number(sync.lastSequence || 0), Number(reducedState.lastSequence || 0), Number(batch.lastSequence || 0)),
-        acceptedCount: admin.firestore.FieldValue.increment(batch.accepted.length),
-        duplicateCount: admin.firestore.FieldValue.increment(batch.duplicates.length),
-        rejectedCount: admin.firestore.FieldValue.increment(batch.rejected.length)
+        acceptedCount: FieldValue.increment(batch.accepted.length),
+        duplicateCount: FieldValue.increment(batch.duplicates.length),
+        rejectedCount: FieldValue.increment(batch.rejected.length)
       }, { merge: true });
       touchDeviceWrites(transaction, auth, receivedAt);
 
@@ -319,6 +342,92 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
     syncMetadata: syncSnap.exists ? syncSnap.data() : null,
     entitlement
   };
+});
+
+exports.createCheckoutSession = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in before starting MCP Miner Pro checkout.");
+  }
+  requireVerifiedFirebaseAuth(request);
+  const uid = request.auth.uid;
+  const data = request.data || {};
+
+  try {
+    assertUidMatchesRequest(data, uid);
+    const dashboardUrl = dashboardUrlFromRequest(request);
+    const now = new Date().toISOString();
+    const stripe = createStripeClient();
+    const billingRef = db.doc(`players/${uid}/billing/current`);
+    const entitlementRef = db.doc(`players/${uid}/entitlements/current`);
+    const [billingSnap, entitlementSnap] = await Promise.all([
+      billingRef.get(),
+      entitlementRef.get()
+    ]);
+    const result = await createCheckoutSession(stripe, {
+      uid,
+      email: request.auth.token && request.auth.token.email,
+      plan: data.plan,
+      dashboardUrl,
+      billing: billingSnap.exists ? billingSnap.data() : null,
+      entitlement: entitlementSnap.exists ? entitlementSnap.data() : null,
+      env: process.env,
+      now
+    });
+    if (result.pendingBilling) {
+      await billingRef.set(result.pendingBilling, { merge: true });
+    }
+
+    logger.info("mcp_miner_stripe_checkout_session", {
+      privacyClass: "abstract",
+      uidPresent: true,
+      destination: result.destination,
+      plan: result.plan || "manage"
+    });
+
+    return {
+      ok: true,
+      privacyClass: "abstract",
+      destination: result.destination,
+      plan: result.plan || null,
+      sessionId: result.sessionId || null,
+      url: result.url
+    };
+  } catch (error) {
+    rethrowBillingError(error);
+  }
+});
+
+exports.createCustomerPortalSession = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in before managing MCP Miner Pro billing.");
+  }
+  requireVerifiedFirebaseAuth(request);
+  const uid = request.auth.uid;
+  const data = request.data || {};
+
+  try {
+    assertUidMatchesRequest(data, uid);
+    const dashboardUrl = dashboardUrlFromRequest(request);
+    const stripe = createStripeClient();
+    const billingSnap = await db.doc(`players/${uid}/billing/current`).get();
+    const customerId = stripeCustomerIdFromBilling(billingSnap.exists ? billingSnap.data() : null);
+    const result = await createCustomerPortalSession(stripe, { customerId, dashboardUrl });
+
+    logger.info("mcp_miner_stripe_customer_portal_session", {
+      privacyClass: "abstract",
+      uidPresent: true
+    });
+
+    return {
+      ok: true,
+      privacyClass: "abstract",
+      destination: "portal",
+      sessionId: result.sessionId || null,
+      url: result.url
+    };
+  } catch (error) {
+    rethrowBillingError(error);
+  }
 });
 
 exports.createLinkSession = onCall({ region: "us-central1" }, async (request) => {
