@@ -3,11 +3,14 @@
 const assert = require("assert");
 const {
   CURRENT_SYNC_SCHEMA_VERSION,
+  CURRENT_RECEIPT_SCHEMA_VERSION,
   eventChecksum,
   hasPrivateKeys,
   prepareSyncBatch,
   reduceCloudState,
-  validateRewardEvent
+  scoreForReceipt,
+  validateRewardEvent,
+  validateSyncReceipt
 } = require("../firebase/functions/src/sync");
 
 let checks = 0;
@@ -45,11 +48,56 @@ function event(overrides = {}) {
   return next;
 }
 
+function receipt(overrides = {}) {
+  const base = {
+    ownerUid: "firebase_uid_123",
+    eventId: "evt_receipt_1",
+    eventType: "work_apply_patch",
+    schemaVersion: CURRENT_RECEIPT_SCHEMA_VERSION,
+    receiptType: "abstract_work",
+    sequence: 1,
+    timestamp: "2026-05-24T00:00:00Z",
+    turnId: "turn_sync",
+    observedFields: {
+      scoreHint: 8.5,
+      category: "coding",
+      rewardControlReasons: []
+    },
+    privacyClass: "abstract",
+    source: "codex_hook",
+    signature: "v2.local-placeholder"
+  };
+  const next = {
+    ...base,
+    ...overrides,
+    observedFields: {
+      ...base.observedFields,
+      ...(overrides.observedFields || {})
+    }
+  };
+  next.checksum = eventChecksum(next);
+  return next;
+}
+
 const valid = event();
+const validReceipt = receipt();
 
 check("valid reward events should pass privacy and checksum validation", () => {
   validateRewardEvent(valid, "firebase_uid_123");
   return true;
+});
+
+check("valid v2 sync receipts should pass privacy and checksum validation", () => {
+  validateSyncReceipt(validReceipt, "firebase_uid_123");
+  return true;
+});
+
+check("v2 receipt score should be calculated server-side from bounded hints", () => {
+  const inflated = receipt({
+    eventId: "evt_receipt_inflated",
+    observedFields: { scoreHint: 999 }
+  });
+  return scoreForReceipt(inflated) === 30;
 });
 
 check("private fields should be detected recursively", () => {
@@ -67,6 +115,39 @@ check("valid sync batches should accept new monotonic events", () => {
     batch.duplicates.length === 0 &&
     batch.rejected.length === 0 &&
     batch.lastSequence === 1;
+});
+
+check("valid v2 sync batches should store server-calculated abstract scores", () => {
+  const batch = prepareSyncBatch({
+    uid: "firebase_uid_123",
+    events: [validReceipt],
+    lastSequence: 0,
+    receivedAt: "2026-05-24T00:00:01Z"
+  });
+  const accepted = batch.accepted[0];
+  return batch.accepted.length === 1 &&
+    accepted.receiptSchemaVersion === CURRENT_RECEIPT_SCHEMA_VERSION &&
+    accepted.observedFields.score === 8.5 &&
+    accepted.observedFields.scoreSource === "server_receipt_v2" &&
+    accepted.observedFields.serverCalculated === true;
+});
+
+check("v2 receipts must not provide final client score fields", () => {
+  const fakeScore = receipt({
+    eventId: "evt_receipt_fake_score",
+    sequence: 2,
+    observedFields: {
+      score: 999
+    }
+  });
+  fakeScore.checksum = eventChecksum(fakeScore);
+  const batch = prepareSyncBatch({
+    uid: "firebase_uid_123",
+    events: [fakeScore],
+    lastSequence: 1
+  });
+  return batch.accepted.length === 0 &&
+    batch.rejected[0].reason === "client_score";
 });
 
 check("duplicate events should be idempotent", () => {
@@ -104,6 +185,24 @@ check("events with private payload fields should be rejected", () => {
     uid: "firebase_uid_123",
     events: [privateEvent],
     lastSequence: 1
+  });
+  return batch.accepted.length === 0 &&
+    batch.rejected[0].reason === "private_fields";
+});
+
+check("v2 receipts with token-shaped private fields should be rejected", () => {
+  const privateReceipt = receipt({
+    eventId: "evt_receipt_private",
+    sequence: 3,
+    observedFields: {
+      deviceToken: "do-not-sync"
+    }
+  });
+  privateReceipt.checksum = eventChecksum(privateReceipt);
+  const batch = prepareSyncBatch({
+    uid: "firebase_uid_123",
+    events: [privateReceipt],
+    lastSequence: 2
   });
   return batch.accepted.length === 0 &&
     batch.rejected[0].reason === "private_fields";

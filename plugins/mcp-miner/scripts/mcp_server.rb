@@ -361,6 +361,24 @@ class McpMinerServer
           },
           functions_origin: {
             type: "string"
+          },
+          force: {
+            type: "boolean"
+          }
+        })
+      },
+      {
+        name: "preview_sync_payload",
+        description: "Preview the exact abstract sync request body and redacted auth headers without sending it.",
+        inputSchema: object_schema({
+          device_token: {
+            type: "string"
+          },
+          id_token: {
+            type: "string"
+          },
+          functions_origin: {
+            type: "string"
           }
         })
       },
@@ -518,6 +536,8 @@ class McpMinerServer
         @engine.sync_progress_payload
       when "sync_cloud"
         @engine.sync_cloud_payload(args)
+      when "preview_sync_payload"
+        @engine.preview_sync_payload(args)
       when "get_backup_status"
         @engine.cloud_backup_status_payload(args)
       when "create_cloud_backup"

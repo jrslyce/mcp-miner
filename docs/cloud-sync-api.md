@@ -57,18 +57,19 @@ Input:
     {
       "eventId": "evt_sync_1",
       "eventType": "work_apply_patch",
-      "schemaVersion": 1,
+      "schemaVersion": 2,
+      "receiptType": "abstract_work",
       "sequence": 1,
       "timestamp": "2026-05-24T00:00:00Z",
       "turnId": "turn_sync",
       "observedFields": {
-        "changedLines": 12,
-        "filesTouchedCount": 2,
-        "score": 8.5
+        "scoreHint": 8.5,
+        "category": "implementation",
+        "rewardControlReasons": []
       },
       "privacyClass": "abstract",
       "source": "codex_hook",
-      "signature": "v1.local-placeholder",
+      "signature": "v2.local-placeholder",
       "checksum": "sha256-of-canonical-abstract-payload"
     }
   ]
@@ -90,13 +91,14 @@ Validation:
 - Sequence and cadence are checked against the caller's sync cursor: `/players/{uid}/syncMetadata/default` for Firebase Auth and `/players/{uid}/syncMetadata/{deviceId}` for linked Codex device tokens.
 - Accepted sync responses include `syncCadence` with the config-driven cadence, mode, retry seconds, and `nextEligibleSyncAt` so the plugin can show current cadence and debounce locally.
 - Plan-limit denials use structured reasons such as `plan_limit_device_count` and `plan_limit_sync_cadence`. Cadence denials include the same retry metadata so local progress can remain queued until the next eligible batch.
-- `schemaVersion` must match the current sync schema.
+- `schemaVersion` must match the current receipt schema.
+- V2 receipts must not provide final client score fields; Functions calculate score server-side from bounded abstract hints.
 - `privacyClass` must be `abstract`.
 - `source` must be `codex_hook`.
 - `sequence` must be monotonic for new event IDs.
 - `eventId` dedupes repeated submissions.
 - `checksum` must match the canonical abstract payload.
-- `signature` must use the V1 placeholder format until plugin signing is finalized.
+- `signature` must use the V2 placeholder format until plugin signing is finalized.
 - private field names such as prompts, code, terminal output, commands, paths, repo names, browser/app content, and transcripts are rejected recursively.
 
 Reducer writes:
@@ -142,7 +144,7 @@ Cloud Logging entries include operational metadata only: privacy class, UID pres
 
 ## Plugin Client
 
-The local plugin exposes `sync_cloud`, which converts local journal reward entries into the canonical abstract event format and posts them to `syncRewardEvents`. It also exposes `get_backup_status`, `create_cloud_backup`, and `restore_cloud_backup` for Pro backup workflows.
+The local plugin exposes `sync_cloud`, which converts local journal reward entries into V2 abstract receipts and posts them to `syncRewardEvents`. It also exposes `preview_sync_payload` so players can inspect the exact request body with redacted auth headers before sending. The plugin also exposes `get_backup_status`, `create_cloud_backup`, and `restore_cloud_backup` for Pro backup workflows.
 
 Local metadata records:
 

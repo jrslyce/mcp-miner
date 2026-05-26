@@ -83,7 +83,7 @@
       "clientAccess": ["read"],
       "serverOwned": true,
       "appendOnly": true,
-      "fields": ["ownerUid", "eventId", "eventType", "schemaVersion", "sequence", "timestamp", "sessionId", "turnId", "observedFields", "privacyClass", "source", "signature", "checksum", "clientCreatedAt", "receivedAt", "reducedAt", "rewardControl"]
+      "fields": ["ownerUid", "eventId", "eventType", "schemaVersion", "receiptSchemaVersion", "receiptType", "sequence", "timestamp", "sessionId", "turnId", "observedFields", "privacyClass", "source", "signature", "checksum", "clientCreatedAt", "receivedAt", "reducedAt", "rewardControl"]
     },
     "players/{uid}/gameState/current": {
       "owner": "uid",

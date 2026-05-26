@@ -98,18 +98,23 @@ Server-stored reward events are append-only and use deterministic event IDs from
   "eventId": "evt_abc123",
   "eventType": "work_apply_patch",
   "schemaVersion": 1,
+  "receiptSchemaVersion": 2,
+  "receiptType": "abstract_work",
   "sequence": 42,
   "timestamp": "2026-05-24T00:00:00Z",
   "sessionId": "session_abc",
   "turnId": "turn_def",
   "observedFields": {
-    "changedLines": 42,
-    "filesTouchedCount": 2
+    "score": 8,
+    "scoreHint": 8,
+    "category": "implementation",
+    "scoreSource": "server_receipt_v2",
+    "serverCalculated": true
   },
   "privacyClass": "abstract",
   "source": "codex_hook",
   "checksum": "sha256-of-canonical-abstract-payload",
-  "signature": "v1.local-signature-placeholder"
+  "signature": "v2.local-signature-placeholder"
 }
 ```
 

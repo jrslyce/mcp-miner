@@ -55,6 +55,14 @@ const ACTIVE_STATUSES = new Set(["active", "trialing"]);
 const PERIOD_REMAINING_STATUSES = new Set(["canceled"]);
 const GRACE_STATUSES = new Set(["past_due"]);
 
+function canonicalPlan(value) {
+  const raw = String(value || "free").toLowerCase();
+  if (raw === "pro" || raw === "paid") {
+    return "pro_monthly";
+  }
+  return Object.prototype.hasOwnProperty.call(PLAN_ENTITLEMENTS, raw) ? raw : "free";
+}
+
 function parseMillis(value) {
   if (!value) {
     return null;
@@ -148,9 +156,7 @@ function evaluateEntitlement(input, options = {}) {
     return freeEntitlement(input, "stale", now.iso);
   }
 
-  const requestedPlan = Object.prototype.hasOwnProperty.call(PLAN_ENTITLEMENTS, input.plan)
-    ? input.plan
-    : "free";
+  const requestedPlan = canonicalPlan(input.plan);
   const billingStatus = typeof input.billingStatus === "string" ? input.billingStatus : "missing";
   if (requestedPlan === "free") {
     return freeEntitlement({ ...input, billingStatus: billingStatus === "missing" ? "free" : billingStatus }, "free_plan", now.iso);
@@ -305,16 +311,54 @@ function syncCadenceDecision({ entitlement, lastAcceptedBatchAt = null, now = ne
   return { ok: true, ...status };
 }
 
+function resolveEntitlement(data = {}, options = {}) {
+  if (!data || typeof data !== "object" || Object.keys(data).length === 0) {
+    return evaluateEntitlement(null, options);
+  }
+
+  const now = normalizedNow(options.now);
+  const plan = canonicalPlan(data.plan);
+  const activePlan = plan !== "free";
+  const source = {
+    ...data,
+    plan,
+    billingStatus: data.billingStatus || (activePlan ? "active" : "free"),
+    updatedAt: data.updatedAt || now.iso
+  };
+  if (activePlan && !source.currentPeriodEnd) {
+    source.currentPeriodEnd = new Date(now.millis + (365 * 24 * 60 * 60 * 1000)).toISOString();
+  }
+  return evaluateEntitlement(source, { ...options, now: now.iso });
+}
+
+function evaluateSyncThrottle({ entitlement, syncMetadata = {}, now = new Date() }) {
+  const nowIso = isoFrom(now) || new Date().toISOString();
+  const status = syncCadenceStatus({
+    entitlement,
+    lastAcceptedBatchAt: syncMetadata.lastAcceptedBatchAt || syncMetadata.lastSuccessAt,
+    now: nowIso
+  });
+  return {
+    throttled: !status.canAcceptNow,
+    reason: status.canAcceptNow ? null : "sync_cadence",
+    nextEligibleSyncAt: status.nextEligibleSyncAt || nowIso,
+    waitSeconds: status.retryAfterSeconds
+  };
+}
+
 module.exports = {
   DEFAULT_MAX_STALENESS_MS,
   ENTITLEMENT_SCHEMA_VERSION,
   PLAN_ENTITLEMENTS,
   buildEntitlementProjection,
+  canonicalPlan,
   deviceLimitDecision,
   evaluateEntitlement,
+  evaluateSyncThrottle,
   normalizedEntitlement,
   parseMillis,
   publicEntitlement,
+  resolveEntitlement,
   sortActiveDevices,
   syncCadenceStatus,
   syncCadenceDecision

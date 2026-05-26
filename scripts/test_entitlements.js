@@ -5,11 +5,18 @@ const {
   buildEntitlementProjection,
   deviceLimitDecision,
   evaluateEntitlement,
+  evaluateSyncThrottle,
   publicEntitlement,
+  resolveEntitlement,
   sortActiveDevices,
   syncCadenceStatus,
   syncCadenceDecision
 } = require("../firebase/functions/src/entitlements");
+const {
+  CURRENT_RECEIPT_SCHEMA_VERSION,
+  eventChecksum,
+  prepareSyncBatch
+} = require("../firebase/functions/src/sync");
 
 let checks = 0;
 function check(message, fn) {
@@ -40,6 +47,37 @@ function doc(overrides = {}) {
     updatedAt: NOW,
     ...overrides
   };
+}
+
+function receipt(overrides = {}) {
+  const base = {
+    ownerUid: "firebase_uid_123",
+    eventId: "evt_entitlement_1",
+    eventType: "work_apply_patch",
+    schemaVersion: CURRENT_RECEIPT_SCHEMA_VERSION,
+    receiptType: "abstract_work",
+    sequence: 1,
+    timestamp: "2026-05-24T00:00:00Z",
+    turnId: "turn_sync",
+    observedFields: {
+      scoreHint: 8.5,
+      category: "coding",
+      rewardControlReasons: []
+    },
+    privacyClass: "abstract",
+    source: "codex_hook",
+    signature: "v2.local-placeholder"
+  };
+  const next = {
+    ...base,
+    ...overrides,
+    observedFields: {
+      ...base.observedFields,
+      ...(overrides.observedFields || {})
+    }
+  };
+  next.checksum = eventChecksum(next);
+  return next;
 }
 
 check("missing entitlement docs should default to Free", () => {
@@ -237,6 +275,43 @@ check("public entitlements should preserve already evaluated access reasons", ()
   return result.plan === "free" &&
     result.accessReason === "missing" &&
     result.maxDevices === 1;
+});
+
+check("legacy Pro alias should resolve to paid sync limits", () => {
+  const pro = resolveEntitlement({ plan: "pro" }, { now: NOW });
+  const free = resolveEntitlement({ plan: "free" }, { now: NOW });
+  return pro.entitlementStatus === "pro" &&
+    pro.syncCadenceSeconds < free.syncCadenceSeconds &&
+    pro.maxDevices === 5;
+});
+
+check("compat sync throttle helper should expose wait seconds", () => {
+  const throttle = evaluateSyncThrottle({
+    entitlement: resolveEntitlement({ plan: "free" }, { now: NOW }),
+    syncMetadata: { lastAcceptedBatchAt: "2026-05-23T23:59:30.000Z" },
+    now: new Date(NOW)
+  });
+  return throttle.throttled === true &&
+    throttle.reason === "sync_cadence" &&
+    throttle.waitSeconds === 30 &&
+    throttle.nextEligibleSyncAt === "2026-05-24T00:00:30.000Z";
+});
+
+check("Free and Pro entitlements should not change receipt reward math", () => {
+  const event = receipt();
+  const freeBatch = prepareSyncBatch({
+    uid: "firebase_uid_123",
+    events: [event],
+    lastSequence: 0,
+    receivedAt: "2026-05-24T00:00:01Z"
+  });
+  const proBatch = prepareSyncBatch({
+    uid: "firebase_uid_123",
+    events: [event],
+    lastSequence: 0,
+    receivedAt: "2026-05-24T00:00:01Z"
+  });
+  return freeBatch.accepted[0].observedFields.score === proBatch.accepted[0].observedFields.score;
 });
 
 console.log(JSON.stringify({

@@ -35,7 +35,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports base]
+required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -54,6 +54,8 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     store-list
     store-balance
     reports-list
+    raw-sync-list
+    raw-sync-count
     sync-status
     sync-cadence
     sync-next-refresh
@@ -129,6 +131,8 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     loadPlanCatalog
     renderPlanCards
     annualDiscountCopy
+    normalizeRawSyncRows
+    renderRawSyncEvents
     getSyncState
     ensureLinkedProfile
     requiresEmailVerification
@@ -458,7 +462,7 @@ assert("signed-in dashboard refresh should warn when cloud reads are partial") d
     auth_js.include?("const DASHBOARD_REFRESH_PARTIAL = \"Some cloud data could not be refreshed. Showing available owner data.\"") &&
     auth_js.include?("const SYNC_API_REFRESH_PARTIAL = \"Cloud sync API did not respond. Showing available owner data.\"") &&
     auth_js.include?("function refreshWarning(reads)") &&
-    auth_js.include?("failedIndexes.includes(10)") &&
+    auth_js.include?("failedIndexes.includes(11)") &&
     auth_js.include?("if (data.refreshWarning)") &&
     auth_js.include?("setMessage(data.refreshWarning, true)") &&
     auth_js.include?("setMessage(DASHBOARD_REFRESH_SUCCESS)")

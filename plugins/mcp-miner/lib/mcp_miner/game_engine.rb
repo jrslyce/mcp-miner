@@ -1095,6 +1095,50 @@ module McpMiner
       end
     end
 
+    def preview_sync_payload(args = {})
+      current_state = state
+      uid = optional_string(current_state.dig("cloud_auth", "uid"))
+      metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
+      entries = read_journal_entries
+      events = build_cloud_sync_events(entries, uid || "unlinked", last_sequence: metadata["last_pushed_sequence"].to_i)
+      token = cloud_auth_token(args)
+      functions_origin = configured_functions_origin(args, metadata)
+
+      {
+        ok: true,
+        status: "preview",
+        queued_event_count: events.length,
+        request: {
+          method: "POST",
+          url: "#{functions_origin.sub(%r{/+$}, '')}/syncRewardEvents",
+          headers: redacted_sync_headers(token),
+          body: {
+            data: {
+              events: events
+            }
+          }
+        },
+        redaction: {
+          auth_headers: "redacted",
+          sensitive_fields_rejected: %w[
+            prompt
+            code
+            command
+            filePath
+            repoName
+            terminalOutput
+            browserContent
+            transcript
+            token
+            apiKey
+            secret
+          ]
+        },
+        sync: sync_progress_payload(current_state)[:sync],
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
     def cloud_backup_status_payload(args = {})
       current_state = state
       account_link = account_link_status_payload(current_state)[:account_link]
@@ -2628,6 +2672,21 @@ module McpMiner
         optional_string(ENV["MCP_MINER_FIREBASE_ID_TOKEN"])
     end
 
+    def redacted_sync_headers(token)
+      headers = {
+        "Content-Type" => "application/json"
+      }
+      token = optional_string(token)
+      return headers unless token
+
+      if token.start_with?("mcpd_")
+        headers["X-MCP-Miner-Device-Token"] = "<redacted:device-token>"
+      else
+        headers["Authorization"] = "Bearer <redacted:firebase-id-token>"
+      end
+      headers
+    end
+
     def build_cloud_backup_payload(current_state)
       profile = default_profile.merge(current_state["profile"].is_a?(Hash) ? current_state["profile"] : {})
       metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
@@ -2920,7 +2979,7 @@ module McpMiner
     def cloud_sync_event_for_entry(entry, uid, sequence)
       control = entry["reward_control"].is_a?(Hash) ? entry["reward_control"] : {}
       observed_fields = {
-        "score" => entry["score"].to_f.round(2),
+        "scoreHint" => entry["score"].to_f.round(2),
         "category" => optional_string(control["category"]),
         "rewardControlReasons" => Array(control["reasons"]).map { |reason| safe_string(reason) }.reject(&:empty?)
       }.compact
@@ -2928,7 +2987,8 @@ module McpMiner
         "ownerUid" => uid,
         "eventId" => safe_string(entry["event_id"]),
         "eventType" => safe_string(entry["event_type"]),
-        "schemaVersion" => 1,
+        "schemaVersion" => 2,
+        "receiptType" => "abstract_work",
         "sequence" => sequence,
         "timestamp" => safe_string(entry["timestamp"]),
         "sessionId" => optional_string(entry["session_id"]),
@@ -2936,7 +2996,7 @@ module McpMiner
         "observedFields" => observed_fields,
         "privacyClass" => "abstract",
         "source" => "codex_hook",
-        "signature" => "v1.local.#{Digest::SHA256.hexdigest("#{uid}:#{entry['event_id']}")[0, 16]}"
+        "signature" => "v2.local.#{Digest::SHA256.hexdigest("#{uid}:#{entry['event_id']}")[0, 16]}"
       }.compact
       event["checksum"] = cloud_sync_event_checksum(event)
       event
