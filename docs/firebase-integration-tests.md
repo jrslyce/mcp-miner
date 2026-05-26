@@ -12,7 +12,7 @@ The integration smoke covers:
 - valid Cloud Functions sync.
 - duplicate sync idempotency.
 - private-field sync rejection.
-- dashboard state reads through `getSyncState`, `getDashboardAnalytics`, `getCosmeticCatalog`, and Firestore REST.
+- dashboard state reads through `getSyncState`, `getDashboardAnalytics`, `getWeeklyDigest`, `getCosmeticCatalog`, and Firestore REST.
 - Firebase Hosting serving the dashboard panels.
 
 The script uses the demo Firebase project `demo-mcp-miner` and does not require production Firebase credentials, service-account keys, or deployed Firebase resources.

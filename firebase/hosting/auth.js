@@ -113,6 +113,81 @@ const DEMO_COSMETICS = {
   }
 };
 
+const DEMO_WEEKLY_DIGEST = {
+  ok: true,
+  schemaVersion: 1,
+  privacyClass: "abstract",
+  status: "locked",
+  week: {
+    label: "Demo week",
+    startAt: null,
+    endAt: null
+  },
+  preferences: {
+    weeklyDigestEnabled: true,
+    betaFeaturesEnabled: false,
+    betaAvailable: false,
+    effectiveBetaAccess: false
+  },
+  summary: {
+    events: {
+      eventCount: 18,
+      workScore: 842,
+      categories: [
+        { category: "implementation", events: 9, score: 420 },
+        { category: "validation", events: 5, score: 260 }
+      ]
+    },
+    chonks: {
+      mined: 1840
+    },
+    spaceBucks: {
+      current: 1240
+    },
+    materials: {
+      types: 4,
+      units: 1925,
+      valueSpaceBucks: 533
+    },
+    orders: {
+      activeOrders: 2,
+      fulfillableOrders: 1,
+      rewardSpaceBucks: 530
+    },
+    sync: {
+      acceptedCount: 18,
+      duplicateCount: 0,
+      rejectedCount: 0,
+      conflictState: "none",
+      activeDevices: 1
+    },
+    milestones: {
+      eventMilestones: 0,
+      scoreMilestones: 3,
+      asteroidMilestones: 3,
+      orderReadyMilestone: true,
+      materialMilestone: true
+    },
+    base: {
+      moduleCount: 2,
+      droneLevel: 1
+    },
+    cosmetics: {
+      activeSelections: 5,
+      categories: ["base_skin", "portal_theme", "profile_badge", "seasonal_variant", "suit_trim"]
+    }
+  },
+  highlights: [
+    "18 abstract work events scored this week.",
+    "1840 Chonks are reflected in synced inventory.",
+    "1 order ready for fulfillment."
+  ],
+  delivery: {
+    inPortal: true,
+    email: "not_enabled"
+  }
+};
+
 const DEMO_DASHBOARD = {
   mode: "Signed-out demo",
   source: "Local demo snapshot",
@@ -126,7 +201,9 @@ const DEMO_DASHBOARD = {
   },
   settings: {
     reportMode: "meaningful_turns_only",
-    cloudSyncEnabled: false
+    cloudSyncEnabled: false,
+    weeklyDigestEnabled: true,
+    betaFeaturesEnabled: false
   },
   cloudState: {
     eventCount: 18,
@@ -253,6 +330,7 @@ const DEMO_DASHBOARD = {
     history: []
   },
   cosmetics: DEMO_COSMETICS,
+  weeklyDigest: DEMO_WEEKLY_DIGEST,
   entitlement: FREE_ENTITLEMENT
 };
 
@@ -270,7 +348,9 @@ const EMPTY_CLOUD_DASHBOARD = {
   },
   settings: {
     reportMode: "meaningful_turns_only",
-    cloudSyncEnabled: true
+    cloudSyncEnabled: true,
+    weeklyDigestEnabled: true,
+    betaFeaturesEnabled: false
   },
   cloudState: {
     eventCount: 0,
@@ -353,6 +433,35 @@ const EMPTY_CLOUD_DASHBOARD = {
     history: []
   },
   cosmetics: DEMO_COSMETICS,
+  weeklyDigest: {
+    ...DEMO_WEEKLY_DIGEST,
+    status: "locked",
+    highlights: [],
+    summary: {
+      ...DEMO_WEEKLY_DIGEST.summary,
+      events: {
+        eventCount: 0,
+        workScore: 0,
+        categories: []
+      },
+      chonks: {
+        mined: 0
+      },
+      spaceBucks: {
+        current: 0
+      },
+      materials: {
+        types: 0,
+        units: 0,
+        valueSpaceBucks: 0
+      },
+      orders: {
+        activeOrders: 0,
+        fulfillableOrders: 0,
+        rewardSpaceBucks: 0
+      }
+    }
+  },
   entitlement: FREE_ENTITLEMENT
 };
 
@@ -518,6 +627,12 @@ const analyticsList = document.querySelector("#analytics-list");
 const exportJson = document.querySelector("#export-json");
 const exportCsv = document.querySelector("#export-csv");
 const exportStatus = document.querySelector("#export-status");
+const weeklyDigestStatus = document.querySelector("#weekly-digest-status");
+const weeklyDigestSummary = document.querySelector("#weekly-digest-summary");
+const weeklyDigestList = document.querySelector("#weekly-digest-list");
+const weeklyDigestEnabled = document.querySelector("#weekly-digest-enabled");
+const betaFeaturesEnabled = document.querySelector("#beta-features-enabled");
+const betaAccessStatus = document.querySelector("#beta-access-status");
 const cosmeticsSummary = document.querySelector("#cosmetics-summary");
 const cosmeticsList = document.querySelector("#cosmetics-list");
 const cosmeticsStatus = document.querySelector("#cosmetics-status");
@@ -1100,7 +1215,9 @@ async function ensureLinkedProfile(user) {
     updatedAt: serverTimestamp(),
     privacyClass: "abstract",
     reportMode: "meaningful_turns_only",
-    cloudSyncEnabled: true
+    cloudSyncEnabled: true,
+    weeklyDigestEnabled: true,
+    betaFeaturesEnabled: false
   }, { merge: true });
 
   return existing.exists() ? "Loaded" : "Created";
@@ -1527,6 +1644,7 @@ function refreshWarning(reads) {
 async function loadDashboardForUser(user) {
   const getSyncState = httpsCallable(functions, "getSyncState");
   const getDashboardAnalytics = httpsCallable(functions, "getDashboardAnalytics");
+  const getWeeklyDigest = httpsCallable(functions, "getWeeklyDigest");
   const getCosmeticCatalog = httpsCallable(functions, "getCosmeticCatalog");
   const reads = await Promise.allSettled([
     getDoc(doc(db, "players", user.uid)),
@@ -1541,6 +1659,7 @@ async function loadDashboardForUser(user) {
     getDocs(query(collection(db, "players", user.uid, "syncDevices"), limit(8))),
     getSyncState({}),
     getDashboardAnalytics({}),
+    getWeeklyDigest({}),
     getCosmeticCatalog({})
   ]);
 
@@ -1553,7 +1672,8 @@ async function loadDashboardForUser(user) {
   const directSync = docsData(reads, 4) || {};
   const callable = reads[10] && reads[10].status === "fulfilled" ? reads[10].value.data : {};
   const analytics = reads[11] && reads[11].status === "fulfilled" ? reads[11].value.data : null;
-  const cosmetics = reads[12] && reads[12].status === "fulfilled" ? reads[12].value.data.cosmetics : null;
+  const weeklyDigest = reads[12] && reads[12].status === "fulfilled" ? reads[12].value.data.weeklyDigest : null;
+  const cosmetics = reads[13] && reads[13].status === "fulfilled" ? reads[13].value.data.cosmetics : null;
   const cloudState = callable.state || directState;
   const syncMetadata = callable.syncMetadata || directSync;
   const inventory = normalizeInventoryRows(queryResult(reads, 7) || { forEach() {} }, cloudState);
@@ -1596,6 +1716,7 @@ async function loadDashboardForUser(user) {
   fallback.base = { ...fallback.base, ...base };
   fallback.reports = Array.isArray(cloudState.reports) && cloudState.reports.length ? cloudState.reports.slice(0, 5) : fallback.reports;
   fallback.analytics = analytics || fallback.analytics;
+  fallback.weeklyDigest = weeklyDigest || fallback.weeklyDigest;
   fallback.cosmetics = cosmetics || fallback.cosmetics;
   return fallback;
 }
@@ -1647,6 +1768,7 @@ function renderDashboard(data) {
   renderCloudDetail(cloudState, asteroid, data.syncDevices || []);
   renderBase(data.base || {});
   renderAnalytics(data.analytics || EMPTY_CLOUD_DASHBOARD.analytics, data.entitlement);
+  renderWeeklyDigest(data.weeklyDigest || DEMO_WEEKLY_DIGEST, data.entitlement, data.settings || {});
   renderCosmetics(data.cosmetics || DEMO_COSMETICS);
   renderPrivacy(data);
   renderBilling(data.entitlement);
@@ -1947,6 +2069,66 @@ function renderAnalytics(analytics, rawEntitlement) {
       <small>${escapeHtml(detail)}</small>
     </article>
   `).join("");
+}
+
+function digestStatusLabel(status, entitlement) {
+  if (status === "ready") {
+    return "Ready";
+  }
+  if (status === "disabled") {
+    return "Disabled";
+  }
+  return normalizedEntitlement(entitlement).entitlementStatus === "pro" ? "Paused" : "Pro";
+}
+
+function topDigestCategory(categories = []) {
+  if (!Array.isArray(categories) || !categories.length) {
+    return "No categories";
+  }
+  const top = categories[0];
+  return `${displayNameFromId(top.category)} (${formatNumber(top.events)})`;
+}
+
+function renderWeeklyDigest(digest, rawEntitlement, settings = {}) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const summary = (digest && digest.summary) || DEMO_WEEKLY_DIGEST.summary;
+  const events = summary.events || {};
+  const chonks = summary.chonks || {};
+  const spaceBucks = summary.spaceBucks || {};
+  const materials = summary.materials || {};
+  const orders = summary.orders || {};
+  const sync = summary.sync || {};
+  const milestones = summary.milestones || {};
+  const preferences = (digest && digest.preferences) || {};
+  const pro = entitlement.entitlementStatus === "pro";
+  weeklyDigestStatus.textContent = digestStatusLabel(digest && digest.status, entitlement);
+  weeklyDigestStatus.dataset.tone = digest && digest.status === "ready" ? "success" : "";
+  weeklyDigestEnabled.checked = preferences.weeklyDigestEnabled !== false && settings.weeklyDigestEnabled !== false;
+  weeklyDigestEnabled.disabled = !currentUser;
+  betaFeaturesEnabled.checked = preferences.betaFeaturesEnabled === true || settings.betaFeaturesEnabled === true;
+  betaFeaturesEnabled.disabled = !currentUser || !pro || preferences.betaAvailable !== true;
+  betaAccessStatus.textContent = preferences.effectiveBetaAccess ? "Beta on" : (preferences.betaAvailable ? "Beta off" : "Beta locked");
+
+  weeklyDigestSummary.innerHTML = [
+    ["Week", digest && digest.week ? digest.week.label : "Demo week", digest && digest.delivery && digest.delivery.inPortal ? "Portal" : "Portal only"],
+    ["Work", `${formatNumber(events.eventCount)} events`, `${formatNumber(events.workScore)} score`],
+    ["Chonks", formatNumber(chonks.mined), `${formatNumber(materials.types)} material types`],
+    ["Space Bucks", formatNumber(spaceBucks.current), `${formatNumber(materials.valueSpaceBucks)} material value`],
+    ["Orders", `${formatNumber(orders.fulfillableOrders)} / ${formatNumber(orders.activeOrders)} ready`, `${formatNumber(orders.rewardSpaceBucks)} SB queued`],
+    ["Sync", sync.conflictState === "none" ? "Clear" : displayNameFromId(sync.conflictState), `${formatNumber(sync.activeDevices)} active devices`],
+    ["Milestones", formatNumber(numberValue(milestones.eventMilestones) + numberValue(milestones.scoreMilestones) + numberValue(milestones.asteroidMilestones)), topDigestCategory(events.categories)]
+  ].map(([label, value, detail]) => `
+    <article class="digest-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </article>
+  `).join("");
+
+  const highlights = Array.isArray(digest && digest.highlights) ? digest.highlights : [];
+  weeklyDigestList.innerHTML = highlights.length
+    ? highlights.map((highlight) => `<p>${escapeHtml(highlight)}</p>`).join("")
+    : `<p class="empty-state">${pro ? "No weekly highlights yet." : "Pro unlocks the weekly portal digest."}</p>`;
 }
 
 function flattenCosmetics(cosmetics) {
@@ -2261,6 +2443,39 @@ async function requestCosmeticApply(category, cosmeticId) {
   }
 }
 
+async function updatePortalPreference(field, value) {
+  if (!currentUser) {
+    setMessage("Sign in before updating portal preferences.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+  const allowed = new Set(["weeklyDigestEnabled", "betaFeaturesEnabled"]);
+  if (!allowed.has(field)) {
+    setMessage("Portal preference is unavailable.", true);
+    return;
+  }
+
+  weeklyDigestEnabled.disabled = true;
+  betaFeaturesEnabled.disabled = true;
+  try {
+    await setDoc(doc(db, "players", currentUser.uid, "settings", "current"), {
+      ownerUid: currentUser.uid,
+      schemaVersion: 1,
+      updatedAt: serverTimestamp(),
+      privacyClass: "abstract",
+      [field]: value
+    }, { merge: true });
+    await refreshForCurrentUser({ quiet: true });
+    setMessage("Portal preference updated.");
+  } catch (error) {
+    setMessage(error.message || "Portal preference update failed.", true);
+    renderWeeklyDigest(activeDashboard.weeklyDigest || DEMO_WEEKLY_DIGEST, activeDashboard.entitlement, activeDashboard.settings || {});
+  }
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!validateAuthForm()) {
@@ -2334,6 +2549,14 @@ cosmeticsList.addEventListener("click", (event) => {
     return;
   }
   requestCosmeticApply(apply.dataset.category, apply.dataset.cosmeticId);
+});
+
+weeklyDigestEnabled.addEventListener("change", () => {
+  updatePortalPreference("weeklyDigestEnabled", weeklyDigestEnabled.checked);
+});
+
+betaFeaturesEnabled.addEventListener("change", () => {
+  updatePortalPreference("betaFeaturesEnabled", betaFeaturesEnabled.checked);
 });
 
 planCards.addEventListener("click", (event) => {

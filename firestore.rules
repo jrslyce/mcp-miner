@@ -144,7 +144,9 @@ service cloud.firestore {
           "reportMode",
           "cloudSyncEnabled",
           "dashboardTheme",
-          "appCheckDebugEnabled"
+          "appCheckDebugEnabled",
+          "weeklyDigestEnabled",
+          "betaFeaturesEnabled"
         ]) &&
         data.keys().hasAll(["ownerUid", "schemaVersion", "updatedAt", "privacyClass"]) &&
         data.schemaVersion is int &&
@@ -152,7 +154,9 @@ service cloud.firestore {
         optionalString(data, "reportMode") &&
         optionalString(data, "dashboardTheme") &&
         optionalBool(data, "cloudSyncEnabled") &&
-        optionalBool(data, "appCheckDebugEnabled");
+        optionalBool(data, "appCheckDebugEnabled") &&
+        optionalBool(data, "weeklyDigestEnabled") &&
+        optionalBool(data, "betaFeaturesEnabled");
     }
 
     function validSyncMetadata(uid, data) {

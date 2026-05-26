@@ -49,6 +49,9 @@ const {
   exportDashboardAnalytics
 } = require("./analytics");
 const {
+  buildWeeklyDigest
+} = require("./digests");
+const {
   COSMETIC_SCHEMA_VERSION,
   normalizedCosmeticState,
   publicCosmeticCatalog,
@@ -266,6 +269,19 @@ function publicCosmeticsFromSnapshots({ entitlement, profileSnap, cosmeticsSnap 
   });
 }
 
+function entitlementWithPortalPreferences(entitlement, settings = {}) {
+  const next = {
+    ...entitlement,
+    features: {
+      ...((entitlement && entitlement.features) || {})
+    }
+  };
+  if (settings && settings.betaFeaturesEnabled === false) {
+    next.features.priorityBetaAccess = false;
+  }
+  return next;
+}
+
 function snapshotDocs(snapshot) {
   return snapshot.docs.map((docSnap) => ({
     id: docSnap.id,
@@ -305,6 +321,41 @@ async function loadAnalyticsData(uid, entitlement, now) {
     orders: snapshotDocs(ordersSnap),
     deviceCount: activeDeviceCountFromSnapshot(devicesSnap),
     entitlement,
+    now
+  });
+}
+
+async function loadWeeklyDigestData(uid, entitlement, settings, now) {
+  const [
+    eventsSnap,
+    stateSnap,
+    syncSnap,
+    inventorySnap,
+    ordersSnap,
+    devicesSnap,
+    baseSnap,
+    cosmeticsSnap
+  ] = await Promise.all([
+    db.collection(`players/${uid}/rewardEvents`).orderBy("timestamp", "desc").limit(500).get(),
+    db.doc(`players/${uid}/gameState/current`).get(),
+    db.doc(`players/${uid}/syncMetadata/default`).get(),
+    db.collection(`players/${uid}/inventory`).limit(50).get(),
+    db.collection(`players/${uid}/orders`).limit(50).get(),
+    db.collection(`players/${uid}/syncDevices`).limit(50).get(),
+    db.doc(`players/${uid}/base/current`).get(),
+    db.doc(`players/${uid}/cosmetics/current`).get()
+  ]);
+  return buildWeeklyDigest({
+    events: snapshotDocs(eventsSnap),
+    state: stateSnap.exists ? stateSnap.data() : {},
+    syncMetadata: syncSnap.exists ? syncSnap.data() : {},
+    inventory: snapshotDocs(inventorySnap),
+    orders: snapshotDocs(ordersSnap),
+    deviceCount: activeDeviceCountFromSnapshot(devicesSnap),
+    base: baseSnap.exists ? baseSnap.data() : {},
+    cosmeticState: cosmeticsSnap.exists ? cosmeticsSnap.data() : {},
+    entitlement,
+    settings,
     now
   });
 }
@@ -682,20 +733,40 @@ exports.getDashboardAnalytics = onCall({ region: "us-central1" }, async (request
   };
 });
 
-exports.getCosmeticCatalog = onCall({ region: "us-central1" }, async (request) => {
+exports.getWeeklyDigest = onCall({ region: "us-central1" }, async (request) => {
   const auth = await resolveSyncAuth(request, "sync:read");
   const now = new Date().toISOString();
-  const [entitlementSnap, profileSnap, cosmeticsSnap] = await Promise.all([
+  const [entitlementSnap, settingsSnap] = await Promise.all([
     db.doc(`players/${auth.uid}/entitlements/current`).get(),
-    db.doc(`players/${auth.uid}/profile/current`).get(),
-    db.doc(`players/${auth.uid}/cosmetics/current`).get()
+    db.doc(`players/${auth.uid}/settings/current`).get()
   ]);
+  const settings = settingsSnap.exists ? settingsSnap.data() : {};
   const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
-  const cosmetics = publicCosmeticsFromSnapshots({ entitlement, profileSnap, cosmeticsSnap });
+  const digest = await loadWeeklyDigestData(auth.uid, entitlement, settings, now);
   return {
     ok: true,
     privacyClass: "abstract",
     entitlement: publicEntitlement(entitlement),
+    weeklyDigest: digest
+  };
+});
+
+exports.getCosmeticCatalog = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request, "sync:read");
+  const now = new Date().toISOString();
+  const [entitlementSnap, profileSnap, cosmeticsSnap, settingsSnap] = await Promise.all([
+    db.doc(`players/${auth.uid}/entitlements/current`).get(),
+    db.doc(`players/${auth.uid}/profile/current`).get(),
+    db.doc(`players/${auth.uid}/cosmetics/current`).get(),
+    db.doc(`players/${auth.uid}/settings/current`).get()
+  ]);
+  const evaluatedEntitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+  const entitlement = entitlementWithPortalPreferences(evaluatedEntitlement, settingsSnap.exists ? settingsSnap.data() : {});
+  const cosmetics = publicCosmeticsFromSnapshots({ entitlement, profileSnap, cosmeticsSnap });
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    entitlement: publicEntitlement(evaluatedEntitlement),
     cosmetics
   };
 });
@@ -711,14 +782,17 @@ exports.applyCosmeticSelection = onCall({ region: "us-central1" }, async (reques
   const profileRef = db.doc(`players/${auth.uid}/profile/current`);
   const cosmeticsRef = db.doc(`players/${auth.uid}/cosmetics/current`);
   const entitlementRef = db.doc(`players/${auth.uid}/entitlements/current`);
+  const settingsRef = db.doc(`players/${auth.uid}/settings/current`);
 
   const result = await db.runTransaction(async (transaction) => {
-    const [entitlementSnap, profileSnap, cosmeticsSnap] = await Promise.all([
+    const [entitlementSnap, profileSnap, cosmeticsSnap, settingsSnap] = await Promise.all([
       transaction.get(entitlementRef),
       transaction.get(profileRef),
-      transaction.get(cosmeticsRef)
+      transaction.get(cosmeticsRef),
+      transaction.get(settingsRef)
     ]);
-    const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+    const evaluatedEntitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+    const entitlement = entitlementWithPortalPreferences(evaluatedEntitlement, settingsSnap.exists ? settingsSnap.data() : {});
     const profile = profileSnap.exists ? profileSnap.data() : {};
     const cosmeticState = cosmeticsSnap.exists ? cosmeticsSnap.data() : {};
     let selection;
@@ -747,7 +821,7 @@ exports.applyCosmeticSelection = onCall({ region: "us-central1" }, async (reques
     transaction.set(cosmeticsRef, nextState, { merge: true });
 
     return {
-      entitlement,
+      entitlement: evaluatedEntitlement,
       cosmetics: publicCosmeticCatalog({
         entitlement,
         profile,

@@ -8,7 +8,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | --- | --- | --- | --- |
 | `/players/{uid}` | `request.auth.uid == uid` | owner read/create/update | Account shell, schema version, display names, sync enabled flag. |
 | `/players/{uid}/profile/current` | owner | owner read/create/update | Miner profile fields and avatar/customization references. |
-| `/players/{uid}/settings/current` | owner | owner read/create/update | Report mode, sync preference, dashboard display preference, App Check debug flag. |
+| `/players/{uid}/settings/current` | owner | owner read/create/update | Report mode, sync preference, digest opt-out, beta-feature opt-in, dashboard display preference, App Check debug flag. |
 | `/players/{uid}/syncMetadata/{clientId}` | owner | owner read/create/update | Aggregate sync metadata at `default` plus server-maintained per-device cursors for linked Codex devices. |
 | `/players/{uid}/syncDevices/{deviceId}` | owner | owner read only | Server-owned public metadata for linked Codex devices; device token hashes stay outside owner-readable docs. |
 | `/players/{uid}/billing/current` | owner | owner read only | Server-owned normalized billing projection from Stripe or the active billing provider. |

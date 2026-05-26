@@ -35,7 +35,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics cosmetics asteroid asteroid-atlas inventory orders upgrades store reports base]
+required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -68,6 +68,12 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     analytics-list
     export-json
     export-csv
+    weekly-digest-status
+    weekly-digest-summary
+    weekly-digest-list
+    weekly-digest-enabled
+    beta-features-enabled
+    beta-access-status
     cosmetics-summary
     cosmetics-list
     cosmetics-status
@@ -101,6 +107,9 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     syncCadenceModel
     getDashboardAnalytics
     exportDashboardHistory
+    getWeeklyDigest
+    renderWeeklyDigest
+    updatePortalPreference
     renderAnalytics
     requestHistoryExport
     getCosmeticCatalog
@@ -119,6 +128,19 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     ensureLinkedProfile
     requiresEmailVerification
   ].all? { |needle| auth_js.include?(needle) }
+end
+
+assert("dashboard should render Pro weekly digest and beta preference controls") do
+  index.include?(%(data-panel="weekly-digest")) &&
+    index.include?(%(id="weekly-digest-enabled")) &&
+    index.include?(%(id="beta-features-enabled")) &&
+    auth_js.include?("function renderWeeklyDigest(digest, rawEntitlement, settings = {})") &&
+    auth_js.include?("httpsCallable(functions, \"getWeeklyDigest\")") &&
+    auth_js.include?("weeklyDigestEnabled") &&
+    auth_js.include?("betaFeaturesEnabled") &&
+    styles.include?(".digest-summary") &&
+    styles.include?(".preference-grid") &&
+    styles.include?(".toggle-row")
 end
 
 assert("dashboard should render cosmetic preview, apply, locked, and mobile-safe states") do

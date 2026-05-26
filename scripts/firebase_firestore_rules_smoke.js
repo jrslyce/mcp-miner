@@ -144,6 +144,16 @@ async function main() {
     ...profileFields,
     ownerUid: stringField(other.localId)
   }, 403);
+  await patchDoc(`players/${owner.localId}/settings/current`, owner.idToken, {
+    ownerUid: stringField(owner.localId),
+    schemaVersion: intField(1),
+    updatedAt: stringField(now),
+    privacyClass: stringField("abstract"),
+    reportMode: stringField("meaningful_turns_only"),
+    cloudSyncEnabled: boolField(true),
+    weeklyDigestEnabled: boolField(false),
+    betaFeaturesEnabled: boolField(true)
+  });
 
   const rewardEvent = {
     eventId: "evt_rules_smoke",
@@ -308,6 +318,7 @@ async function main() {
     ownerUid: owner.localId,
     cases: [
       "owner_profile_allow",
+      "owner_settings_digest_beta_allow",
       "cross_user_profile_deny",
       "abstract_reward_event_allow",
       "private_reward_event_deny",

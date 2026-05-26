@@ -59,6 +59,12 @@ become inactive after the effective entitlement falls back to Free; the portal r
 free default until Pro access returns. Retired cosmetics cannot be newly unlocked and are retained
 only for accounts with server-side ownership.
 
+Weekly digests are generated in the portal from abstract cloud game state only. They summarize
+Chonks, Space Bucks, materials, orders, sync health, milestones, base state, and cosmetic changes
+without including prompts, code, commands, paths, repositories, browser/app content, transcripts, or
+other private work details. Pro users can disable digests and opt in or out of priority beta access
+through portal settings without changing their billing subscription.
+
 ## Support Notes
 
 Support and admin tooling should be able to answer these questions from the config:

@@ -48,6 +48,12 @@ Run the server-validated cosmetics entitlement smoke case:
 npm run firebase:cosmetics:smoke
 ```
 
+Run the Pro weekly digest and beta opt-in smoke case:
+
+```sh
+npm run firebase:weekly-digest:smoke
+```
+
 Run the full Auth, Firestore rules, Functions sync, and dashboard integration smoke case:
 
 ```sh

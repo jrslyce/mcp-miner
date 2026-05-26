@@ -58,6 +58,7 @@ assert("integration smoke should cover dashboard hosting and no-auth/offline pos
   %w[
     HOSTING_HOST
     DEMO_DASHBOARD
+    getWeeklyDigest
     getCosmeticCatalog
     applyCosmeticSelection
     device-link

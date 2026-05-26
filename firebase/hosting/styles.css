@@ -186,6 +186,12 @@ h2 {
   gap: 12px;
 }
 
+.digest-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .panel,
 .metric-card,
 .mode-strip {
@@ -558,6 +564,7 @@ dd {
 .cosmetic-row,
 .upgrade-row,
 .analytics-card,
+.digest-card,
 .report-list article {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -728,20 +735,69 @@ dd {
   padding: 12px;
 }
 
-.analytics-card span {
+.digest-card {
+  display: grid;
+  gap: 8px;
+  min-height: 104px;
+  padding: 12px;
+}
+
+.analytics-card span,
+.digest-card span {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 800;
 }
 
-.analytics-card strong {
+.analytics-card strong,
+.digest-card strong {
   font-size: 1.35rem;
   line-height: 1.1;
 }
 
-.analytics-card small {
+.analytics-card small,
+.digest-card small {
   color: var(--muted);
   line-height: 1.35;
+}
+
+.digest-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.digest-list p {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.preference-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr)) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.toggle-row {
+  display: flex;
+  min-height: 42px;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--panel-soft);
+  color: var(--ink);
+}
+
+.toggle-row input {
+  width: 18px;
+  min-height: 18px;
 }
 
 .export-actions {
@@ -874,6 +930,7 @@ dd {
     .dashboard-grid,
     .metric-strip,
     .analytics-list,
+    .digest-summary,
     .cosmetics-list,
     .asteroid-atlas,
     .actions,
@@ -891,6 +948,10 @@ dd {
   .privacy-list li {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .preference-grid {
+    grid-template-columns: 1fr;
   }
 
   .panel,

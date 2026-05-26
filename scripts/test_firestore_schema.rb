@@ -105,6 +105,7 @@ end
 assert("emulator rule smoke script should cover allow and deny cases") do
   package.dig("scripts", "firebase:rules:smoke") &&
     smoke.include?("owner_profile_allow") &&
+    smoke.include?("owner_settings_digest_beta_allow") &&
     smoke.include?("cross_user_profile_deny") &&
     smoke.include?("private_reward_event_deny") &&
     smoke.include?("aggregate_game_state_write_deny") &&
