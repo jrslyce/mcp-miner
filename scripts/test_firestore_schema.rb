@@ -58,13 +58,12 @@ end
 
 assert("client-writeable documents should require ownerUid and abstract privacy class") do
   rules.include?("data.ownerUid == uid") &&
-    rules.include?('data.privacyClass == "abstract"') &&
-    rules.include?("validRewardEvent(uid, eventId, request.resource.data)")
+    rules.include?('data.privacyClass == "abstract"')
 end
 
 assert("rules should reject practical private field names") do
   schema.fetch("privateFieldDenylist").all? { |field| rules.include?(%("#{field}")) } &&
-    rules.include?("noPrivateObservedFields(data)") &&
+    rules.include?("noPrivateTopLevel(data)") &&
     docs.include?("Rejected Private Fields")
 end
 
@@ -96,11 +95,14 @@ assert("linking secrets should stay in server-owned top-level collections") do
     rules.include?("allow read, write: if false;")
 end
 
-assert("reward events should be append-only abstract Codex hook summaries") do
-  rules.include?("allow create: if isOwner(uid) && validRewardEvent") &&
-    rules.include?("allow update, delete: if false") &&
-    rules.include?('data.source == "codex_hook"') &&
-    schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "appendOnly") == true
+assert("reward events should be server-owned abstract Codex hook summaries") do
+  rules.include?("match /rewardEvents/{eventId}") &&
+    rules.include?("allow read: if isOwner(uid);") &&
+    rules.include?("allow write: if false;") &&
+    schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "serverOwned") == true &&
+    schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "clientAccess") == ["read"] &&
+    schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "appendOnly") == true &&
+    schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "fields").include?("source")
 end
 
 assert("emulator rule smoke script should cover allow and deny cases") do
@@ -108,6 +110,7 @@ assert("emulator rule smoke script should cover allow and deny cases") do
     smoke.include?("owner_profile_allow") &&
     smoke.include?("owner_settings_digest_beta_allow") &&
     smoke.include?("cross_user_profile_deny") &&
+    smoke.include?("direct_reward_event_write_deny") &&
     smoke.include?("private_reward_event_deny") &&
     smoke.include?("aggregate_game_state_write_deny") &&
     smoke.include?("admin_entitlement_projection_read_allow") &&

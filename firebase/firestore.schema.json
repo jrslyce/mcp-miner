@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "ownerBoundary": "Firebase Auth UID; all player documents live under /players/{uid}",
-  "clientWritePolicy": "Clients may write profile/settings/sync metadata and append abstract reward events only. Aggregate game state is Cloud Functions/Admin SDK owned.",
+  "clientWritePolicy": "Clients may write profile/settings/sync metadata only. Reward events and aggregate game state are Cloud Functions/Admin SDK owned.",
   "privateFieldDenylist": [
     "prompt",
     "prompts",
@@ -23,7 +23,19 @@
     "browserContent",
     "appContent",
     "transcript",
-    "rawTranscript"
+    "rawTranscript",
+    "token",
+    "tokens",
+    "idToken",
+    "idTokens",
+    "deviceToken",
+    "deviceTokens",
+    "refreshToken",
+    "refreshTokens",
+    "apiKey",
+    "apiKeys",
+    "secret",
+    "secrets"
   ],
   "collections": {
     "players/{uid}": {
@@ -68,7 +80,8 @@
     },
     "players/{uid}/rewardEvents/{eventId}": {
       "owner": "uid",
-      "clientAccess": ["read", "create"],
+      "clientAccess": ["read"],
+      "serverOwned": true,
       "appendOnly": true,
       "fields": ["ownerUid", "eventId", "eventType", "schemaVersion", "sequence", "timestamp", "sessionId", "turnId", "observedFields", "privacyClass", "source", "signature", "checksum", "clientCreatedAt", "receivedAt", "reducedAt", "rewardControl"]
     },

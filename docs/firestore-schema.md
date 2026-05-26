@@ -13,7 +13,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/players/{uid}/syncDevices/{deviceId}` | owner | owner read only | Server-owned public metadata for linked Codex devices; device token hashes stay outside owner-readable docs. |
 | `/players/{uid}/billing/current` | owner | owner read only | Server-owned normalized billing projection from Stripe or the active billing provider. |
 | `/players/{uid}/entitlements/current` | owner | owner read only | Server-owned entitlement projection used by Functions, portal UI, and the local plugin. |
-| `/players/{uid}/rewardEvents/{eventId}` | owner | owner read/create only | Append-only abstract Codex work-event summaries for Functions to validate and reduce. |
+| `/players/{uid}/rewardEvents/{eventId}` | owner | owner read only | Server-owned append-only abstract Codex work-event summaries written after Functions validate and reduce sync receipts. |
 | `/players/{uid}/gameState/current` | owner | owner read only | Cloud-reduced materialized game state, including Space Bucks and schema versions. |
 | `/players/{uid}/inventory/{bucket}` | owner | owner read only | Cloud-reduced inventory buckets for dashboard reads. |
 | `/players/{uid}/upgrades/current` | owner | owner read only | Cloud-reduced upgrade levels and effects. |
@@ -28,7 +28,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 
 ## Client-Write Boundaries
 
-Clients may create profile/settings/sync metadata and append abstract reward events. Clients may not write aggregate balances. In production, Cloud Functions are responsible for validating reward event signatures, dedupe keys, cooldowns, daily soft caps, and reducers before writing game state.
+Clients may create profile/settings/sync metadata. Clients may not directly append reward events or write aggregate balances. In production, Cloud Functions are responsible for validating reward event signatures, dedupe keys, cooldowns, daily soft caps, and reducers before writing sanitized reward events and game state.
 
 Link sessions, link-code reservations, device-token hashes, billing webhook events, and support audit logs are top-level server-owned collections. They are written only by Cloud Functions or Admin SDK support tooling and remain blocked from direct dashboard/plugin Firestore access by the default deny rule.
 
@@ -90,7 +90,7 @@ The owner field must match Firebase Auth:
 
 ## Abstract Reward Event
 
-Reward events are append-only and use deterministic event IDs from the local journal:
+Server-stored reward events are append-only and use deterministic event IDs from the local journal:
 
 ```json
 {
@@ -113,17 +113,18 @@ Reward events are append-only and use deterministic event IDs from the local jou
 }
 ```
 
-Allowed reward-event fields intentionally exclude reward deltas and aggregate balances. Functions compute trusted rewards after validation.
+Allowed reward-event fields intentionally exclude reward deltas and aggregate balances. Clients submit abstract sync receipts through callable Functions; Functions compute trusted rewards after validation and store the sanitized event.
 
 ## Rejected Private Fields
 
-Rules reject practical top-level private field names on client-writeable documents and inside reward-event `observedFields`:
+Rules reject practical top-level private field names on client-writeable documents:
 
 - prompts and assistant replies
 - code and source code
 - terminal output and commands
 - file paths, working directories, repo names, and repository names
 - browser content, app content, transcripts, and raw transcripts
+- tokens, API keys, and secrets
 
 Rules cannot understand every possible nested semantic value, so Functions must repeat privacy validation before reducing an event. The local plugin should continue to send only abstract event summaries by default.
 
@@ -133,8 +134,8 @@ Rules cannot understand every possible nested semantic value, so Functions must 
 
 - owner can write `/players/{uid}/profile/current`
 - another signed-in user cannot write the owner profile
-- owner can append an abstract reward event
-- reward events with private fields are denied
+- owner cannot directly append an abstract reward event
+- direct reward events with private fields are denied
 - owner cannot directly write `/players/{uid}/gameState/current`
 - Admin SDK can create billing and entitlement projections
 - owner can read, but not write, `/players/{uid}/billing/current`

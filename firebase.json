@@ -7,7 +7,7 @@
     {
       "source": "firebase/functions",
       "codebase": "mcp-miner-api",
-      "runtime": "nodejs20",
+      "runtime": "nodejs22",
       "ignore": [
         "node_modules",
         ".git",

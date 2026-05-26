@@ -67,8 +67,8 @@ end
 assert("Functions scaffold should declare Firebase dependencies and Node runtime") do
   function_config = firebase.fetch("functions").first
   function_config["source"] == "firebase/functions" &&
-    function_config["runtime"] == "nodejs20" &&
-    functions_package.dig("engines", "node").include?("20") &&
+    function_config["runtime"] == "nodejs22" &&
+    functions_package.dig("engines", "node").include?("22") &&
     functions_package.dig("dependencies", "firebase-admin") &&
     functions_package.dig("dependencies", "firebase-functions")
 end
