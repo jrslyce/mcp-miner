@@ -365,6 +365,21 @@ class McpMinerServer
         })
       },
       {
+        name: "preview_sync_payload",
+        description: "Preview the exact abstract sync request body and redacted auth headers without sending it.",
+        inputSchema: object_schema({
+          device_token: {
+            type: "string"
+          },
+          id_token: {
+            type: "string"
+          },
+          functions_origin: {
+            type: "string"
+          }
+        })
+      },
+      {
         name: "claim_milestone",
         description: "Return local milestone claim availability. Claiming is disabled until milestone rewards are defined.",
         inputSchema: object_schema({
@@ -467,6 +482,8 @@ class McpMinerServer
         @engine.sync_progress_payload
       when "sync_cloud"
         @engine.sync_cloud_payload(args)
+      when "preview_sync_payload"
+        @engine.preview_sync_payload(args)
       when "claim_milestone"
         @engine.claim_milestone_payload(args)
       when "open_dashboard"

@@ -121,6 +121,7 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     get_catalog_summary
     update_settings
     sync_progress
+    preview_sync_payload
     sync_cloud
     claim_milestone
     open_dashboard

@@ -51,6 +51,7 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 - `update_settings`: change report mode or cloud sync preference.
 - `sync_progress`: local/offline sync state, queued events, account link state, and retry/conflict metadata.
 - `get_sync_status`: same intent as `sync_progress`; use when the user asks if cloud sync is connected.
+- `preview_sync_payload`: show the exact next abstract sync request body and redacted auth headers without sending it.
 - `sync_cloud`: push queued abstract journal events to the configured Firebase Cloud Functions sync API.
 - `claim_milestone`: disabled local stub until milestone rewards are defined.
 - `open_dashboard`: return dashboard URL.

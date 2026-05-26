@@ -111,6 +111,17 @@ Sync cadence:
 Returns the current server-owned `gameState/current`, `syncMetadata/default`, and public entitlement
 summary for the authenticated UID.
 
+## Payload Inspection
+
+The local plugin exposes `preview_sync_payload`, which builds the next `syncRewardEvents` request
+without sending it. It shows the exact abstract JSON request body that would be posted and redacts
+Firebase ID tokens or device sync tokens in headers.
+
+The web portal reads the owner-scoped `/players/{uid}/rewardEvents` collection and shows recent
+stored receipt payloads. This portal view is a sanitized audit view of abstract sync data; it does
+not fetch or render auth headers, Codex/OpenAI account data, prompts, code, terminal output,
+commands, paths, repo names, browser/app content, transcripts, tokens, API keys, or secrets.
+
 ## Logging
 
 Cloud Logging entries include operational metadata only: privacy class, UID presence, requested event count, accepted count, duplicate count, rejected count, and error code. Logs do not include prompt text, source code, terminal output, commands, paths, repo names, browser/app content, or transcripts.

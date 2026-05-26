@@ -32,7 +32,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth device-link sync-privacy status asteroid asteroid-atlas inventory orders upgrades store reports base]
+required_panels = %w[auth device-link sync-privacy status asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -51,6 +51,8 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     store-list
     store-balance
     reports-list
+    raw-sync-list
+    raw-sync-count
     sync-status
     privacy-list
     base-detail
@@ -279,10 +281,22 @@ assert("signed-in dashboard refresh should warn when cloud reads are partial") d
     auth_js.include?("const DASHBOARD_REFRESH_PARTIAL = \"Some cloud data could not be refreshed. Showing available owner data.\"") &&
     auth_js.include?("const SYNC_API_REFRESH_PARTIAL = \"Cloud sync API did not respond. Showing available owner data.\"") &&
     auth_js.include?("function refreshWarning(reads)") &&
-    auth_js.include?("failedIndexes.includes(10)") &&
+    auth_js.include?("failedIndexes.includes(11)") &&
     auth_js.include?("if (data.refreshWarning)") &&
     auth_js.include?("setMessage(data.refreshWarning, true)") &&
     auth_js.include?("setMessage(DASHBOARD_REFRESH_SUCCESS)")
+end
+
+assert("dashboard should expose a raw abstract sync payload inspector without auth headers") do
+  index.include?(%(data-panel="raw-sync")) &&
+    auth_js.include?("function rawSyncEventPayload(event)") &&
+    auth_js.include?("function renderRawSyncEvents(events)") &&
+    auth_js.include?('collection(db, "players", user.uid, "rewardEvents")') &&
+    auth_js.include?('orderBy("receivedAt", "desc")') &&
+    auth_js.include?("scoreSource") &&
+    auth_js.include?("serverCalculated") &&
+    !auth_js.include?("Authorization: Bearer") &&
+    !auth_js.include?("X-MCP-Miner-Device-Token")
 end
 
 assert("signed-in reports panel should show an empty state when no reports are synced") do
@@ -294,7 +308,8 @@ end
 assert("dashboard reads should stay owner-scoped under players/{uid}") do
   auth_js.scan(/doc\(db, "players", user\.uid/).length >= 7 &&
     auth_js.include?('collection(db, "players", user.uid, "inventory")') &&
-    auth_js.include?('collection(db, "players", user.uid, "orders")')
+    auth_js.include?('collection(db, "players", user.uid, "orders")') &&
+    auth_js.include?('collection(db, "players", user.uid, "rewardEvents")')
 end
 
 private_needles = %w[
@@ -322,7 +337,8 @@ end
 
 assert("privacy rows should stack on narrow mobile screens") do
   styles.include?("@media (max-width: 700px)") &&
-    styles.include?(".privacy-list li {\n    grid-template-columns: 1fr;\n    gap: 4px;\n  }")
+    styles.include?(".privacy-list li {\n    grid-template-columns: 1fr;\n    gap: 4px;\n  }") &&
+    styles.include?(".raw-sync-meta {\n    grid-template-columns: 1fr;\n    gap: 4px;\n  }")
 end
 
 assert("panel headings should stack on very narrow mobile screens") do

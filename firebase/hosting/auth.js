@@ -19,6 +19,7 @@ import {
   getDocs,
   getFirestore,
   limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc
@@ -64,6 +65,11 @@ const DEMO_DASHBOARD = {
     acceptedCount: 18,
     duplicateCount: 0,
     rejectedCount: 0
+  },
+  entitlement: {
+    plan: "free",
+    displayName: "Free",
+    syncCadenceSeconds: 60
   },
   inventory: [
     { materialId: "mat_chonks", displayName: "Chonks", category: "core", quantity: 1840, totalSpaceBucks: 0 },
@@ -111,6 +117,21 @@ const DEMO_DASHBOARD = {
     "Order board has one fulfillable buyer request.",
     "Cloud sync remains optional; shared state is abstract."
   ],
+  rawSyncEvents: [
+    {
+      eventId: "evt_demo_018",
+      eventType: "work_apply_patch",
+      receiptSchemaVersion: 2,
+      sequence: 18,
+      observedFields: {
+        score: 8.5,
+        scoreSource: "server_receipt_v2",
+        serverCalculated: true
+      },
+      privacyClass: "abstract",
+      source: "codex_hook"
+    }
+  ],
   base: {
     moduleCount: 2,
     droneLevel: 1,
@@ -148,6 +169,11 @@ const EMPTY_CLOUD_DASHBOARD = {
     duplicateCount: 0,
     rejectedCount: 0
   },
+  entitlement: {
+    plan: "free",
+    displayName: "Free",
+    syncCadenceSeconds: 60
+  },
   inventory: [],
   orders: [],
   asteroid: {
@@ -169,6 +195,7 @@ const EMPTY_CLOUD_DASHBOARD = {
     }
   },
   reports: [],
+  rawSyncEvents: [],
   base: {
     moduleCount: 0,
     droneLevel: 0,
@@ -330,6 +357,8 @@ const upgradesList = document.querySelector("#upgrades-list");
 const storeBalance = document.querySelector("#store-balance");
 const storeList = document.querySelector("#store-list");
 const reportsList = document.querySelector("#reports-list");
+const rawSyncList = document.querySelector("#raw-sync-list");
+const rawSyncCount = document.querySelector("#raw-sync-count");
 const baseDetail = document.querySelector("#base-detail");
 const deviceLinkPanel = document.querySelector("[data-panel=\"device-link\"]");
 const deviceLinkStatus = document.querySelector("#device-link-status");
@@ -928,6 +957,45 @@ function normalizeDeviceRows(snapshot) {
   return rows.filter((device) => device.status !== "revoked").slice(0, 8);
 }
 
+function normalizeRawSyncRows(snapshot) {
+  const rows = [];
+  snapshot.forEach((entry) => {
+    rows.push(rawSyncEventPayload({ ...entry.data(), eventId: entry.id }));
+  });
+  return rows.slice(0, 8);
+}
+
+function rawSyncEventPayload(event) {
+  const observedFields = event.observedFields && typeof event.observedFields === "object" ? event.observedFields : {};
+  const payload = {
+    eventId: event.eventId || event.event_id || "",
+    eventType: event.eventType || event.event_type || "",
+    schemaVersion: event.schemaVersion || event.schema_version || 1,
+    receiptSchemaVersion: event.receiptSchemaVersion || event.receipt_schema_version || null,
+    receiptType: event.receiptType || event.receipt_type || null,
+    sequence: numberValue(event.sequence),
+    timestamp: event.timestamp || null,
+    sessionId: event.sessionId || event.session_id || null,
+    turnId: event.turnId || event.turn_id || null,
+    observedFields: {
+      category: observedFields.category || null,
+      rewardControlReasons: Array.isArray(observedFields.rewardControlReasons) ? observedFields.rewardControlReasons : [],
+      scoreHint: observedFields.scoreHint ?? null,
+      score: observedFields.score ?? null,
+      scoreSource: observedFields.scoreSource || null,
+      serverCalculated: observedFields.serverCalculated === true,
+      scoreCapped: observedFields.scoreCapped === true
+    },
+    privacyClass: event.privacyClass || event.privacy_class || "abstract",
+    source: event.source || "codex_hook",
+    checksum: event.checksum || null,
+    signature: event.signature || null,
+    receivedAt: event.receivedAt || event.received_at || null,
+    reducedAt: event.reducedAt || event.reduced_at || null
+  };
+  return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== null && value !== undefined));
+}
+
 function normalizeUpgradeRows(data) {
   if (!data) {
     return [];
@@ -1006,7 +1074,7 @@ function refreshWarning(reads) {
   if (!failedIndexes.length) {
     return "";
   }
-  if (failedIndexes.includes(10)) {
+  if (failedIndexes.includes(11)) {
     return SYNC_API_REFRESH_PARTIAL;
   }
   return DASHBOARD_REFRESH_PARTIAL;
@@ -1025,6 +1093,7 @@ async function loadDashboardForUser(user) {
     getDocs(query(collection(db, "players", user.uid, "inventory"), limit(12))),
     getDocs(query(collection(db, "players", user.uid, "orders"), limit(8))),
     getDocs(query(collection(db, "players", user.uid, "syncDevices"), limit(8))),
+    getDocs(query(collection(db, "players", user.uid, "rewardEvents"), orderBy("receivedAt", "desc"), limit(8))),
     getSyncState({})
   ]);
 
@@ -1035,12 +1104,13 @@ async function loadDashboardForUser(user) {
   const directSyncExists = docExists(reads, 4);
   const directState = docsData(reads, 3) || {};
   const directSync = docsData(reads, 4) || {};
-  const callable = reads[10] && reads[10].status === "fulfilled" ? reads[10].value.data : {};
+  const callable = reads[11] && reads[11].status === "fulfilled" ? reads[11].value.data : {};
   const cloudState = callable.state || directState;
   const syncMetadata = callable.syncMetadata || directSync;
   const inventory = normalizeInventoryRows(queryResult(reads, 7) || { forEach() {} }, cloudState);
   const orders = normalizeOrderRows(queryResult(reads, 8) || { forEach() {} });
   const syncDevices = normalizeDeviceRows(queryResult(reads, 9) || { forEach() {} });
+  const rawSyncEvents = normalizeRawSyncRows(queryResult(reads, 10) || { forEach() {} });
   const upgrades = normalizeUpgradeRows(docsData(reads, 5));
   const base = docsData(reads, 6) || {};
   const hasCloudState = directStateExists ||
@@ -1067,9 +1137,11 @@ async function loadDashboardForUser(user) {
   fallback.settings = { ...fallback.settings, ...settings, cloudSyncEnabled: settings.cloudSyncEnabled ?? player.cloudSyncEnabled ?? true };
   fallback.cloudState = { ...fallback.cloudState, ...cloudState };
   fallback.syncMetadata = { ...fallback.syncMetadata, ...syncMetadata };
+  fallback.entitlement = callable.entitlement || {};
   fallback.inventory = inventory.length ? inventory : fallback.inventory;
   fallback.orders = orders.length ? orders : fallback.orders;
   fallback.syncDevices = syncDevices;
+  fallback.rawSyncEvents = rawSyncEvents;
   fallback.asteroid = cloudState.asteroidProgress || cloudState.asteroid_progress || cloudState.currentAsteroid || cloudState.current_asteroid ? normalizeAsteroid(cloudState) : fallback.asteroid;
   fallback.upgrades = upgrades.length ? upgrades : fallback.upgrades;
   fallback.store = cloudState.store || fallback.store;
@@ -1119,6 +1191,7 @@ function renderDashboard(data) {
   renderUpgrades(data.upgrades || []);
   renderStore(data);
   renderReports(data.reports || []);
+  renderRawSyncEvents(data.rawSyncEvents || []);
   renderCloudDetail(cloudState, asteroid, data.syncDevices || []);
   renderBase(data.base || {});
   renderPrivacy(data);
@@ -1354,6 +1427,27 @@ function renderReports(reports) {
       <p>${escapeHtml(report)}</p>
     </article>
   `).join("");
+}
+
+function renderRawSyncEvents(events) {
+  rawSyncCount.textContent = `${formatNumber(events.length)} shown`;
+  if (!events.length) {
+    rawSyncList.innerHTML = `<p class="empty-state">No abstract sync payloads have been stored yet.</p>`;
+    return;
+  }
+
+  rawSyncList.innerHTML = events.slice(0, 8).map((event) => {
+    const title = `${eventLabel({ lastEventId: event.eventType })} #${formatNumber(event.sequence)}`;
+    return `
+      <article class="raw-sync-item">
+        <div class="raw-sync-meta">
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(timestampLabel(event.receivedAt || event.timestamp))}</span>
+        </div>
+        <pre class="raw-sync-json">${escapeHtml(JSON.stringify(event, null, 2))}</pre>
+      </article>
+    `;
+  }).join("");
 }
 
 function renderCloudDetail(cloudState, asteroid, syncDevices = []) {

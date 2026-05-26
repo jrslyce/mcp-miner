@@ -101,6 +101,25 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
       auth_required.dig("sync", "metadata", "status") == "queued_auth_required"
   end
 
+  preview = tool_payload(run_mcp(state_path, [
+    { jsonrpc: "2.0", id: 40, method: "tools/call", params: { name: "preview_sync_payload", arguments: { device_token: "mcpd_preview_secret", functions_origin: "https://example.invalid/functions" } } }
+  ]).last)
+  preview_json = JSON.generate(preview)
+  assert("preview_sync_payload should show exact request body with redacted auth headers") do
+    preview["ok"] == true &&
+      preview["status"] == "preview" &&
+      preview.dig("request", "method") == "POST" &&
+      preview.dig("request", "url") == "https://example.invalid/functions/syncRewardEvents" &&
+      preview.dig("request", "headers", "X-MCP-Miner-Device-Token") == "<redacted:device-token>" &&
+      preview.dig("request", "body", "data", "events").length >= 2 &&
+      preview.dig("request", "body", "data", "events").all? { |event| event["schemaVersion"] == 2 }
+  end
+  assert("preview_sync_payload should not expose local auth tokens or private work data") do
+    !preview_json.include?("mcpd_preview_secret") &&
+      !preview_json.include?("please implement") &&
+      !preview_json.include?(ROOT)
+  end
+
   requests = []
   response_queue = Queue.new
   server, thread, origin = start_sync_server(response_queue, requests)

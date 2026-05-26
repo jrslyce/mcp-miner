@@ -1070,6 +1070,54 @@ module McpMiner
       end
     end
 
+    def preview_sync_payload(args = {})
+      current_state = state
+      uid = optional_string(current_state.dig("cloud_auth", "uid"))
+      metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
+      entries = read_journal_entries
+      events = build_cloud_sync_events(entries, uid || "unlinked", last_sequence: metadata["last_pushed_sequence"].to_i)
+      token = optional_string(args["device_token"]) ||
+              optional_string(args["id_token"]) ||
+              stored_device_token ||
+              optional_string(ENV["MCP_MINER_DEVICE_TOKEN"]) ||
+              optional_string(ENV["MCP_MINER_FIREBASE_ID_TOKEN"])
+      functions_origin = configured_functions_origin(args, metadata)
+
+      {
+        ok: true,
+        status: "preview",
+        queued_event_count: events.length,
+        request: {
+          method: "POST",
+          url: "#{functions_origin.sub(%r{/+$}, '')}/syncRewardEvents",
+          headers: redacted_sync_headers(token),
+          body: {
+            data: {
+              events: events
+            }
+          }
+        },
+        redaction: {
+          auth_headers: "redacted",
+          sensitive_fields_rejected: [
+            "prompt",
+            "code",
+            "command",
+            "filePath",
+            "repoName",
+            "terminalOutput",
+            "browserContent",
+            "transcript",
+            "token",
+            "apiKey",
+            "secret"
+          ]
+        },
+        sync: sync_progress_payload(current_state)[:sync],
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
     def account_link_status_payload(current_state = state)
       auth = default_cloud_auth.merge(current_state["cloud_auth"].is_a?(Hash) ? current_state["cloud_auth"] : {})
       status = if !current_state["cloud_sync"]
@@ -2342,6 +2390,20 @@ module McpMiner
       raise "Cloud sync rejected: #{body.dig('error', 'message')}" if body["error"]
 
       body
+    end
+
+    def redacted_sync_headers(token)
+      headers = {
+        "Content-Type" => "application/json"
+      }
+      return headers unless token && !token.empty?
+
+      if token.start_with?("mcpd_")
+        headers["X-MCP-Miner-Device-Token"] = "<redacted:device-token>"
+      else
+        headers["Authorization"] = "Bearer <redacted:firebase-id-token>"
+      end
+      headers
     end
 
     def configured_functions_origin(args = {}, metadata = {})
