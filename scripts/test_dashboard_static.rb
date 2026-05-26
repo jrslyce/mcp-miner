@@ -64,6 +64,8 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     signInWithPopup
     signInWithEmailAndPassword
     createUserWithEmailAndPassword
+    sendEmailVerification
+    reload
     getFirestore
     getFunctions
     httpsCallable
@@ -76,6 +78,7 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     renderStore
     getSyncState
     ensureLinkedProfile
+    requiresEmailVerification
   ].all? { |needle| auth_js.include?(needle) }
 end
 
@@ -186,6 +189,19 @@ assert("auth buttons should reflect signed-in and signed-out states") do
     auth_js.include?("signOutButton.disabled = !signedIn")
 end
 
+assert("password auth should require email verification before cloud sync and device linking") do
+  index.include?(%(id="send-verification-email")) &&
+    index.include?(%(id="email-verification-status")) &&
+    auth_js.include?("function sendVerificationEmailFor(user = currentUser)") &&
+    auth_js.include?("await sendEmailVerification(user)") &&
+    auth_js.include?("function verificationDashboard()") &&
+    auth_js.include?("Verify email before cloud sync") &&
+    auth_js.include?("profileStatus.textContent = \"Verification required\"") &&
+    auth_js.include?("approveDeviceLink.disabled = !signedIn || verificationRequired") &&
+    auth_js.include?("await reload(currentUser)") &&
+    auth_js.include?("await currentUser.getIdToken(true)")
+end
+
 assert("signed-in account panel should not render the raw Firebase UID") do
   index.include?("<dt>Account</dt>") &&
     index.include?(%(id="auth-identity">Not signed in</dd>)) &&
@@ -196,7 +212,9 @@ assert("signed-in account panel should not render the raw Firebase UID") do
 end
 
 assert("signed-in auth form should not keep account identifiers in disabled inputs") do
-  auth_js.include?("authIdentity.textContent = \"Private profile\";\n  email.value = \"\";\n  profileStatus.textContent = \"Loading\"")
+  auth_js.include?("authIdentity.textContent = \"Private profile\";") &&
+    auth_js.include?("email.value = \"\";") &&
+    auth_js.include?("profileStatus.textContent = \"Loading\"")
 end
 
 assert("auth flow should validate form input, hide Firebase internals, and clear passwords") do

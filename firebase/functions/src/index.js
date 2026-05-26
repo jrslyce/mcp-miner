@@ -52,6 +52,24 @@ function deviceTokenFromRequest(request) {
   return token && token.startsWith(DEVICE_TOKEN_PREFIX) ? token : null;
 }
 
+function firebaseSignInProvider(request) {
+  const token = request.auth && request.auth.token ? request.auth.token : {};
+  return token.firebase && token.firebase.sign_in_provider ? token.firebase.sign_in_provider : "";
+}
+
+function requiresVerifiedPasswordEmail(request) {
+  const token = request.auth && request.auth.token ? request.auth.token : {};
+  return Boolean(token.email) &&
+    firebaseSignInProvider(request) === "password" &&
+    token.email_verified !== true;
+}
+
+function requireVerifiedFirebaseAuth(request) {
+  if (requiresVerifiedPasswordEmail(request)) {
+    throw new HttpsError("permission-denied", "Verify your email before using MCP Miner cloud sync.");
+  }
+}
+
 async function resolveLinkSessionRef(data) {
   const sessionId = typeof data.sessionId === "string" ? data.sessionId.trim() : "";
   if (sessionId) {
@@ -81,6 +99,7 @@ async function resolveLinkSessionRef(data) {
 
 async function resolveSyncAuth(request, requiredScope = null) {
   if (request.auth) {
+    requireVerifiedFirebaseAuth(request);
     return {
       uid: request.auth.uid,
       authType: "firebase",
@@ -361,6 +380,7 @@ exports.approveLinkSession = onCall({ region: "us-central1" }, async (request) =
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Sign in before approving a Codex device.");
   }
+  requireVerifiedFirebaseAuth(request);
 
   const ref = await resolveLinkSessionRef(request.data || {});
   const uid = request.auth.uid;

@@ -21,13 +21,35 @@ async function requestJson(url, options) {
   return body;
 }
 
+function firebaseAdmin() {
+  const admin = require("../firebase/functions/node_modules/firebase-admin");
+  if (!admin.apps.length) {
+    admin.initializeApp({ projectId: PROJECT_ID });
+  }
+  return admin;
+}
+
+async function verifyEmulatorUser(uid) {
+  await firebaseAdmin().auth().updateUser(uid, { emailVerified: true });
+}
+
 async function main() {
   const email = `smoke-${Date.now()}@mcp-miner.local`;
-  const auth = await requestJson(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key`, {
+  const password = "local-emulator-only";
+  const created = await requestJson(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key`, {
     method: "POST",
     body: JSON.stringify({
       email,
-      password: "local-emulator-only",
+      password,
+      returnSecureToken: true
+    })
+  });
+  await verifyEmulatorUser(created.localId);
+  const auth = await requestJson(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key`, {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password,
       returnSecureToken: true
     })
   });

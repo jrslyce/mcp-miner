@@ -204,6 +204,7 @@ Dir.mktmpdir("mcp-miner-auth-linking") do |dir|
 
   auth_js = File.read(File.join(ROOT, "firebase", "hosting", "auth.js"))
   auth_smoke = File.read(File.join(ROOT, "scripts", "firebase_auth_linking_smoke.js"))
+  functions_js = File.read(File.join(ROOT, "firebase", "functions", "src", "index.js"))
   assert("dashboard auth shell should use Firebase Auth sign-in and sign-out") do
     auth_js.include?("getAuth") &&
       auth_js.include?("signInWithEmailAndPassword") &&
@@ -211,6 +212,14 @@ Dir.mktmpdir("mcp-miner-auth-linking") do |dir|
       auth_js.include?("signOut") &&
       auth_js.include?("setDoc") &&
       auth_smoke.include?("signed_out_write_denied")
+  end
+
+  assert("cloud sync and link approval should require verified password email auth") do
+    functions_js.include?("function requireVerifiedFirebaseAuth(request)") &&
+      functions_js.include?("firebaseSignInProvider(request) === \"password\"") &&
+      functions_js.include?("token.email_verified !== true") &&
+      functions_js.include?("Verify your email before using MCP Miner cloud sync.") &&
+      functions_js.scan("requireVerifiedFirebaseAuth(request)").length >= 3
   end
 
   puts JSON.pretty_generate({

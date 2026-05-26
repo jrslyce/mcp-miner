@@ -13,6 +13,7 @@ const EMAIL_DOMAIN = process.env.MCP_MINER_QA_EMAIL_DOMAIN || "gmail.com";
 const RUN_ID = (process.env.MCP_MINER_QA_RUN_ID || new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)).toLowerCase();
 const EXACT_WORD_ADDRESSES = process.env.MCP_MINER_QA_EXACT_WORDS === "1";
 const CLEANUP = process.env.MCP_MINER_QA_CLEANUP === "1";
+const MARK_EMAIL_VERIFIED = process.env.MCP_MINER_QA_MARK_EMAIL_VERIFIED !== "0";
 const WORDS = (process.env.MCP_MINER_QA_WORDS || "basalt,quartz,cobalt,nickel,orbit,rover,beacon,comet")
   .split(",")
   .map((word) => word.trim().toLowerCase())
@@ -36,6 +37,30 @@ async function requestJson(url, options, expectedStatus = 200) {
     throw new Error(`${options.method || "GET"} ${url} expected ${expectedStatus}, got ${response.status}: ${text}`);
   }
   return body;
+}
+
+async function requestForm(url, form, expectedStatus = 200) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams(form).toString()
+  });
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : {};
+  if (response.status !== expectedStatus) {
+    throw new Error(`POST ${url} expected ${expectedStatus}, got ${response.status}: ${text}`);
+  }
+  return body;
+}
+
+function firebaseAdmin() {
+  const admin = require("../firebase/functions/node_modules/firebase-admin");
+  if (!admin.apps.length) {
+    admin.initializeApp({ projectId: PROJECT_ID });
+  }
+  return admin;
 }
 
 function authHeaders(token) {
@@ -65,6 +90,31 @@ async function signUp(email) {
       returnSecureToken: true
     })
   });
+}
+
+async function refreshIdToken(auth) {
+  const refreshed = await requestForm(`https://securetoken.googleapis.com/v1/token?key=${API_KEY}`, {
+    grant_type: "refresh_token",
+    refresh_token: auth.refreshToken
+  });
+  return {
+    ...auth,
+    idToken: refreshed.id_token,
+    refreshToken: refreshed.refresh_token || auth.refreshToken
+  };
+}
+
+async function markEmailVerified(auth) {
+  if (!MARK_EMAIL_VERIFIED) {
+    return auth;
+  }
+  const admin = firebaseAdmin();
+  await admin.auth().updateUser(auth.localId, { emailVerified: true });
+  const refreshed = await refreshIdToken(auth);
+  return {
+    ...refreshed,
+    emailVerifiedByAdmin: true
+  };
 }
 
 async function callFunction(name, token, data, expectedStatus = 200) {
@@ -101,7 +151,8 @@ function syncEvent(word, uid, sequence, privateFields = {}) {
 
 async function runCycle(word, index) {
   const email = qaEmail(word);
-  const auth = await signUp(email);
+  let auth = await signUp(email);
+  auth = await markEmailVerified(auth);
   const link = await callFunction("createLinkSession", null, {
     dashboardUrl: DASHBOARD_URL,
     deviceName: `Live QA ${index + 1} ${word}`
@@ -156,10 +207,7 @@ async function runCycle(word, index) {
 }
 
 async function cleanupAccounts(results) {
-  const admin = require("../firebase/functions/node_modules/firebase-admin");
-  if (!admin.apps.length) {
-    admin.initializeApp({ projectId: PROJECT_ID });
-  }
+  const admin = firebaseAdmin();
   const auth = admin.auth();
   const db = admin.firestore();
   const cleaned = [];
@@ -197,6 +245,7 @@ async function main() {
     dashboardUrl: DASHBOARD_URL,
     runId: RUN_ID,
     cleanupEnabled: CLEANUP,
+    emailVerifiedByAdmin: MARK_EMAIL_VERIFIED,
     cleanup,
     accountCount: results.length,
     accounts: results.map(({ tokenHash, sessionId, linkCode, ...result }) => result)

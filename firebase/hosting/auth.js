@@ -5,6 +5,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   onAuthStateChanged,
+  reload,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut
@@ -194,6 +196,10 @@ const FORM_VALIDATION_MESSAGE = "Check the highlighted email and password fields
 const DASHBOARD_REFRESH_SUCCESS = "Dashboard refreshed.";
 const DASHBOARD_REFRESH_PARTIAL = "Some cloud data could not be refreshed. Showing available owner data.";
 const SYNC_API_REFRESH_PARTIAL = "Cloud sync API did not respond. Showing available owner data.";
+const EMAIL_VERIFICATION_REQUIRED = "Verify your email before cloud sync or Codex linking.";
+const EMAIL_VERIFICATION_SENT = "Verification email sent. Check your inbox, then refresh this dashboard after verifying.";
+const EMAIL_VERIFICATION_FAILED = "Account created, but the verification email could not be sent. Use Resend Verification.";
+const VERIFICATION_RESEND_COOLDOWN_MS = 60_000;
 const THEME_STORAGE_KEY = "mcp-miner-theme";
 const ASTEROID_CLASSES = [
   {
@@ -286,11 +292,13 @@ const googleSignInButton = document.querySelector("#google-sign-in");
 const signInButton = document.querySelector("#sign-in");
 const createAccount = document.querySelector("#create-account");
 const signOutButton = document.querySelector("#sign-out");
+const sendVerificationEmailButton = document.querySelector("#send-verification-email");
 const themeToggle = document.querySelector("#theme-toggle");
 const themeToggleLabel = document.querySelector("#theme-toggle-label");
 const refreshDashboard = document.querySelector("#refresh-dashboard");
 const authStatus = document.querySelector("#auth-status");
 const authIdentity = document.querySelector("#auth-identity");
+const emailVerificationStatus = document.querySelector("#email-verification-status");
 const profileStatus = document.querySelector("#profile-status");
 const dashboardSource = document.querySelector("#dashboard-source");
 const message = document.querySelector("#auth-message");
@@ -339,6 +347,7 @@ let activeDashboard = cloneDemo();
 let activeAsteroidVisual = ASTEROID_CLASSES[0];
 let activeAsteroidProgress = 0;
 let asteroidAnimationStarted = false;
+let verificationEmailSentAt = 0;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function setMessage(text, isError = false) {
@@ -377,6 +386,48 @@ function cloneEmptyCloud(overrides = {}) {
   return JSON.parse(JSON.stringify({ ...EMPTY_CLOUD_DASHBOARD, ...overrides }));
 }
 
+function isPasswordProviderUser(user) {
+  return Boolean(user && Array.isArray(user.providerData) && user.providerData.some((provider) => provider.providerId === "password"));
+}
+
+function requiresEmailVerification(user) {
+  return Boolean(user && user.email && isPasswordProviderUser(user) && user.emailVerified !== true);
+}
+
+function verificationDashboard() {
+  return cloneEmptyCloud({
+    mode: "Verify email",
+    source: "Verify email before cloud sync",
+    settings: {
+      ...EMPTY_CLOUD_DASHBOARD.settings,
+      cloudSyncEnabled: false
+    },
+    cloudState: {
+      ...EMPTY_CLOUD_DASHBOARD.cloudState,
+      updatedAt: "Email verification pending"
+    }
+  });
+}
+
+function emailVerificationLabel(user) {
+  if (!user) {
+    return "Not signed in";
+  }
+  if (!isPasswordProviderUser(user)) {
+    return "Verified by provider";
+  }
+  return user.emailVerified ? "Verified" : "Verification required";
+}
+
+function updateVerificationControls(user) {
+  const pendingVerification = requiresEmailVerification(user);
+  const cooldownRemaining = Math.max(0, VERIFICATION_RESEND_COOLDOWN_MS - (Date.now() - verificationEmailSentAt));
+  emailVerificationStatus.textContent = emailVerificationLabel(user);
+  sendVerificationEmailButton.hidden = !pendingVerification;
+  sendVerificationEmailButton.disabled = !pendingVerification || cooldownRemaining > 0;
+  sendVerificationEmailButton.textContent = cooldownRemaining > 0 ? "Verification Sent" : "Resend Verification";
+}
+
 function updateAuthControls(user) {
   const signedIn = Boolean(user);
   email.disabled = signedIn;
@@ -385,6 +436,7 @@ function updateAuthControls(user) {
   signInButton.disabled = signedIn;
   createAccount.disabled = signedIn;
   signOutButton.disabled = !signedIn;
+  updateVerificationControls(user);
 }
 
 function hasPendingLink() {
@@ -398,14 +450,21 @@ function renderDeviceLink(user, status = "waiting") {
   }
 
   const signedIn = Boolean(user);
+  const verificationRequired = requiresEmailVerification(user);
   deviceLinkPanel.hidden = false;
   deviceLinkCode.textContent = pendingLink.code || "From link";
-  approveDeviceLink.disabled = !signedIn || status === "approved" || status === "rejected";
-  rejectDeviceLink.disabled = !signedIn || status === "approved" || status === "rejected";
+  approveDeviceLink.disabled = !signedIn || verificationRequired || status === "approved" || status === "rejected";
+  rejectDeviceLink.disabled = !signedIn || verificationRequired || status === "approved" || status === "rejected";
 
   if (!signedIn) {
     deviceLinkStatus.textContent = "Sign in";
     deviceLinkSummary.textContent = "Sign in to approve this Codex device. Approval syncs only abstract MCP Miner game progress.";
+    return;
+  }
+
+  if (verificationRequired) {
+    deviceLinkStatus.textContent = "Verify email";
+    deviceLinkSummary.textContent = "Verify your email before approving this Codex device. Codex sync uses only abstract game progress after approval.";
     return;
   }
 
@@ -435,6 +494,12 @@ async function submitDeviceLink(action) {
   approveDeviceLink.disabled = true;
   rejectDeviceLink.disabled = true;
   try {
+    await reloadCurrentUser();
+    if (requiresEmailVerification(currentUser)) {
+      renderDeviceLink(currentUser);
+      setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+      return;
+    }
     await callable({
       sessionId: pendingLink.sessionId,
       code: pendingLink.code
@@ -444,6 +509,40 @@ async function submitDeviceLink(action) {
   } catch (error) {
     renderDeviceLink(currentUser);
     setMessage(error.message || "Device link update failed.", true);
+  }
+}
+
+async function reloadCurrentUser() {
+  if (!currentUser) {
+    return null;
+  }
+  await reload(currentUser);
+  await currentUser.getIdToken(true);
+  updateAuthControls(currentUser);
+  return currentUser;
+}
+
+async function sendVerificationEmailFor(user = currentUser) {
+  if (!requiresEmailVerification(user)) {
+    updateAuthControls(user);
+    setMessage("Email is already verified.");
+    return;
+  }
+
+  await sendEmailVerification(user);
+  verificationEmailSentAt = Date.now();
+  updateAuthControls(user);
+  setTimeout(() => updateAuthControls(currentUser), VERIFICATION_RESEND_COOLDOWN_MS + 250);
+  setMessage(EMAIL_VERIFICATION_SENT);
+}
+
+async function createPasswordAccount() {
+  const credential = await createUserWithEmailAndPassword(auth, email.value, password.value);
+  try {
+    await sendVerificationEmailFor(credential.user);
+  } catch (error) {
+    updateAuthControls(credential.user);
+    setMessage(EMAIL_VERIFICATION_FAILED, true);
   }
 }
 
@@ -1287,6 +1386,13 @@ async function refreshForCurrentUser() {
       setMessage("Demo preview refreshed.");
       return;
     }
+    await reloadCurrentUser();
+    if (requiresEmailVerification(currentUser)) {
+      renderDeviceLink(currentUser);
+      renderDashboard(verificationDashboard());
+      setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+      return;
+    }
     const data = await loadDashboardForUser(currentUser);
     renderDashboard(data);
     if (data.refreshWarning) {
@@ -1319,11 +1425,15 @@ createAccount.addEventListener("click", () => {
   if (!validateAuthForm()) {
     return;
   }
-  handleAuth(() => createUserWithEmailAndPassword(auth, email.value, password.value));
+  handleAuth(() => createPasswordAccount());
 });
 
 googleSignInButton.addEventListener("click", () => {
   handleAuth(() => signInWithPopup(auth, googleProvider));
+});
+
+sendVerificationEmailButton.addEventListener("click", () => {
+  handleAuth(() => sendVerificationEmailFor(currentUser));
 });
 
 signOutButton.addEventListener("click", () => {
@@ -1366,6 +1476,7 @@ onAuthStateChanged(auth, async (user) => {
   if (!user) {
     authStatus.textContent = "Signed out";
     authIdentity.textContent = "Not signed in";
+    emailVerificationStatus.textContent = "Not signed in";
     profileStatus.textContent = "Demo preview";
     if (previousUser) {
       email.value = "";
@@ -1379,6 +1490,18 @@ onAuthStateChanged(auth, async (user) => {
   authStatus.textContent = "Signed in";
   authIdentity.textContent = "Private profile";
   email.value = "";
+
+  if (requiresEmailVerification(user)) {
+    authStatus.textContent = "Verify email";
+    authIdentity.textContent = "Email pending";
+    profileStatus.textContent = "Verification required";
+    renderDeviceLink(user);
+    renderDashboard(verificationDashboard());
+    const verificationJustSent = Date.now() - verificationEmailSentAt < 5000;
+    setMessage(verificationJustSent ? EMAIL_VERIFICATION_SENT : EMAIL_VERIFICATION_REQUIRED, !verificationJustSent);
+    return;
+  }
+
   profileStatus.textContent = "Loading";
   setMessage("Loading profile.");
   renderDashboard(cloneEmptyCloud({

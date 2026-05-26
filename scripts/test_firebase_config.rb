@@ -80,6 +80,13 @@ assert("Firestore rules should stay closed except authenticated emulator smoke w
     !rules.include?("allow read, write: if true")
 end
 
+assert("Firestore owner rules should require verified password email auth") do
+  rules.include?("function isVerifiedEmailAuth()") &&
+    rules.include?("request.auth.token.firebase.sign_in_provider == \"password\"") &&
+    rules.include?("request.auth.token.email_verified == true") &&
+    rules.include?("isSignedIn() && request.auth.uid == uid && isVerifiedEmailAuth()")
+end
+
 assert("Local startup and smoke-test commands should be documented and scripted") do
   package.dig("scripts", "firebase:emulators:start") &&
     package.dig("scripts", "firebase:emulators:smoke") &&

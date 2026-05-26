@@ -46,6 +46,8 @@ end
 assert("rules should isolate player documents by Firebase Auth UID") do
   rules.include?("function isOwner(uid)") &&
     rules.include?("request.auth.uid == uid") &&
+    rules.include?("isVerifiedEmailAuth()") &&
+    rules.include?("request.auth.token.email_verified == true") &&
     rules.scan("isOwner(uid)").length >= 10
 end
 

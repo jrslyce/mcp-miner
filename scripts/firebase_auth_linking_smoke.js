@@ -20,6 +20,44 @@ async function requestJson(url, options, expectedStatus = 200) {
   return body;
 }
 
+function firebaseAdmin() {
+  const admin = require("../firebase/functions/node_modules/firebase-admin");
+  if (!admin.apps.length) {
+    admin.initializeApp({ projectId: PROJECT_ID });
+  }
+  return admin;
+}
+
+async function verifyEmulatorUser(uid) {
+  await firebaseAdmin().auth().updateUser(uid, { emailVerified: true });
+}
+
+async function signIn(email, password) {
+  return requestJson(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key`, {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password,
+      returnSecureToken: true
+    })
+  });
+}
+
+async function signUp(label) {
+  const email = `${label}-${Date.now()}@mcp-miner.local`;
+  const password = "local-emulator-only";
+  const created = await requestJson(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key`, {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password,
+      returnSecureToken: true
+    })
+  });
+  await verifyEmulatorUser(created.localId);
+  return signIn(email, password);
+}
+
 function documentUrl(path) {
   return `http://${FIRESTORE_HOST}/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}`;
 }
@@ -51,14 +89,7 @@ async function patchDoc(path, token, fields, expectedStatus = 200) {
 }
 
 async function main() {
-  const auth = await requestJson(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key`, {
-    method: "POST",
-    body: JSON.stringify({
-      email: `link-${Date.now()}@mcp-miner.local`,
-      password: "local-emulator-only",
-      returnSecureToken: true
-    })
-  });
+  const auth = await signUp("link");
   const now = new Date().toISOString();
 
   await requestJson(`http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1/accounts:lookup?key=fake-api-key`, {
