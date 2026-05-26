@@ -162,6 +162,12 @@ h2 {
   gap: 14px;
 }
 
+.analytics-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .panel,
 .metric-card,
 .mode-strip {
@@ -532,6 +538,7 @@ dd {
 .device-row,
 .store-row,
 .upgrade-row,
+.analytics-card,
 .report-list article {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -625,6 +632,34 @@ dd {
   display: grid;
   gap: 9px;
   padding: 12px;
+}
+
+.analytics-card {
+  display: grid;
+  gap: 8px;
+  min-height: 116px;
+  padding: 12px;
+}
+
+.analytics-card span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.analytics-card strong {
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.analytics-card small {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.export-actions {
+  grid-template-columns: repeat(2, minmax(96px, 1fr));
+  width: min(260px, 100%);
 }
 
 .report-list article {
@@ -747,6 +782,7 @@ dd {
   .side-rail,
   .dashboard-grid,
   .metric-strip,
+  .analytics-list,
   .asteroid-atlas,
   .actions,
   .device-row,

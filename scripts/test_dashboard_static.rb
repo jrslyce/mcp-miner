@@ -35,7 +35,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth billing device-link linked-devices sync-privacy status asteroid asteroid-atlas inventory orders upgrades store reports base]
+required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics asteroid asteroid-atlas inventory orders upgrades store reports base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -64,6 +64,10 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     manage-billing
     linked-devices-usage
     linked-devices-list
+    analytics-summary
+    analytics-list
+    export-json
+    export-csv
     privacy-list
     base-detail
   ].all? { |id| index.include?(%(id="#{id}")) }
@@ -92,6 +96,10 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     renderLinkedDevices
     schedulePortalRefresh
     syncCadenceModel
+    getDashboardAnalytics
+    exportDashboardHistory
+    renderAnalytics
+    requestHistoryExport
     renderStore
     createCheckoutSession
     createCustomerPortalSession
@@ -148,6 +156,19 @@ assert("dashboard should use cadence polling instead of realtime listeners") do
     auth_js.include?("window.setTimeout") &&
     auth_js.include?("portalPollingSeconds") &&
     !auth_js.include?("onSnapshot")
+end
+
+assert("dashboard should render Pro analytics and export controls") do
+  index.include?(%(data-panel="analytics")) &&
+    index.include?(%(id="analytics-list")) &&
+    index.include?(%(id="export-json")) &&
+    index.include?(%(id="export-csv")) &&
+    auth_js.include?("const getDashboardAnalytics = httpsCallable(functions, \"getDashboardAnalytics\")") &&
+    auth_js.include?("function renderAnalytics(analytics, rawEntitlement)") &&
+    auth_js.include?("function requestHistoryExport(format)") &&
+    auth_js.include?("httpsCallable(functions, \"exportDashboardHistory\")") &&
+    auth_js.include?("Exports contain abstract gameplay history only.") &&
+    auth_js.include?("Pro unlocks history export.")
 end
 
 assert("refresh control should not expose placeholder icon text") do
@@ -426,6 +447,7 @@ end
 assert("emulator dashboard smoke should exercise hosting and callable sync state") do
   smoke.include?("syncRewardEvents") &&
     smoke.include?("getSyncState") &&
+    smoke.include?("getDashboardAnalytics") &&
     smoke.include?("HOSTING_HOST") &&
     smoke.include?("eventChecksum")
 end

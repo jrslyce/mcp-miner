@@ -227,6 +227,22 @@
             </article>
           </section>
 
+          <section class="panel panel-wide analytics-panel" data-panel="analytics" aria-labelledby="analytics-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Portal analytics</p>
+                <h2 id="analytics-title">History Trends</h2>
+              </div>
+              <span id="analytics-summary" class="pill">7 day history</span>
+            </div>
+            <div id="analytics-list" class="analytics-list"></div>
+            <div class="actions export-actions">
+              <button id="export-json" type="button" class="button-secondary" disabled>JSON</button>
+              <button id="export-csv" type="button" class="button-secondary" disabled>CSV</button>
+            </div>
+            <p id="export-status" class="message" role="status" aria-live="polite"></p>
+          </section>
+
           <section class="dashboard-grid">
             <section class="panel panel-wide" data-panel="asteroid" aria-labelledby="asteroid-title">
               <div class="panel-heading">

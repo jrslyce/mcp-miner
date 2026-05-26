@@ -154,6 +154,48 @@ const DEMO_DASHBOARD = {
     droneLevel: 1,
     storageBonus: "1.10x"
   },
+  analytics: {
+    retention: {
+      days: 7,
+      limited: true,
+      returnedEvents: 18
+    },
+    trends: {
+      workScoreOverTime: [
+        { day: "Demo", score: 842, events: 18 }
+      ],
+      eventsByCategory: [
+        { category: "implementation", events: 9, score: 420 },
+        { category: "validation", events: 5, score: 260 }
+      ],
+      spaceBucksTrend: [
+        { day: "Demo", value: 1240 }
+      ],
+      materialValueTrend: [
+        { day: "Demo", value: 533 }
+      ],
+      orderEfficiency: [
+        { day: "Demo", value: 50 }
+      ]
+    },
+    syncHealth: {
+      acceptedCount: 18,
+      duplicateCount: 0,
+      rejectedCount: 0,
+      conflictState: "none",
+      activeDevices: 1
+    },
+    current: {
+      spaceBucks: 1240,
+      materialValue: 533,
+      orderEfficiency: {
+        readyPercent: 50,
+        activeOrders: 2,
+        fulfillableOrders: 1
+      }
+    },
+    history: []
+  },
   entitlement: FREE_ENTITLEMENT
 };
 
@@ -221,6 +263,37 @@ const EMPTY_CLOUD_DASHBOARD = {
     moduleCount: 0,
     droneLevel: 0,
     storageBonus: "1.00x"
+  },
+  analytics: {
+    retention: {
+      days: 7,
+      limited: true,
+      returnedEvents: 0
+    },
+    trends: {
+      workScoreOverTime: [],
+      eventsByCategory: [],
+      spaceBucksTrend: [],
+      materialValueTrend: [],
+      orderEfficiency: []
+    },
+    syncHealth: {
+      acceptedCount: 0,
+      duplicateCount: 0,
+      rejectedCount: 0,
+      conflictState: "none",
+      activeDevices: 0
+    },
+    current: {
+      spaceBucks: 0,
+      materialValue: 0,
+      orderEfficiency: {
+        readyPercent: 0,
+        activeOrders: 0,
+        fulfillableOrders: 0
+      }
+    },
+    history: []
   },
   entitlement: FREE_ENTITLEMENT
 };
@@ -382,6 +455,11 @@ const storeBalance = document.querySelector("#store-balance");
 const storeList = document.querySelector("#store-list");
 const reportsList = document.querySelector("#reports-list");
 const baseDetail = document.querySelector("#base-detail");
+const analyticsSummary = document.querySelector("#analytics-summary");
+const analyticsList = document.querySelector("#analytics-list");
+const exportJson = document.querySelector("#export-json");
+const exportCsv = document.querySelector("#export-csv");
+const exportStatus = document.querySelector("#export-status");
 const billingStatus = document.querySelector("#billing-status");
 const billingSummary = document.querySelector("#billing-summary");
 const billingPlan = document.querySelector("#billing-plan");
@@ -1386,6 +1464,7 @@ function refreshWarning(reads) {
 
 async function loadDashboardForUser(user) {
   const getSyncState = httpsCallable(functions, "getSyncState");
+  const getDashboardAnalytics = httpsCallable(functions, "getDashboardAnalytics");
   const reads = await Promise.allSettled([
     getDoc(doc(db, "players", user.uid)),
     getDoc(doc(db, "players", user.uid, "profile", "current")),
@@ -1397,7 +1476,8 @@ async function loadDashboardForUser(user) {
     getDocs(query(collection(db, "players", user.uid, "inventory"), limit(12))),
     getDocs(query(collection(db, "players", user.uid, "orders"), limit(8))),
     getDocs(query(collection(db, "players", user.uid, "syncDevices"), limit(8))),
-    getSyncState({})
+    getSyncState({}),
+    getDashboardAnalytics({})
   ]);
 
   const player = docsData(reads, 0) || {};
@@ -1408,6 +1488,7 @@ async function loadDashboardForUser(user) {
   const directState = docsData(reads, 3) || {};
   const directSync = docsData(reads, 4) || {};
   const callable = reads[10] && reads[10].status === "fulfilled" ? reads[10].value.data : {};
+  const analytics = reads[11] && reads[11].status === "fulfilled" ? reads[11].value.data : null;
   const cloudState = callable.state || directState;
   const syncMetadata = callable.syncMetadata || directSync;
   const inventory = normalizeInventoryRows(queryResult(reads, 7) || { forEach() {} }, cloudState);
@@ -1449,6 +1530,7 @@ async function loadDashboardForUser(user) {
   fallback.store = cloudState.store || fallback.store;
   fallback.base = { ...fallback.base, ...base };
   fallback.reports = Array.isArray(cloudState.reports) && cloudState.reports.length ? cloudState.reports.slice(0, 5) : fallback.reports;
+  fallback.analytics = analytics || fallback.analytics;
   return fallback;
 }
 
@@ -1498,6 +1580,7 @@ function renderDashboard(data) {
   renderReports(data.reports || []);
   renderCloudDetail(cloudState, asteroid, data.syncDevices || []);
   renderBase(data.base || {});
+  renderAnalytics(data.analytics || EMPTY_CLOUD_DASHBOARD.analytics, data.entitlement);
   renderPrivacy(data);
   renderBilling(data.entitlement);
   renderLinkedDevices(data.syncDevices || [], data.entitlement);
@@ -1752,6 +1835,53 @@ function renderBase(base) {
   `;
 }
 
+function trendLastValue(rows, key = "value") {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    return 0;
+  }
+  const last = list[list.length - 1];
+  return numberValue(last[key]);
+}
+
+function topCategoryLabel(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    return "No categories";
+  }
+  const top = list[0];
+  return `${displayNameFromId(top.category)} (${formatNumber(top.events)})`;
+}
+
+function renderAnalytics(analytics, rawEntitlement) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const retention = analytics.retention || {};
+  const trends = analytics.trends || {};
+  const current = analytics.current || {};
+  const syncHealth = analytics.syncHealth || {};
+  const orderEfficiency = current.orderEfficiency || {};
+  const pro = entitlement.entitlementStatus === "pro";
+  analyticsSummary.textContent = `${formatNumber(retention.days || entitlement.historyRetentionDays || 7)} day ${retention.limited ? "sample" : "history"}`;
+  exportJson.disabled = !currentUser || !pro;
+  exportCsv.disabled = !currentUser || !pro;
+  exportStatus.textContent = pro ? "Exports contain abstract gameplay history only." : "Pro unlocks history export.";
+  exportStatus.dataset.tone = pro ? "success" : "";
+  analyticsList.innerHTML = [
+    ["Work score", formatNumber(trendLastValue(trends.workScoreOverTime, "score")), `${formatNumber((analytics.history || []).length)} retained events`],
+    ["Events by category", topCategoryLabel(trends.eventsByCategory), "Aggregated abstract work types"],
+    ["Space Bucks", formatNumber(current.spaceBucks ?? trendLastValue(trends.spaceBucksTrend)), "Current cloud aggregate"],
+    ["Material value", `${formatNumber(current.materialValue ?? trendLastValue(trends.materialValueTrend))} SB`, "Current synced inventory value"],
+    ["Order efficiency", `${formatPercent(orderEfficiency.readyPercent ?? trendLastValue(trends.orderEfficiency))}`, `${formatNumber(orderEfficiency.fulfillableOrders)} / ${formatNumber(orderEfficiency.activeOrders)} ready`],
+    ["Sync health", syncHealth.conflictState === "none" ? "Clear" : displayNameFromId(syncHealth.conflictState), `${formatNumber(syncHealth.activeDevices)} active devices`]
+  ].map(([label, value, detail]) => `
+    <article class="analytics-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </article>
+  `).join("");
+}
+
 function renderPrivacy(data) {
   const privacyItems = [
     ["Owner scope", currentUser ? "Private profile boundary" : "Local demo"],
@@ -1876,6 +2006,44 @@ async function updateLinkedDevice(action, deviceId, name = "") {
   }
 }
 
+async function requestHistoryExport(format) {
+  if (!currentUser) {
+    setMessage("Sign in before exporting history.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+
+  exportJson.disabled = true;
+  exportCsv.disabled = true;
+  exportStatus.textContent = "Preparing export.";
+  try {
+    const callable = httpsCallable(functions, "exportDashboardHistory");
+    const result = await callable({ format });
+    const payload = result.data || {};
+    const blob = new Blob([payload.content || ""], { type: payload.mimeType || "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = payload.filename || `mcp-miner-history.${format}`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    exportStatus.textContent = `${format.toUpperCase()} export ready.`;
+    exportStatus.dataset.tone = "success";
+  } catch (error) {
+    exportStatus.textContent = error.message || "History export failed.";
+    exportStatus.dataset.tone = "error";
+  } finally {
+    const pro = normalizedEntitlement(activeDashboard.entitlement).entitlementStatus === "pro";
+    exportJson.disabled = !currentUser || !pro;
+    exportCsv.disabled = !currentUser || !pro;
+  }
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!validateAuthForm()) {
@@ -1927,6 +2095,14 @@ checkoutAnnual.addEventListener("click", () => {
 
 manageBilling.addEventListener("click", () => {
   openBillingSession("createCustomerPortalSession");
+});
+
+exportJson.addEventListener("click", () => {
+  requestHistoryExport("json");
+});
+
+exportCsv.addEventListener("click", () => {
+  requestHistoryExport("csv");
 });
 
 planCards.addEventListener("click", (event) => {

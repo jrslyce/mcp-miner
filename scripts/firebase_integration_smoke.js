@@ -212,17 +212,18 @@ async function main() {
   privateEvent.checksum = eventChecksum(privateEvent);
   const rejected = await callFunction("syncRewardEvents", owner.idToken, { events: [privateEvent] });
   const state = await callFunction("getSyncState", owner.idToken, {});
+  const analytics = await callFunction("getDashboardAnalytics", owner.idToken, {});
   await getDoc(`players/${owner.localId}/gameState/current`, owner.idToken);
 
   const indexHtml = await requestText(`http://${HOSTING_HOST}/`);
   const dashboardJs = await requestText(`http://${HOSTING_HOST}/auth.js`);
   const planCatalog = JSON.parse(await requestText(`http://${HOSTING_HOST}/subscription-plans.json`));
-  const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "device-link", "linked-devices", "sync-privacy"];
+  const requiredPanels = ["status", "analytics", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "device-link", "linked-devices", "sync-privacy"];
   const missingPanels = requiredPanels.filter((panel) => !indexHtml.includes(`data-panel="${panel}"`));
   if (missingPanels.length) {
     throw new Error(`dashboard hosting response missing panels: ${missingPanels.join(", ")}`);
   }
-  if (!dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("getSyncState") || !dashboardJs.includes("connectFunctionsEmulator") || !dashboardJs.includes("renameSyncDevice") || !dashboardJs.includes("syncCadenceModel")) {
+  if (!dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("getSyncState") || !dashboardJs.includes("getDashboardAnalytics") || !dashboardJs.includes("exportDashboardHistory") || !dashboardJs.includes("connectFunctionsEmulator") || !dashboardJs.includes("renameSyncDevice") || !dashboardJs.includes("syncCadenceModel")) {
     throw new Error("dashboard module missing demo/offline or Functions integration support");
   }
   if (!indexHtml.includes("id=\"sync-cadence\"") || !indexHtml.includes("id=\"sync-next-refresh\"")) {
@@ -247,6 +248,9 @@ async function main() {
   if (!state.result || !state.result.state || state.result.state.eventCount < 2) {
     throw new Error("dashboard sync state read did not include reduced state");
   }
+  if (!analytics.result || !analytics.result.trends || analytics.result.history.length < 2) {
+    throw new Error("dashboard analytics read did not include abstract history");
+  }
 
   console.log(JSON.stringify({
     ok: true,
@@ -266,6 +270,7 @@ async function main() {
       "duplicate_sync_idempotent",
       "private_sync_rejected",
       "dashboard_state_read",
+      "dashboard_analytics_read",
       "hosting_dashboard_served"
     ],
     accepted: sync.result.accepted.length + deviceSync.result.accepted.length,

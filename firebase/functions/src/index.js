@@ -44,6 +44,10 @@ const {
   backupConflict,
   sanitizeBackupPayload
 } = require("./backups");
+const {
+  buildDashboardAnalytics,
+  exportDashboardAnalytics
+} = require("./analytics");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -223,6 +227,58 @@ function publicBackupMetadata(snapshot) {
     checksum: data.checksum || null,
     byteSize: data.byteSize || 0
   };
+}
+
+function requireExportEntitlement(entitlement) {
+  if (!entitlement || !entitlement.features || entitlement.features.exports !== true) {
+    throw new HttpsError("resource-exhausted", "History exports are a Pro benefit.", {
+      reason: "plan_limit_exports",
+      entitlement: publicEntitlement(entitlement)
+    });
+  }
+}
+
+function snapshotDocs(snapshot) {
+  return snapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data()
+  }));
+}
+
+function activeDeviceCountFromSnapshot(snapshot) {
+  return snapshot.docs.filter((docSnap) => {
+    const data = docSnap.data() || {};
+    return data.status !== "revoked";
+  }).length;
+}
+
+async function loadAnalyticsData(uid, entitlement, now) {
+  const eventLimit = entitlement.entitlementStatus === "pro" ? 2000 : 100;
+  const [
+    eventsSnap,
+    stateSnap,
+    syncSnap,
+    inventorySnap,
+    ordersSnap,
+    devicesSnap
+  ] = await Promise.all([
+    db.collection(`players/${uid}/rewardEvents`).orderBy("timestamp", "desc").limit(eventLimit).get(),
+    db.doc(`players/${uid}/gameState/current`).get(),
+    db.doc(`players/${uid}/syncMetadata/default`).get(),
+    db.collection(`players/${uid}/inventory`).limit(50).get(),
+    db.collection(`players/${uid}/orders`).limit(50).get(),
+    db.collection(`players/${uid}/syncDevices`).limit(50).get()
+  ]);
+  return buildDashboardAnalytics({
+    events: snapshotDocs(eventsSnap),
+    state: stateSnap.exists ? stateSnap.data() : {},
+    syncMetadata: syncSnap.exists ? syncSnap.data() : {},
+    inventory: snapshotDocs(inventorySnap),
+    orders: snapshotDocs(ordersSnap),
+    deviceCount: activeDeviceCountFromSnapshot(devicesSnap),
+    entitlement,
+    now
+  });
 }
 
 async function readEntitlementInTransaction(transaction, uid, now) {
@@ -583,6 +639,39 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
       lastAcceptedBatchAt: cursorSync.lastAcceptedBatchAt,
       now: entitlementNow
     }))
+  };
+});
+
+exports.getDashboardAnalytics = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request, "sync:read");
+  const now = new Date().toISOString();
+  const entitlementSnap = await db.doc(`players/${auth.uid}/entitlements/current`).get();
+  const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+  const analytics = await loadAnalyticsData(auth.uid, entitlement, now);
+  return {
+    ...analytics,
+    entitlement: publicEntitlement(entitlement)
+  };
+});
+
+exports.exportDashboardHistory = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request, "sync:read");
+  const requestedUid = request.data && request.data.uid ? String(request.data.uid) : null;
+  if (requestedUid && requestedUid !== auth.uid) {
+    throw new HttpsError("permission-denied", "History exports are owner-scoped.");
+  }
+  const now = new Date().toISOString();
+  const entitlementSnap = await db.doc(`players/${auth.uid}/entitlements/current`).get();
+  const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+  requireExportEntitlement(entitlement);
+  const format = request.data && request.data.format === "csv" ? "csv" : "json";
+  const analytics = await loadAnalyticsData(auth.uid, entitlement, now);
+  const exported = exportDashboardAnalytics(analytics, format);
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    filename: `mcp-miner-history-${new Date(now).toISOString().slice(0, 10)}.${exported.format}`,
+    ...exported
   };
 });
 

@@ -110,6 +110,14 @@ Reducer writes:
 
 Returns the current server-owned `gameState/current`, aggregate `syncMetadata/default`, the caller's `deviceSyncMetadata`, and the evaluated entitlement for the authenticated UID.
 
+### `getDashboardAnalytics`
+
+Returns owner-scoped, aggregate dashboard analytics for the effective retention window. Free returns a limited recent history window; Pro returns the longer paid window. Query limits cap dashboard reads for large accounts. Trend payloads cover work score over time, events by category, current Space Bucks, material value, sync health, and order efficiency without raw work content.
+
+### `exportDashboardHistory`
+
+Returns Pro-gated JSON or CSV export content for the same abstract history rows. Requests can include the caller's UID for confirmation, but any other UID is rejected. Export rows include event ID, event type, timestamp, sequence, score, category, and privacy class only.
+
 ### `getCloudBackupStatus`
 
 Returns the evaluated entitlement and current cloud backup metadata for the authenticated UID. Free users receive `eligible: false`; local play is unchanged and no local save data is uploaded by this status call.
