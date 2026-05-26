@@ -74,6 +74,7 @@ Validation:
 - Functions evaluate `/players/{uid}/entitlements/current` on every sync. Missing, stale, unpaid, or invalid entitlement projections fall back to Free.
 - Free accounts can have one active linked Codex device; Pro accounts can have five. Extra device tokens are rejected without deleting local saves or server device metadata.
 - Free accepts at most one new cloud batch per 60 seconds. Pro uses the paid `syncCadenceSeconds` limit for near-real-time sync within cost controls.
+- Sequence and cadence are checked against the caller's sync cursor: `/players/{uid}/syncMetadata/default` for Firebase Auth and `/players/{uid}/syncMetadata/{deviceId}` for linked Codex device tokens.
 - Plan-limit denials use structured reasons such as `plan_limit_device_count` and `plan_limit_sync_cadence`.
 - `schemaVersion` must match the current sync schema.
 - `privacyClass` must be `abstract`.
@@ -88,11 +89,12 @@ Reducer writes:
 
 - `/players/{uid}/rewardEvents/{eventId}` stores the sanitized event.
 - `/players/{uid}/gameState/current` stores aggregate abstract state such as event counts, score totals, work-event counters, last event ID, and last sequence.
-- `/players/{uid}/syncMetadata/default` stores sequence/counter metadata, plus the last accepted batch timestamp used for entitlement cadence checks.
+- `/players/{uid}/syncMetadata/default` stores aggregate sequence/counter metadata for the account and the legacy Firebase Auth cursor.
+- `/players/{uid}/syncMetadata/{deviceId}` stores the per-device cursor for linked Codex instances. Reward event IDs remain globally idempotent under `/players/{uid}/rewardEvents/{eventId}`.
 
 ### `getSyncState`
 
-Returns the current server-owned `gameState/current` and `syncMetadata/default` documents for the authenticated UID.
+Returns the current server-owned `gameState/current`, aggregate `syncMetadata/default`, the caller's `deviceSyncMetadata`, and the evaluated entitlement for the authenticated UID.
 
 ## Logging
 

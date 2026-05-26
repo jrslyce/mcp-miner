@@ -9,7 +9,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/players/{uid}` | `request.auth.uid == uid` | owner read/create/update | Account shell, schema version, display names, sync enabled flag. |
 | `/players/{uid}/profile/current` | owner | owner read/create/update | Miner profile fields and avatar/customization references. |
 | `/players/{uid}/settings/current` | owner | owner read/create/update | Report mode, sync preference, dashboard display preference, App Check debug flag. |
-| `/players/{uid}/syncMetadata/{clientId}` | owner | owner read/create/update | Per-client cursors and conflict metadata. |
+| `/players/{uid}/syncMetadata/{clientId}` | owner | owner read/create/update | Aggregate sync metadata at `default` plus server-maintained per-device cursors for linked Codex devices. |
 | `/players/{uid}/syncDevices/{deviceId}` | owner | owner read only | Server-owned public metadata for linked Codex devices; device token hashes stay outside owner-readable docs. |
 | `/players/{uid}/billing/current` | owner | owner read only | Server-owned normalized billing projection from Stripe or the active billing provider. |
 | `/players/{uid}/entitlements/current` | owner | owner read only | Server-owned entitlement projection used by Functions, portal UI, and the local plugin. |
@@ -35,6 +35,8 @@ Billing and entitlement documents under `/players/{uid}` are owner-readable but 
 If `/players/{uid}/entitlements/current` is missing, stale, unpaid, canceled beyond the paid period, or otherwise invalid, Functions must evaluate the effective entitlement as Free. `past_due` subscriptions can remain Pro only until the configured grace-period end; canceled subscriptions can remain Pro only through `currentPeriodEnd`.
 
 Cloud Functions enforce the evaluated entitlement for device linking, device-token sync, and sync state reads. Free accounts are limited to one active Codex device and one accepted sync batch per 60 seconds. Pro accounts are limited to five active Codex devices and the paid near-real-time cadence. Downgrades do not delete existing `syncDevices`; only the earliest allowed active device remains usable until the account upgrades or extra devices are disconnected.
+
+Cloud sync uses per-device cursors so multiple Pro Codex instances can alternate event batches without one account-wide sequence causing stale rejections. `/players/{uid}/syncMetadata/default` remains the aggregate and legacy Firebase Auth cursor. Linked device tokens write their own `/players/{uid}/syncMetadata/{deviceId}` document while reward event IDs stay globally idempotent across the account.
 
 Normalized entitlement fields:
 

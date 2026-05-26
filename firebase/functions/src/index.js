@@ -174,6 +174,22 @@ function enforceActiveDeviceAccess({ entitlement, activeDevices, auth }) {
   }), entitlement);
 }
 
+function syncCursorId(auth) {
+  return auth && auth.authType === "device_token" && auth.deviceId ? auth.deviceId : "default";
+}
+
+function syncCursorRef(uid, auth) {
+  return db.doc(`players/${uid}/syncMetadata/${syncCursorId(auth)}`);
+}
+
+function legacyCursorFromDefault(cursorId, defaultSync) {
+  const sync = defaultSync && typeof defaultSync === "object" ? defaultSync : {};
+  if (cursorId !== "default") {
+    return {};
+  }
+  return sync;
+}
+
 async function resolveLinkSessionRef(data) {
   const sessionId = typeof data.sessionId === "string" ? data.sessionId.trim() : "";
   if (sessionId) {
@@ -274,7 +290,9 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
   const receivedAt = new Date().toISOString();
   const playerRef = db.doc(`players/${uid}`);
   const stateRef = db.doc(`players/${uid}/gameState/current`);
-  const syncRef = db.doc(`players/${uid}/syncMetadata/default`);
+  const defaultSyncRef = db.doc(`players/${uid}/syncMetadata/default`);
+  const cursorRef = syncCursorRef(uid, auth);
+  const cursorId = syncCursorId(auth);
   const entitlementNow = receivedAt;
   const eventRefs = events.map((event, index) => {
     const eventId = event && typeof event.eventId === "string" && /^evt_[a-zA-Z0-9_-]+$/.test(event.eventId)
@@ -286,7 +304,8 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
   try {
     const result = await db.runTransaction(async (transaction) => {
       const stateSnap = await transaction.get(stateRef);
-      const syncSnap = await transaction.get(syncRef);
+      const defaultSyncSnap = await transaction.get(defaultSyncRef);
+      const cursorSnap = cursorRef.path === defaultSyncRef.path ? defaultSyncSnap : await transaction.get(cursorRef);
       const entitlement = await readEntitlementInTransaction(transaction, uid, entitlementNow);
       const activeDevices = await readActiveDevicesInTransaction(transaction, uid, auth.deviceId);
       const eventSnaps = [];
@@ -304,7 +323,8 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         workEvents: {},
         lastSequence: 0
       };
-      const sync = syncSnap.exists ? syncSnap.data() : {};
+      const defaultSync = defaultSyncSnap.exists ? defaultSyncSnap.data() : {};
+      const cursorSync = cursorSnap.exists ? cursorSnap.data() : legacyCursorFromDefault(cursorId, defaultSync);
       const existingEventIds = eventSnaps
         .filter((snapshot) => snapshot.exists)
         .map((snapshot) => snapshot.id);
@@ -312,12 +332,12 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         uid,
         events,
         existingEventIds,
-        lastSequence: Number(sync.lastSequence || state.lastSequence || 0),
+        lastSequence: Number(cursorSync.lastSequence || 0),
         receivedAt
       });
       throwEntitlementDecision(syncCadenceDecision({
         entitlement,
-        lastAcceptedBatchAt: sync.lastAcceptedBatchAt,
+        lastAcceptedBatchAt: cursorSync.lastAcceptedBatchAt,
         now: receivedAt,
         acceptedCount: batch.accepted.length
       }), entitlement);
@@ -330,8 +350,14 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
       };
       for (const event of batch.accepted) {
         const eventRef = db.doc(`players/${uid}/rewardEvents/${event.eventId}`);
-        transaction.set(eventRef, event, { merge: false });
-        reducedState = reduceCloudState(reducedState, event, receivedAt);
+        const enrichedEvent = {
+          ...event,
+          deviceId: auth.deviceId || null,
+          authType: auth.authType,
+          cursorId
+        };
+        transaction.set(eventRef, enrichedEvent, { merge: false });
+        reducedState = reduceCloudState(reducedState, enrichedEvent, receivedAt);
       }
 
       transaction.set(playerRef, {
@@ -342,20 +368,42 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         updatedAt: receivedAt
       }, { merge: true });
       transaction.set(stateRef, reducedState, { merge: true });
-      transaction.set(syncRef, {
+      const nextCursorSequence = Math.max(Number(cursorSync.lastSequence || 0), Number(batch.lastSequence || 0));
+      const cursorUpdate = {
         ownerUid: uid,
+        cursorId,
+        deviceId: auth.deviceId || null,
+        authType: auth.authType,
         schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
         privacyClass: "abstract",
         updatedAt: receivedAt,
-        lastCloudEventId: reducedState.lastEventId || sync.lastCloudEventId || null,
-        lastSequence: Math.max(Number(sync.lastSequence || 0), Number(reducedState.lastSequence || 0), Number(batch.lastSequence || 0)),
+        lastCloudEventId: batch.accepted.length > 0 ? reducedState.lastEventId : cursorSync.lastCloudEventId || null,
+        lastSequence: nextCursorSequence,
         acceptedCount: FieldValue.increment(batch.accepted.length),
         duplicateCount: FieldValue.increment(batch.duplicates.length),
         rejectedCount: FieldValue.increment(batch.rejected.length),
-        lastAcceptedBatchAt: batch.accepted.length > 0 ? receivedAt : sync.lastAcceptedBatchAt || null,
-        lastAcceptedBatchAuthType: batch.accepted.length > 0 ? auth.authType : sync.lastAcceptedBatchAuthType || null,
-        lastAcceptedBatchDeviceId: batch.accepted.length > 0 ? auth.deviceId : sync.lastAcceptedBatchDeviceId || null
-      }, { merge: true });
+        lastAcceptedBatchAt: batch.accepted.length > 0 ? receivedAt : cursorSync.lastAcceptedBatchAt || null,
+        migratedFromDefault: cursorId !== "default" && !cursorSnap.exists && defaultSyncSnap.exists ? true : cursorSync.migratedFromDefault || false
+      };
+      transaction.set(cursorRef, cursorUpdate, { merge: true });
+      if (cursorRef.path !== defaultSyncRef.path) {
+        transaction.set(defaultSyncRef, {
+          ownerUid: uid,
+          cursorId: "default",
+          schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
+          privacyClass: "abstract",
+          cursorMode: "per_device",
+          updatedAt: receivedAt,
+          lastCloudEventId: reducedState.lastEventId || defaultSync.lastCloudEventId || null,
+          lastSequence: Math.max(Number(defaultSync.lastSequence || 0), Number(reducedState.lastSequence || 0), Number(batch.lastSequence || 0)),
+          acceptedCount: FieldValue.increment(batch.accepted.length),
+          duplicateCount: FieldValue.increment(batch.duplicates.length),
+          rejectedCount: FieldValue.increment(batch.rejected.length),
+          lastAcceptedBatchAt: batch.accepted.length > 0 ? receivedAt : defaultSync.lastAcceptedBatchAt || null,
+          lastAcceptedBatchAuthType: batch.accepted.length > 0 ? auth.authType : defaultSync.lastAcceptedBatchAuthType || null,
+          lastAcceptedBatchDeviceId: batch.accepted.length > 0 ? auth.deviceId : defaultSync.lastAcceptedBatchDeviceId || null
+        }, { merge: true });
+      }
       touchDeviceWrites(transaction, auth, receivedAt);
 
       return {
@@ -370,7 +418,12 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
           lastSequence: reducedState.lastSequence,
           workEvents: reducedState.workEvents
         },
-        entitlement
+        entitlement,
+        syncCursor: {
+          cursorId,
+          deviceId: auth.deviceId || null,
+          lastSequence: nextCursorSequence
+        }
       };
     });
 
@@ -381,7 +434,8 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
       requestedCount: events.length,
       acceptedCount: result.accepted.length,
       duplicateCount: result.duplicates.length,
-      rejectedCount: result.rejected.length
+      rejectedCount: result.rejected.length,
+      cursorId: result.syncCursor.cursorId
     });
 
     return {
@@ -407,9 +461,12 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
   const auth = await resolveSyncAuth(request, "sync:read");
   const uid = auth.uid;
   const entitlementNow = new Date().toISOString();
-  const [stateSnap, syncSnap, entitlementSnap, activeDevicesSnap] = await Promise.all([
+  const cursorRef = syncCursorRef(uid, auth);
+  const defaultSyncRef = db.doc(`players/${uid}/syncMetadata/default`);
+  const [stateSnap, syncSnap, cursorSnap, entitlementSnap, activeDevicesSnap] = await Promise.all([
     db.doc(`players/${uid}/gameState/current`).get(),
-    db.doc(`players/${uid}/syncMetadata/default`).get(),
+    defaultSyncRef.get(),
+    cursorRef.path === defaultSyncRef.path ? defaultSyncRef.get() : cursorRef.get(),
     db.doc(`players/${uid}/entitlements/current`).get(),
     auth.authType === "device_token" ? activeDevicesQuery(uid).get() : Promise.resolve(null)
   ]);
@@ -439,6 +496,7 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
     privacyClass: "abstract",
     state: stateSnap.exists ? stateSnap.data() : null,
     syncMetadata: syncSnap.exists ? syncSnap.data() : null,
+    deviceSyncMetadata: cursorSnap.exists ? cursorSnap.data() : legacyCursorFromDefault(syncCursorId(auth), syncSnap.exists ? syncSnap.data() : {}),
     entitlement
   };
 });

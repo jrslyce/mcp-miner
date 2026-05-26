@@ -147,8 +147,8 @@ async function setEntitlement(uid, plan, overrides = {}) {
   }, { merge: true });
 }
 
-async function backdateAcceptedBatch(uid, secondsAgo) {
-  await firestore().doc(`players/${uid}/syncMetadata/default`).set({
+async function backdateAcceptedBatch(uid, secondsAgo, cursorId = "default") {
+  await firestore().doc(`players/${uid}/syncMetadata/${cursorId}`).set({
     lastAcceptedBatchAt: new Date(Date.now() - (secondsAgo * 1000)).toISOString()
   }, { merge: true });
 }
@@ -273,6 +273,44 @@ async function main() {
       createdAt: `2026-05-24T00:00:0${index + 1}.000Z`
     }, { merge: true });
   }
+  const proDeviceA = await callFunction("syncRewardEvents", proDevices[0].result.deviceToken, {
+    events: [event({
+      eventId: "evt_emulator_sync_pro_a",
+      sequence: 1,
+      ownerUid: proUser.localId
+    })]
+  });
+  const proDeviceB = await callFunction("syncRewardEvents", proDevices[1].result.deviceToken, {
+    events: [event({
+      eventId: "evt_emulator_sync_pro_b",
+      sequence: 1,
+      ownerUid: proUser.localId
+    })]
+  });
+  const proDuplicateGlobal = await callFunction("syncRewardEvents", proDevices[1].result.deviceToken, {
+    events: [event({
+      eventId: "evt_emulator_sync_pro_a",
+      sequence: 2,
+      ownerUid: proUser.localId
+    })]
+  });
+  const [raceA, raceB] = await Promise.all([
+    callFunction("syncRewardEvents", proDevices[2].result.deviceToken, {
+      events: [event({
+        eventId: "evt_emulator_sync_pro_race_a",
+        sequence: 1,
+        ownerUid: proUser.localId
+      })]
+    }),
+    callFunction("syncRewardEvents", proDevices[3].result.deviceToken, {
+      events: [event({
+        eventId: "evt_emulator_sync_pro_race_b",
+        sequence: 1,
+        ownerUid: proUser.localId
+      })]
+    })
+  ]);
+  const proDeviceAState = await callFunction("getSyncState", proDevices[0].result.deviceToken, {});
   const proSixthRejected = await callFunction("exchangeLinkSession", null, {
     sessionId: proLinks[5].result.session.sessionId,
     deviceSecret: proLinks[5].result.deviceSecret
@@ -287,14 +325,33 @@ async function main() {
   const downgradedSecond = await callFunction("getSyncState", proDevices[1].result.deviceToken, {}, false);
   const downgradedDevices = await firestore().collection(`players/${proUser.localId}/syncDevices`).where("status", "==", "active").get();
   await setEntitlement(proUser.localId, "pro_monthly");
-  await backdateAcceptedBatch(proUser.localId, 11);
+  await backdateAcceptedBatch(proUser.localId, 11, proDevices[0].result.deviceId);
   const proSync = await callFunction("syncRewardEvents", proDevices[0].result.deviceToken, {
     events: [event({
       eventId: "evt_emulator_sync_pro_device",
-      sequence: 1,
+      sequence: 2,
       ownerUid: proUser.localId
     })]
   });
+  const migrationUser = await signUp("cursor-migration");
+  await setEntitlement(migrationUser.localId, "pro_monthly");
+  const migrationDevice = await linkDevice(migrationUser.idToken, "Migrated Device");
+  await firestore().doc(`players/${migrationUser.localId}/syncMetadata/default`).set({
+    ownerUid: migrationUser.localId,
+    schemaVersion: 1,
+    privacyClass: "abstract",
+    lastSequence: 99,
+    cursorMode: "legacy",
+    updatedAt: new Date(Date.now() - 60 * 1000).toISOString()
+  }, { merge: true });
+  const migrationSync = await callFunction("syncRewardEvents", migrationDevice.result.deviceToken, {
+    events: [event({
+      eventId: "evt_emulator_sync_cursor_migration",
+      sequence: 1,
+      ownerUid: migrationUser.localId
+    })]
+  });
+  const migrationCursor = await firestore().doc(`players/${migrationUser.localId}/syncMetadata/${migrationDevice.result.deviceId}`).get();
 
   if (!first.result || first.result.accepted.length !== 1) {
     throw new Error("valid sync did not accept one event");
@@ -335,11 +392,26 @@ async function main() {
   if (proDevices.length !== 5 || errorReason(proSixthRejected) !== "plan_limit_device_count") {
     throw new Error("Pro device limit did not allow five devices and reject the sixth");
   }
+  if (!proDeviceA.result || !proDeviceB.result || proDeviceA.result.accepted.length !== 1 || proDeviceB.result.accepted.length !== 1) {
+    throw new Error("Two Pro devices did not sync alternating sequence-1 events with per-device cursors");
+  }
+  if (!proDuplicateGlobal.result || proDuplicateGlobal.result.duplicates.length !== 1) {
+    throw new Error("Global event idempotency did not reject duplicate event IDs across devices");
+  }
+  if (!raceA.result || !raceB.result || raceA.result.accepted.length !== 1 || raceB.result.accepted.length !== 1) {
+    throw new Error("Concurrent Pro device sync transactions did not both settle");
+  }
+  if (!proDeviceAState.result || proDeviceAState.result.deviceSyncMetadata.lastSequence !== 1) {
+    throw new Error("getSyncState did not return the current device cursor");
+  }
   if (!downgradedFirst.result || errorReason(downgradedSecond) !== "plan_limit_device_count" || downgradedDevices.size !== 5) {
     throw new Error("Downgraded Pro devices were not restricted without deleting device metadata");
   }
   if (!proSync.result || proSync.result.accepted.length !== 1 || proSync.result.entitlement.maxDevices !== 5) {
     throw new Error("Pro near-real-time sync was not accepted under configured limits");
+  }
+  if (!migrationSync.result || migrationSync.result.accepted.length !== 1 || !migrationCursor.exists || migrationCursor.data().lastSequence !== 1) {
+    throw new Error("Legacy default sync metadata did not migrate into a per-device cursor");
   }
 
   console.log(JSON.stringify({
@@ -355,9 +427,13 @@ async function main() {
     freeSyncCadenceLimit: errorReason(freeCadence),
     freeDeviceLimit: errorReason(freeDeviceBRejected),
     proDeviceLimit: errorReason(proSixthRejected),
+    proAlternatingAccepted: proDeviceA.result.accepted.length + proDeviceB.result.accepted.length,
+    proGlobalDuplicateCount: proDuplicateGlobal.result.duplicates.length,
+    proRaceAccepted: raceA.result.accepted.length + raceB.result.accepted.length,
     downgradedDeviceLimit: errorReason(downgradedSecond),
     downgradedActiveDevicesKept: downgradedDevices.size,
-    proSyncAccepted: proSync.result.accepted.length
+    proSyncAccepted: proSync.result.accepted.length,
+    migratedCursorSequence: migrationCursor.data().lastSequence
   }, null, 2));
 }
 
