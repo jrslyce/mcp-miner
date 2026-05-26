@@ -63,8 +63,8 @@ def user_prompt(turn_id, state_path, cwd: ROOT)
   }, state_path)
 end
 
-def post_tool(turn_id, state_path, tool_name:, tool_use_id:, command: nil, response: { "status" => "success" }, cwd: ROOT)
-  tool_input = command.nil? ? {} : { "command" => command }
+def post_tool(turn_id, state_path, tool_name:, tool_use_id:, command: nil, tool_input: nil, response: { "status" => "success" }, cwd: ROOT)
+  resolved_tool_input = tool_input || (command.nil? ? {} : { "command" => command })
   run_hook("post_tool_use", {
     "session_id" => "session-smoke",
     "turn_id" => turn_id,
@@ -72,7 +72,7 @@ def post_tool(turn_id, state_path, tool_name:, tool_use_id:, command: nil, respo
     "cwd" => cwd,
     "tool_name" => tool_name,
     "tool_use_id" => tool_use_id,
-    "tool_input" => tool_input,
+    "tool_input" => resolved_tool_input,
     "tool_response" => response
   }, state_path)
 end
@@ -123,12 +123,17 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
 
   user_prompt("turn-every", state_path)
   every_stop = stop_turn("turn-every", state_path)
-  assert("every_turn_compact should emit for prompt-only turns") do
-    every_stop["decision"] == "block" && every_stop["reason"].include?("MCP Miner:")
+  assert("every_turn_compact should emit a non-blocking report for prompt-only turns") do
+    every_stop["continue"] == true &&
+      !every_stop.key?("decision") &&
+      every_stop["systemMessage"].start_with?("![MCP Miner](data:image/svg+xml;base64,") &&
+      every_stop["systemMessage"].include?(") MCP Miner:")
   end
-  duplicate_stop = stop_turn("turn-every", state_path, last_message: every_stop["reason"])
-  assert("Stop hook should not duplicate an existing MCP Miner footer") do
-    duplicate_stop["continue"] == true && !duplicate_stop.key?("decision")
+  duplicate_stop = stop_turn("turn-every", state_path)
+  assert("Stop hook should not duplicate an existing MCP Miner report") do
+    duplicate_stop["continue"] == true &&
+      !duplicate_stop.key?("decision") &&
+      !duplicate_stop.key?("systemMessage")
   end
 
   run_mcp(state_path, [
@@ -143,6 +148,11 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
             command: "rg -n MCP Miner .",
             response: { "exit_code" => 0 })
   post_tool("turn-work", state_path,
+            tool_name: "functions.exec_command",
+            tool_use_id: "tool-modern-search",
+            tool_input: { "cmd" => "rg -n MCP Miner ." },
+            response: { "exit_code" => 0 })
+  post_tool("turn-work", state_path,
             tool_name: "apply_patch",
             tool_use_id: "tool-patch",
             command: patch_command,
@@ -154,13 +164,19 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
             response: { "status" => "success" })
 
   work_stop = stop_turn("turn-work", state_path)
-  assert("meaningful concrete work should request an MCP Miner footer") do
-    work_stop["decision"] == "block" && work_stop["reason"].include?("fabricator sparks approved")
+  assert("meaningful concrete work should emit a non-blocking MCP Miner report") do
+    work_stop["continue"] == true &&
+      !work_stop.key?("decision") &&
+      work_stop["systemMessage"].start_with?("![MCP Miner](data:image/svg+xml;base64,") &&
+      work_stop["systemMessage"].include?("MCP Miner:")
   end
 
   after_work = state(state_path)
   assert("duplicate PostToolUse should be ignored") do
     after_work.dig("current_turn", "events", "work_apply_patch") == 1
+  end
+  assert("modern exec_command tools should be classified") do
+    after_work.dig("current_turn", "events", "work_search") == 2
   end
   assert("hook smoke test did not mine Chonks") do
     after_work.dig("inventory", "mat_chonks").to_i.positive?
@@ -213,6 +229,35 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     state(state_path).dig("stats", "tool_events_seen") == stats_before_self_mcp
   end
 
+  post_tool("turn-modern-patch", state_path,
+            tool_name: "functions.apply_patch",
+            tool_use_id: "tool-modern-patch",
+            tool_input: patch_command(path: "modern.rb"),
+            response: { "status" => "success" })
+  assert("modern apply_patch tools should accept string patch payloads") do
+    state(state_path).dig("current_turn", "events", "work_apply_patch") == 1
+  end
+
+  post_tool("turn-modern-parallel", state_path,
+            tool_name: "multi_tool_use.parallel",
+            tool_use_id: "tool-modern-parallel",
+            tool_input: {
+              "tool_uses" => [
+                {
+                  "recipient_name" => "functions.exec_command",
+                  "parameters" => { "cmd" => "npm test" }
+                },
+                {
+                  "recipient_name" => "functions.exec_command",
+                  "parameters" => { "cmd" => "rg -n MCP Miner ." }
+                }
+              ]
+            },
+            response: { "status" => "success" })
+  assert("parallel wrapper tools should classify their highest-value child work") do
+    state(state_path).dig("current_turn", "events", "work_test_pass") == 1
+  end
+
   post_tool("turn-test-fail", state_path,
             tool_name: "Bash",
             tool_use_id: "tool-test-fail",
@@ -252,9 +297,10 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     user_prompt("turn-full", report_state_path)
     full_stop = stop_turn("turn-full", report_state_path)
     assert("every_turn_full should use the full expedition template") do
-      full_stop["decision"] == "block" &&
-        full_stop["reason"].include?("MCP Miner Expedition Report") &&
-        full_stop["reason"].include?("Space Bucks:")
+      full_stop["continue"] == true &&
+        !full_stop.key?("decision") &&
+        full_stop["systemMessage"].include?("MCP Miner Expedition Report") &&
+        full_stop["systemMessage"].include?("Space Bucks:")
     end
 
     update_report_mode(report_state_path, "session_summary_only")
@@ -266,9 +312,10 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
               response: { "status" => "success" })
     session_stop = stop_turn("turn-session", report_state_path)
     assert("session_summary_only should emit detailed summaries for concrete work") do
-      session_stop["decision"] == "block" &&
-        session_stop["reason"].include?("MCP Miner Expedition Report") &&
-        session_stop["reason"].include?("Asteroid:")
+      session_stop["continue"] == true &&
+        !session_stop.key?("decision") &&
+        session_stop["systemMessage"].include?("MCP Miner Expedition Report") &&
+        session_stop["systemMessage"].include?("Asteroid:")
     end
 
     update_report_mode(report_state_path, "milestones_only")
@@ -283,9 +330,10 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
               response: { "status" => "success" })
     milestone_stop = stop_turn("turn-milestone", report_state_path)
     assert("milestones_only should emit deterministic milestone reports") do
-      milestone_stop["decision"] == "block" &&
-        milestone_stop["reason"].include?("MCP Miner milestone:") &&
-        milestone_stop["reason"].include?("Space Bucks balance")
+      milestone_stop["continue"] == true &&
+        !milestone_stop.key?("decision") &&
+        milestone_stop["systemMessage"].include?("MCP Miner milestone:") &&
+        milestone_stop["systemMessage"].include?("Space Bucks balance")
     end
 
     update_report_mode(report_state_path, "every_turn_compact")
@@ -307,9 +355,10 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
               response: { "status" => "success" })
     order_stop = stop_turn("turn-order", report_state_path)
     assert("compact reports should use order progress templates when orders are active") do
-      order_stop["decision"] == "block" &&
-        order_stop["reason"].include?("order +100%") &&
-        order_stop["reason"].include?("#{target_order.fetch('expires_in_days')} days left")
+      order_stop["continue"] == true &&
+        !order_stop.key?("decision") &&
+        order_stop["systemMessage"].include?("order +100%") &&
+        order_stop["systemMessage"].include?("#{target_order.fetch('expires_in_days')} days left")
     end
   end
 
