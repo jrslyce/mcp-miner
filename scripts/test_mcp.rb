@@ -189,6 +189,7 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     sync_payload["ok"] == true &&
       sync_payload.dig("sync", "available") == false &&
       sync_payload.dig("sync", "status") == "unauthenticated" &&
+      sync_payload.dig("sync", "cadence", "sync_cadence_seconds") == 60 &&
       sync_payload.dig("sync", "metadata", "pending_event_count").is_a?(Integer) &&
       !sync_payload.dig("sync", "journal").key?("path")
   end

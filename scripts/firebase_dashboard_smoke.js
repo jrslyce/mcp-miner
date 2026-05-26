@@ -124,8 +124,11 @@ async function main() {
   if (missingPanels.length) {
     throw new Error(`dashboard hosting response missing panels: ${missingPanels.join(", ")}`);
   }
-  if (!dashboardJs.includes("getSyncState") || !dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("ASTEROID_CLASSES") || !dashboardJs.includes("createCheckoutSession") || !dashboardJs.includes("revokeSyncDevice")) {
+  if (!dashboardJs.includes("getSyncState") || !dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("ASTEROID_CLASSES") || !dashboardJs.includes("createCheckoutSession") || !dashboardJs.includes("revokeSyncDevice") || !dashboardJs.includes("schedulePortalRefresh")) {
     throw new Error("dashboard module missing Firebase sync or demo-mode support");
+  }
+  if (!indexHtml.includes("id=\"sync-cadence\"") || !indexHtml.includes("id=\"sync-next-refresh\"")) {
+    throw new Error("dashboard hosting response missing sync cadence status fields");
   }
 
   console.log(JSON.stringify({

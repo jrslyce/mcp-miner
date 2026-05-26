@@ -260,31 +260,49 @@ function deviceLimitDecision({ entitlement, activeDevices = [], deviceId = null,
   };
 }
 
-function syncCadenceDecision({ entitlement, lastAcceptedBatchAt = null, now = new Date().toISOString(), acceptedCount = 1 }) {
+function syncCadenceStatus({ entitlement, lastAcceptedBatchAt = null, now = new Date().toISOString() }) {
   const evaluated = normalizedEntitlement(entitlement, { now });
   const cadenceSeconds = Math.max(0, Number(evaluated.syncCadenceSeconds || 0));
-  if (Number(acceptedCount || 0) <= 0 || cadenceSeconds <= 0) {
-    return { ok: true, cadenceSeconds, retryAfterSeconds: 0 };
-  }
-
   const lastMillis = parseMillis(lastAcceptedBatchAt);
   const nowMillis = parseMillis(now) || Date.now();
-  if (lastMillis === null) {
-    return { ok: true, cadenceSeconds, retryAfterSeconds: 0 };
-  }
-
-  const elapsedMs = Math.max(0, nowMillis - lastMillis);
-  const cadenceMs = cadenceSeconds * 1000;
-  if (elapsedMs < cadenceMs) {
+  const mode = evaluated.features && evaluated.features.nearRealTimeSync ? "near_real_time" : "batch";
+  if (lastMillis === null || cadenceSeconds <= 0) {
     return {
-      ok: false,
-      reason: "plan_limit_sync_cadence",
       cadenceSeconds,
-      retryAfterSeconds: Math.ceil((cadenceMs - elapsedMs) / 1000)
+      mode,
+      nextEligibleSyncAt: null,
+      retryAfterSeconds: 0,
+      canAcceptNow: true
     };
   }
 
-  return { ok: true, cadenceSeconds, retryAfterSeconds: 0 };
+  const cadenceMs = cadenceSeconds * 1000;
+  const nextEligibleMillis = lastMillis + cadenceMs;
+  const retryAfterSeconds = nextEligibleMillis > nowMillis ? Math.ceil((nextEligibleMillis - nowMillis) / 1000) : 0;
+  return {
+    cadenceSeconds,
+    mode,
+    nextEligibleSyncAt: new Date(nextEligibleMillis).toISOString(),
+    retryAfterSeconds,
+    canAcceptNow: retryAfterSeconds <= 0
+  };
+}
+
+function syncCadenceDecision({ entitlement, lastAcceptedBatchAt = null, now = new Date().toISOString(), acceptedCount = 1 }) {
+  const status = syncCadenceStatus({ entitlement, lastAcceptedBatchAt, now });
+  if (Number(acceptedCount || 0) <= 0 || status.cadenceSeconds <= 0) {
+    return { ok: true, ...status };
+  }
+
+  if (!status.canAcceptNow) {
+    return {
+      ok: false,
+      reason: "plan_limit_sync_cadence",
+      ...status
+    };
+  }
+
+  return { ok: true, ...status };
 }
 
 module.exports = {
@@ -298,5 +316,6 @@ module.exports = {
   parseMillis,
   publicEntitlement,
   sortActiveDevices,
+  syncCadenceStatus,
   syncCadenceDecision
 };

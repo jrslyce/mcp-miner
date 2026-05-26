@@ -140,6 +140,7 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
         !serialized_request.include?(ROOT)
     end
 
+    future_sync_at = (Time.now.utc + 60).iso8601
     response_queue << {
       body: {
         result: {
@@ -147,6 +148,20 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
           accepted: accepted_ids,
           duplicates: [],
           rejected: [],
+          entitlement: {
+            plan: "free",
+            syncCadenceSeconds: 60,
+            features: {
+              nearRealTimeSync: false
+            }
+          },
+          syncCadence: {
+            cadenceSeconds: 60,
+            mode: "batch",
+            nextEligibleSyncAt: future_sync_at,
+            retryAfterSeconds: 60,
+            canAcceptNow: false
+          },
           state: {
             eventCount: accepted_ids.length,
             lastSequence: max_sequence
@@ -161,7 +176,24 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
       synced["ok"] == true &&
         synced["status"] == "synced" &&
         synced.dig("sync", "metadata", "last_pushed_sequence") == max_sequence &&
-        synced.dig("sync", "metadata", "pending_event_count") == 0
+        synced.dig("sync", "metadata", "pending_event_count") == 0 &&
+        synced.dig("sync", "cadence", "sync_cadence_seconds") == 60 &&
+        synced.dig("sync", "cadence", "next_eligible_sync_at") == future_sync_at
+    end
+
+    request_count_before_debounce = requests.length
+    engine.with_state do |state|
+      state["cloud_sync_metadata"]["last_pushed_sequence"] = 0
+    end
+    debounced = tool_payload(run_mcp(state_path, [
+      { jsonrpc: "2.0", id: 60, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin } } }
+    ]).last)
+    assert("sync_cloud should debounce locally until the next eligible sync time") do
+      debounced["ok"] == true &&
+        debounced["status"] == "waiting_for_cadence" &&
+        debounced["queued_event_count"] >= 2 &&
+        debounced["next_eligible_sync_at"] == future_sync_at &&
+        requests.length == request_count_before_debounce
     end
 
     engine.with_state do |state|
@@ -182,7 +214,7 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
       }
     }
     duplicate = tool_payload(run_mcp(state_path, [
-      { jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin } } }
+      { jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin, force: true } } }
     ]).last)
     assert("duplicate retry responses should be idempotent and advance metadata") do
       duplicate["ok"] == true &&
@@ -208,7 +240,7 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
       }
     }
     conflict = tool_payload(run_mcp(state_path, [
-      { jsonrpc: "2.0", id: 8, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin } } }
+      { jsonrpc: "2.0", id: 8, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin, force: true } } }
     ]).last)
     assert("rejected cloud events should produce a local conflict status") do
       conflict["ok"] == false &&
@@ -229,7 +261,16 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
           message: "Free cloud sync accepts one batch per minute.",
           details: {
             reason: "plan_limit_sync_cadence",
-            retryAfterSeconds: 42
+            cadenceSeconds: 60,
+            retryAfterSeconds: 42,
+            nextEligibleSyncAt: (Time.now.utc + 42).iso8601,
+            entitlement: {
+              plan: "free",
+              syncCadenceSeconds: 60,
+              features: {
+                nearRealTimeSync: false
+              }
+            }
           }
         }
       }
@@ -243,7 +284,9 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
         plan_limited["message"].include?("Free cloud sync accepts one batch per minute") &&
         plan_limited["message"].include?("42 seconds") &&
         plan_limited.dig("sync", "account_link", "status") == "linked" &&
-        plan_limited.dig("sync", "metadata", "status") == "plan_limited"
+        plan_limited.dig("sync", "metadata", "status") == "plan_limited" &&
+        plan_limited.dig("sync", "cadence", "sync_cadence_seconds") == 60 &&
+        plan_limited.dig("sync", "cadence", "retry_after_seconds") <= 42
     end
   ensure
     server.shutdown

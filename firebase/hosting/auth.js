@@ -52,6 +52,11 @@ const FREE_ENTITLEMENT = {
   }
 };
 
+const PORTAL_POLLING = {
+  minSeconds: 10,
+  freeSeconds: 60
+};
+
 const DEMO_DASHBOARD = {
   mode: "Signed-out demo",
   source: "Local demo snapshot",
@@ -78,8 +83,16 @@ const DEMO_DASHBOARD = {
     lastSequence: 18,
     conflictState: "none",
     acceptedCount: 18,
+    lastAcceptedBatchAt: "Demo snapshot",
     duplicateCount: 0,
     rejectedCount: 0
+  },
+  syncCadence: {
+    cadenceSeconds: 60,
+    mode: "batch",
+    nextEligibleSyncAt: null,
+    retryAfterSeconds: 0,
+    canAcceptNow: true
   },
   syncDevices: [
     {
@@ -171,8 +184,16 @@ const EMPTY_CLOUD_DASHBOARD = {
     lastSequence: 0,
     conflictState: "none",
     acceptedCount: 0,
+    lastAcceptedBatchAt: null,
     duplicateCount: 0,
     rejectedCount: 0
+  },
+  syncCadence: {
+    cadenceSeconds: 60,
+    mode: "batch",
+    nextEligibleSyncAt: null,
+    retryAfterSeconds: 0,
+    canAcceptNow: true
   },
   syncDevices: [],
   inventory: [],
@@ -342,6 +363,8 @@ const syncStatus = document.querySelector("#sync-status");
 const syncEvents = document.querySelector("#sync-events");
 const syncSequence = document.querySelector("#sync-sequence");
 const syncConflicts = document.querySelector("#sync-conflicts");
+const syncCadence = document.querySelector("#sync-cadence");
+const syncNextRefresh = document.querySelector("#sync-next-refresh");
 const privacyList = document.querySelector("#privacy-list");
 const asteroidName = document.querySelector("#asteroid-name");
 const asteroidProgressLabel = document.querySelector("#asteroid-progress-label");
@@ -388,6 +411,8 @@ let activeAsteroidVisual = ASTEROID_CLASSES[0];
 let activeAsteroidProgress = 0;
 let asteroidAnimationStarted = false;
 let verificationEmailSentAt = 0;
+let portalRefreshTimer = null;
+let portalRefreshInFlight = false;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function setMessage(text, isError = false) {
@@ -584,6 +609,72 @@ function renderLinkedDevices(devices = [], rawEntitlement = FREE_ENTITLEMENT) {
       </article>
     `;
   }).join("");
+}
+
+function nextEligibleFromMetadata(syncMetadata, cadenceSeconds) {
+  const lastAccepted = syncMetadata && (syncMetadata.lastAcceptedBatchAt || syncMetadata.last_accepted_batch_at);
+  const lastMillis = Date.parse(lastAccepted || "");
+  if (Number.isNaN(lastMillis) || cadenceSeconds <= 0) {
+    return null;
+  }
+  return new Date(lastMillis + (cadenceSeconds * 1000)).toISOString();
+}
+
+function syncCadenceModel(rawCadence, rawEntitlement, syncMetadata = {}) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const cadence = rawCadence || {};
+  const cadenceSeconds = numberValue(cadence.cadenceSeconds || cadence.cadence_seconds, entitlement.syncCadenceSeconds);
+  const nextEligibleSyncAt = cadence.nextEligibleSyncAt || cadence.next_eligible_sync_at || nextEligibleFromMetadata(syncMetadata, cadenceSeconds);
+  const retryAfterSeconds = numberValue(cadence.retryAfterSeconds || cadence.retry_after_seconds, 0);
+  const nextMillis = Date.parse(nextEligibleSyncAt || "");
+  const canAcceptNow = Object.prototype.hasOwnProperty.call(cadence, "canAcceptNow") || Object.prototype.hasOwnProperty.call(cadence, "can_accept_now")
+    ? cadence.canAcceptNow !== false && cadence.can_accept_now !== false
+    : Number.isNaN(nextMillis) || nextMillis <= Date.now();
+  return {
+    cadenceSeconds,
+    mode: cadence.mode || (entitlement.features.nearRealTimeSync ? "near_real_time" : "batch"),
+    nextEligibleSyncAt,
+    retryAfterSeconds,
+    canAcceptNow
+  };
+}
+
+function syncCadenceLabel(details) {
+  return details.mode === "near_real_time"
+    ? `${formatNumber(details.cadenceSeconds)} sec`
+    : `${formatNumber(details.cadenceSeconds)} sec batch`;
+}
+
+function clearPortalRefreshTimer() {
+  if (portalRefreshTimer) {
+    window.clearTimeout(portalRefreshTimer);
+    portalRefreshTimer = null;
+  }
+}
+
+function portalPollingSeconds(rawEntitlement) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  if (!currentUser || requiresEmailVerification(currentUser)) {
+    return 0;
+  }
+  const cadenceSeconds = numberValue(entitlement.syncCadenceSeconds, PORTAL_POLLING.freeSeconds);
+  return entitlement.features.nearRealTimeSync
+    ? Math.max(PORTAL_POLLING.minSeconds, cadenceSeconds)
+    : Math.max(PORTAL_POLLING.freeSeconds, cadenceSeconds);
+}
+
+function schedulePortalRefresh(rawEntitlement) {
+  clearPortalRefreshTimer();
+  const seconds = portalPollingSeconds(rawEntitlement);
+  if (!seconds) {
+    return null;
+  }
+  const nextRefreshAt = new Date(Date.now() + (seconds * 1000)).toISOString();
+  portalRefreshTimer = window.setTimeout(() => {
+    portalRefreshTimer = null;
+    refreshForCurrentUser({ quiet: true, scheduled: true });
+  }, seconds * 1000);
+  return nextRefreshAt;
 }
 
 function hasPendingLink() {
@@ -1224,6 +1315,7 @@ async function loadDashboardForUser(user) {
   fallback.cloudState = { ...fallback.cloudState, ...cloudState };
   fallback.syncMetadata = { ...fallback.syncMetadata, ...syncMetadata };
   fallback.entitlement = normalizedEntitlement(callable.entitlement);
+  fallback.syncCadence = syncCadenceModel(callable.syncCadence, fallback.entitlement, fallback.syncMetadata);
   fallback.inventory = inventory.length ? inventory : fallback.inventory;
   fallback.orders = orders.length ? orders : fallback.orders;
   fallback.syncDevices = syncDevices;
@@ -1240,6 +1332,7 @@ function renderDashboard(data) {
   const inventory = data.inventory || [];
   const cloudState = data.cloudState || {};
   const syncMetadata = data.syncMetadata || {};
+  const cadence = syncCadenceModel(data.syncCadence, data.entitlement, syncMetadata);
   const asteroid = data.asteroid || {};
   const progress = Math.max(0, Math.min(100, numberValue(asteroid.percentComplete)));
   const syncOn = Boolean(data.settings && data.settings.cloudSyncEnabled);
@@ -1258,6 +1351,8 @@ function renderDashboard(data) {
   syncEvents.textContent = formatNumber(cloudState.eventCount || syncMetadata.acceptedCount || 0);
   syncSequence.textContent = formatNumber(syncMetadata.lastSequence || cloudState.lastSequence || 0);
   syncConflicts.textContent = conflictState === "none" ? "None" : displayNameFromId(conflictState);
+  syncCadence.textContent = syncCadenceLabel(cadence);
+  syncNextRefresh.textContent = cadence.canAcceptNow ? "Now" : timestampLabel(cadence.nextEligibleSyncAt);
   const hasAsteroidProgress = numberValue(asteroid.depletionSize) > 0;
   asteroidName.textContent = asteroid.displayName || "-";
   asteroidProgressLabel.textContent = hasAsteroidProgress
@@ -1544,12 +1639,20 @@ function renderPrivacy(data) {
   `).join("");
 }
 
-async function refreshForCurrentUser() {
+async function refreshForCurrentUser(options = {}) {
+  if (portalRefreshInFlight) {
+    return;
+  }
+  portalRefreshInFlight = true;
+  clearPortalRefreshTimer();
   refreshDashboard.disabled = true;
+  const quiet = options.quiet === true;
   try {
     if (!currentUser) {
       renderDashboard(cloneDemo());
-      setMessage("Demo preview refreshed.");
+      if (!quiet) {
+        setMessage("Demo preview refreshed.");
+      }
       return;
     }
     await reloadCurrentUser();
@@ -1561,9 +1664,12 @@ async function refreshForCurrentUser() {
     }
     const data = await loadDashboardForUser(currentUser);
     renderDashboard(data);
+    schedulePortalRefresh(data.entitlement);
     if (data.refreshWarning) {
-      setMessage(data.refreshWarning, true);
-    } else {
+      if (!quiet) {
+        setMessage(data.refreshWarning, true);
+      }
+    } else if (!quiet) {
       setMessage(DASHBOARD_REFRESH_SUCCESS);
     }
   } catch (error) {
@@ -1571,9 +1677,12 @@ async function refreshForCurrentUser() {
       mode: "Demo fallback",
       source: "Firebase read failed; showing local preview"
     }));
-    setMessage(error.message || "Dashboard refresh failed.", true);
+    if (!quiet) {
+      setMessage(error.message || "Dashboard refresh failed.", true);
+    }
   } finally {
     refreshDashboard.disabled = false;
+    portalRefreshInFlight = false;
   }
 }
 
@@ -1732,6 +1841,7 @@ onAuthStateChanged(auth, async (user) => {
   updateAuthControls(user);
   renderDeviceLink(user);
   if (!user) {
+    clearPortalRefreshTimer();
     authStatus.textContent = "Signed out";
     authIdentity.textContent = "Not signed in";
     emailVerificationStatus.textContent = "Not signed in";
@@ -1750,6 +1860,7 @@ onAuthStateChanged(auth, async (user) => {
   email.value = "";
 
   if (requiresEmailVerification(user)) {
+    clearPortalRefreshTimer();
     authStatus.textContent = "Verify email";
     authIdentity.textContent = "Email pending";
     profileStatus.textContent = "Verification required";

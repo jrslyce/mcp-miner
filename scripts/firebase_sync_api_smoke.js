@@ -304,6 +304,13 @@ async function main() {
       ownerUid: proUser.localId
     })]
   });
+  const proCadence = await callFunction("syncRewardEvents", proDevices[0].result.deviceToken, {
+    events: [event({
+      eventId: "evt_emulator_sync_pro_cadence",
+      sequence: 2,
+      ownerUid: proUser.localId
+    })]
+  }, false);
   const proDeviceB = await callFunction("syncRewardEvents", proDevices[1].result.deviceToken, {
     events: [event({
       eventId: "evt_emulator_sync_pro_b",
@@ -386,6 +393,12 @@ async function main() {
   if (!freeCadence.error || freeCadence.error.status !== "RESOURCE_EXHAUSTED" || errorReason(freeCadence) !== "plan_limit_sync_cadence") {
     throw new Error("Free sync cadence was not server-enforced");
   }
+  if (!first.result.syncCadence || first.result.syncCadence.cadenceSeconds !== 60 || first.result.syncCadence.mode !== "batch" || !first.result.syncCadence.nextEligibleSyncAt) {
+    throw new Error("Free sync cadence metadata was not returned from accepted sync");
+  }
+  if (!freeCadence.error.details || freeCadence.error.details.cadenceSeconds !== 60 || !freeCadence.error.details.nextEligibleSyncAt) {
+    throw new Error("Free sync cadence limit did not include retry metadata");
+  }
   if (!deviceSync.result || deviceSync.result.accepted.length !== 1) {
     throw new Error("device token sync did not accept one event");
   }
@@ -428,6 +441,9 @@ async function main() {
   if (!proDeviceA.result || !proDeviceB.result || proDeviceA.result.accepted.length !== 1 || proDeviceB.result.accepted.length !== 1) {
     throw new Error("Two Pro devices did not sync alternating sequence-1 events with per-device cursors");
   }
+  if (!proCadence.error || errorReason(proCadence) !== "plan_limit_sync_cadence" || proCadence.error.details.cadenceSeconds !== 10) {
+    throw new Error("Pro near-real-time cadence throttle was not server-enforced at the configured cadence");
+  }
   if (!proDuplicateGlobal.result || proDuplicateGlobal.result.duplicates.length !== 1) {
     throw new Error("Global event idempotency did not reject duplicate event IDs across devices");
   }
@@ -458,11 +474,13 @@ async function main() {
     billingUidMismatch: checkoutForOtherUser.error.status,
     billingMissingSecret: checkoutMissingSecret.error.status,
     freeSyncCadenceLimit: errorReason(freeCadence),
+    freeNextEligibleSyncAt: freeCadence.error.details.nextEligibleSyncAt,
     freeDeviceLimit: errorReason(freeDeviceBRejected),
     renamedDevice: renamedFreeDeviceDoc.data().deviceName,
     revokedDeviceStatus: revokedFreeDeviceDoc.data().status,
     revokedTokenSync: revokedDeviceSync.error.status,
     proDeviceLimit: errorReason(proSixthRejected),
+    proSyncCadenceLimit: errorReason(proCadence),
     proAlternatingAccepted: proDeviceA.result.accepted.length + proDeviceB.result.accepted.length,
     proGlobalDuplicateCount: proDuplicateGlobal.result.duplicates.length,
     proRaceAccepted: raceA.result.accepted.length + raceB.result.accepted.length,

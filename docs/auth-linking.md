@@ -80,7 +80,7 @@ MCP tools expose the local account-linking state:
 - `link_cloud_profile`
 - `unlink_cloud_profile`
 
-`update_settings` can enable cloud sync before sign-in; in that case `sync_progress` returns `unauthenticated` instead of failing. Starting a link session changes local status to `link_pending`. Completing an approved session changes local status to `linked`; the sync client can then call the Cloud Functions sync API with the stored device token.
+`update_settings` can enable cloud sync before sign-in; in that case `sync_progress` returns `unauthenticated` instead of failing. Starting a link session changes local status to `link_pending`. Completing an approved session changes local status to `linked`; the sync client can then call the Cloud Functions sync API with the stored device token. `sync_progress` also reports the current plan cadence and `next_eligible_sync_at`, and `sync_cloud` debounces locally until that time unless called with `force: true` for test/debug use.
 
 `link_cloud_profile` remains a low-level test/development tool for linking a Firebase UID manually.
 It is not the recommended production user flow.

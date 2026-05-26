@@ -88,7 +88,8 @@ Validation:
 - Free accounts can have one active linked Codex device; Pro accounts can have five. Extra device tokens are rejected without deleting local saves or server device metadata.
 - Free accepts at most one new cloud batch per 60 seconds. Pro uses the paid `syncCadenceSeconds` limit for near-real-time sync within cost controls.
 - Sequence and cadence are checked against the caller's sync cursor: `/players/{uid}/syncMetadata/default` for Firebase Auth and `/players/{uid}/syncMetadata/{deviceId}` for linked Codex device tokens.
-- Plan-limit denials use structured reasons such as `plan_limit_device_count` and `plan_limit_sync_cadence`.
+- Accepted sync responses include `syncCadence` with the config-driven cadence, mode, retry seconds, and `nextEligibleSyncAt` so the plugin can show current cadence and debounce locally.
+- Plan-limit denials use structured reasons such as `plan_limit_device_count` and `plan_limit_sync_cadence`. Cadence denials include the same retry metadata so local progress can remain queued until the next eligible batch.
 - `schemaVersion` must match the current sync schema.
 - `privacyClass` must be `abstract`.
 - `source` must be `codex_hook`.

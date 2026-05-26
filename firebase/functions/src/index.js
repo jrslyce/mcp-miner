@@ -26,6 +26,7 @@ const {
   deviceLimitDecision,
   evaluateEntitlement,
   publicEntitlement,
+  syncCadenceStatus,
   syncCadenceDecision
 } = require("./entitlements");
 const {
@@ -177,8 +178,20 @@ function throwEntitlementDecision(decision, entitlement) {
     maxDevices: decision.maxDevices || null,
     activeDevices: decision.activeDevices || null,
     cadenceSeconds: decision.cadenceSeconds || null,
-    retryAfterSeconds: decision.retryAfterSeconds || null
+    retryAfterSeconds: decision.retryAfterSeconds || null,
+    nextEligibleSyncAt: decision.nextEligibleSyncAt || null,
+    syncMode: decision.mode || null
   });
+}
+
+function publicSyncCadence(status) {
+  return {
+    cadenceSeconds: status.cadenceSeconds || 0,
+    mode: status.mode || "batch",
+    nextEligibleSyncAt: status.nextEligibleSyncAt || null,
+    retryAfterSeconds: status.retryAfterSeconds || 0,
+    canAcceptNow: status.canAcceptNow !== false
+  };
 }
 
 async function readEntitlementInTransaction(transaction, uid, now) {
@@ -434,6 +447,12 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
       }
       touchDeviceWrites(transaction, auth, receivedAt);
 
+      const cadence = syncCadenceStatus({
+        entitlement,
+        lastAcceptedBatchAt: batch.accepted.length > 0 ? receivedAt : cursorSync.lastAcceptedBatchAt,
+        now: receivedAt
+      });
+
       return {
         ok: true,
         accepted: batch.accepted.map((event) => event.eventId),
@@ -451,7 +470,8 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
           cursorId,
           deviceId: auth.deviceId || null,
           lastSequence: nextCursorSequence
-        }
+        },
+        syncCadence: publicSyncCadence(cadence)
       };
     });
 
@@ -519,13 +539,19 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
     hasState: stateSnap.exists
   });
 
+  const cursorSync = cursorSnap.exists ? cursorSnap.data() : legacyCursorFromDefault(syncCursorId(auth), syncSnap.exists ? syncSnap.data() : {});
   return {
     ok: true,
     privacyClass: "abstract",
     state: stateSnap.exists ? stateSnap.data() : null,
     syncMetadata: syncSnap.exists ? syncSnap.data() : null,
-    deviceSyncMetadata: cursorSnap.exists ? cursorSnap.data() : legacyCursorFromDefault(syncCursorId(auth), syncSnap.exists ? syncSnap.data() : {}),
-    entitlement
+    deviceSyncMetadata: cursorSync,
+    entitlement,
+    syncCadence: publicSyncCadence(syncCadenceStatus({
+      entitlement,
+      lastAcceptedBatchAt: cursorSync.lastAcceptedBatchAt,
+      now: entitlementNow
+    }))
   };
 });
 

@@ -221,8 +221,11 @@ async function main() {
   if (missingPanels.length) {
     throw new Error(`dashboard hosting response missing panels: ${missingPanels.join(", ")}`);
   }
-  if (!dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("getSyncState") || !dashboardJs.includes("connectFunctionsEmulator") || !dashboardJs.includes("renameSyncDevice")) {
+  if (!dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("getSyncState") || !dashboardJs.includes("connectFunctionsEmulator") || !dashboardJs.includes("renameSyncDevice") || !dashboardJs.includes("syncCadenceModel")) {
     throw new Error("dashboard module missing demo/offline or Functions integration support");
+  }
+  if (!indexHtml.includes("id=\"sync-cadence\"") || !indexHtml.includes("id=\"sync-next-refresh\"")) {
+    throw new Error("dashboard hosting response missing cadence refresh fields");
   }
 
   if (!sync.result || sync.result.accepted[0] !== acceptedEvent.eventId) {

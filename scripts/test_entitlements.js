@@ -7,6 +7,7 @@ const {
   evaluateEntitlement,
   publicEntitlement,
   sortActiveDevices,
+  syncCadenceStatus,
   syncCadenceDecision
 } = require("../firebase/functions/src/entitlements");
 
@@ -207,6 +208,27 @@ check("sync cadence decisions should allow Free after 60 seconds and Pro near-re
       now: NOW,
       acceptedCount: 1
     }).ok === true;
+});
+
+check("sync cadence status should expose next eligible sync timestamps from plan config", () => {
+  const free = evaluateEntitlement(null, { now: NOW });
+  const pro = evaluateEntitlement(doc(), { now: NOW });
+  const freeStatus = syncCadenceStatus({
+    entitlement: free,
+    lastAcceptedBatchAt: "2026-05-23T23:59:30.000Z",
+    now: NOW
+  });
+  const proStatus = syncCadenceStatus({
+    entitlement: pro,
+    lastAcceptedBatchAt: "2026-05-23T23:59:55.000Z",
+    now: NOW
+  });
+  return freeStatus.mode === "batch" &&
+    freeStatus.nextEligibleSyncAt === "2026-05-24T00:00:30.000Z" &&
+    freeStatus.retryAfterSeconds === 30 &&
+    proStatus.mode === "near_real_time" &&
+    proStatus.cadenceSeconds === 10 &&
+    proStatus.nextEligibleSyncAt === "2026-05-24T00:00:05.000Z";
 });
 
 check("public entitlements should preserve already evaluated access reasons", () => {

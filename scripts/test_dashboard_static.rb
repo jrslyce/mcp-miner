@@ -52,6 +52,8 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     store-balance
     reports-list
     sync-status
+    sync-cadence
+    sync-next-refresh
     billing-status
     checkout-monthly
     checkout-annual
@@ -84,6 +86,8 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     revokeSyncDevice
     renameSyncDevice
     renderLinkedDevices
+    schedulePortalRefresh
+    syncCadenceModel
     renderStore
     createCheckoutSession
     createCustomerPortalSession
@@ -103,6 +107,13 @@ assert("dashboard should render linked device management without token secrets")
     auth_js.include?("device-rename") &&
     !auth_js.include?("tokenHash") &&
     !index.include?("token hash")
+end
+
+assert("dashboard should use cadence polling instead of realtime listeners") do
+  auth_js.include?("const PORTAL_POLLING") &&
+    auth_js.include?("window.setTimeout") &&
+    auth_js.include?("portalPollingSeconds") &&
+    !auth_js.include?("onSnapshot")
 end
 
 assert("refresh control should not expose placeholder icon text") do
