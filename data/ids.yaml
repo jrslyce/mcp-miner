@@ -1,0 +1,24 @@
+id_prefixes:
+  material: mat_
+  element: mat_element_
+  fictional_material: mat_fictional_
+  gem: mat_gem_
+  machine: machine_
+  recipe: recipe_
+  order_variant: order_variant_
+  buyer: buyer_
+  asteroid_class: asteroid_
+  upgrade: upgrade_
+  hazard: hazard_
+  base_module: base_
+  stat: stat_
+  work_event: work_
+reserved_ids:
+  - mat_chonks
+  - mat_scrap
+  - mat_ore
+  - mat_circuits
+  - mat_fuel_cells
+  - machine_basic_3d_printer
+  - asteroid_starter_rubble
+  - upgrade_drill_power

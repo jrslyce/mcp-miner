@@ -1,0 +1,25 @@
+rarities:
+  common:
+    display_name: Common
+    value_multiplier: 1.0
+    drop_weight_multiplier: 1.0
+  uncommon:
+    display_name: Uncommon
+    value_multiplier: 1.6
+    drop_weight_multiplier: 0.55
+  rare:
+    display_name: Rare
+    value_multiplier: 2.4
+    drop_weight_multiplier: 0.22
+  dangerous:
+    display_name: Dangerous
+    value_multiplier: 2.8
+    drop_weight_multiplier: 0.12
+  fictional_rare:
+    display_name: Fictional Rare
+    value_multiplier: 3.2
+    drop_weight_multiplier: 0.08
+  legendary:
+    display_name: Legendary
+    value_multiplier: 5.0
+    drop_weight_multiplier: 0.02

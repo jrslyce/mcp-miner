@@ -1,0 +1,22 @@
+balance:
+  refinement_multiplier:
+    raw: 1.0
+    refined: 1.55
+    high_purity: 2.25
+  upgrade_phase:
+    interval: 10
+    multiplier_per_phase_squared: 0.08
+  pity:
+    max_score: 3.0
+    bonus_per_score: 0.04
+    max_final_rare_chance: 0.35
+  direct_market:
+    min_multiplier: 0.72
+    max_multiplier: 0.92
+  order_price_variation:
+    windfall_chance: 0.10
+    windfall_min_multiplier: 2.25
+    windfall_max_multiplier: 4.0
+    normal_min_multiplier: 0.85
+    normal_mode_multiplier: 1.0
+    normal_max_multiplier: 1.18

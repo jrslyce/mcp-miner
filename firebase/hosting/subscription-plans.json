@@ -1,0 +1,54 @@
+{
+  "currency": "usd",
+  "annualMonthsCharged": 11,
+  "plans": [
+    {
+      "id": "free",
+      "publicName": "Free",
+      "billingInterval": "none",
+      "monthlyPriceCents": 0,
+      "annualPriceCents": 0,
+      "shortCopy": "Batch cloud sync every minute for one Codex device.",
+      "privacyCopy": "Syncs abstract MCP Miner game progress only, not prompts, code, files, terminal output, or transcripts.",
+      "progressionCopy": "Does not boost mining output, payouts, rarity, or order progress.",
+      "entitlements": {
+        "maxCodexDevices": 1,
+        "syncCadenceSeconds": 60,
+        "nearRealTimeSync": false,
+        "historyRetentionDays": 7
+      }
+    },
+    {
+      "id": "pro_monthly",
+      "publicName": "Pro Monthly",
+      "billingInterval": "monthly",
+      "monthlyPriceCents": 500,
+      "annualPriceCents": null,
+      "shortCopy": "Near-real-time sync and richer portal tools for up to five Codex devices.",
+      "privacyCopy": "Syncs abstract MCP Miner game progress only, not prompts, code, files, terminal output, or transcripts.",
+      "progressionCopy": "Does not boost mining output, payouts, rarity, or order progress.",
+      "entitlements": {
+        "maxCodexDevices": 5,
+        "syncCadenceSeconds": 10,
+        "nearRealTimeSync": true,
+        "historyRetentionDays": 365
+      }
+    },
+    {
+      "id": "pro_annual",
+      "publicName": "Pro Annual",
+      "billingInterval": "annual",
+      "monthlyPriceCents": 500,
+      "annualPriceCents": 5500,
+      "shortCopy": "Same Pro benefits, billed yearly for the price of eleven months.",
+      "privacyCopy": "Syncs abstract MCP Miner game progress only, not prompts, code, files, terminal output, or transcripts.",
+      "progressionCopy": "Does not boost mining output, payouts, rarity, or order progress.",
+      "entitlements": {
+        "maxCodexDevices": 5,
+        "syncCadenceSeconds": 10,
+        "nearRealTimeSync": true,
+        "historyRetentionDays": 365
+      }
+    }
+  ]
+}

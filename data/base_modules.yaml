@@ -1,0 +1,93 @@
+base_modules:
+  - id: base_command_center
+    display_name: Command Center
+    max_level: 5
+    unlock:
+      space_bucks: 0
+      required_modules: []
+    effects:
+      - target: expedition_log_slots
+        formula: "1 + L"
+    material_costs:
+      - material_id: mat_chonks
+        base_quantity: 0
+  - id: base_workshop
+    display_name: Workshop
+    max_level: 5
+    unlock:
+      space_bucks: 150
+      required_modules:
+        - base_command_center
+    effects:
+      - target: upgrade_discount_percent
+        formula: "0.02 * L"
+    material_costs:
+      - material_id: mat_chonks
+        base_quantity: 80
+      - material_id: mat_element_fe
+        base_quantity: 10
+  - id: base_refinery
+    display_name: Refinery
+    max_level: 5
+    unlock:
+      space_bucks: 250
+      required_modules:
+        - base_command_center
+    effects:
+      - target: refining_queue_slots
+        formula: "1 + L"
+    material_costs:
+      - material_id: mat_chonks
+        base_quantity: 120
+      - material_id: mat_element_si
+        base_quantity: 8
+  - id: base_fabrication_bay
+    display_name: Fabrication Bay
+    max_level: 5
+    unlock:
+      space_bucks: 400
+      required_modules:
+        - base_workshop
+    effects:
+      - target: fabrication_queue_slots
+        formula: "1 + L"
+    material_costs:
+      - material_id: mat_chonks
+        base_quantity: 160
+      - material_id: mat_element_fe
+        base_quantity: 16
+      - material_id: mat_element_cu
+        base_quantity: 6
+  - id: base_order_terminal
+    display_name: Order Terminal
+    max_level: 5
+    unlock:
+      space_bucks: 250
+      required_modules:
+        - base_command_center
+    effects:
+      - target: active_order_slots
+        formula: "3 + L"
+    material_costs:
+      - material_id: mat_element_si
+        base_quantity: 8
+      - material_id: mat_element_cu
+        base_quantity: 4
+  - id: base_weird_matter_annex
+    display_name: Weird Matter Annex
+    max_level: 3
+    unlock:
+      space_bucks: 9000
+      required_modules:
+        - base_fabrication_bay
+        - base_refinery
+    effects:
+      - target: weird_matter_quality_cap
+        formula: "L"
+    material_costs:
+      - material_id: mat_fictional_sparkglass
+        base_quantity: 10
+      - material_id: mat_element_pt
+        base_quantity: 3
+      - material_id: mat_gem_amethyst
+        base_quantity: 2

@@ -1,0 +1,83 @@
+hazards:
+  - id: hazard_micro_meteor_shove
+    display_name: Micro-Meteor Shove
+    trigger:
+      source: failed_commands
+      base_chance: 0.05
+    effects:
+      suit_damage:
+        min: 2
+        max: 8
+      resource_loss:
+        material_id: mat_chonks
+        percent_min: 0.01
+        percent_max: 0.04
+    mitigated_by:
+      upgrade_id: upgrade_suit_plating
+      mitigation_formula: suit_damage_reduction
+    flavor:
+      - "A tiny rock voted against your trajectory."
+  - id: hazard_power_drain
+    display_name: Power Drain
+    trigger:
+      source: long_session_without_completion
+      base_chance: 0.04
+    effects:
+      suit_damage:
+        min: 1
+        max: 5
+      stat_penalty:
+        target: energy_reserve
+        percent_min: 0.05
+        percent_max: 0.12
+    mitigated_by:
+      upgrade_id: upgrade_drone_automation
+      mitigation_formula: drone_support_reduction
+    flavor:
+      - "The suit battery briefly considered a career change."
+  - id: hazard_suit_leak
+    display_name: Suit Leak
+    trigger:
+      source: abandoned_failed_work
+      base_chance: 0.035
+    effects:
+      suit_damage:
+        min: 4
+        max: 12
+    mitigated_by:
+      upgrade_id: upgrade_suit_plating
+      mitigation_formula: suit_damage_reduction
+    flavor:
+      - "A hiss. A pause. A professionally calm warning light."
+  - id: hazard_crystal_surge
+    display_name: Crystal Surge
+    trigger:
+      source: rare_find_roll
+      base_chance: 0.025
+    effects:
+      suit_damage:
+        min: 3
+        max: 9
+      bonus_roll:
+        target: rare_material
+        chance: 0.15
+    mitigated_by:
+      upgrade_id: upgrade_scanner_precision
+      mitigation_formula: scanner_stability_reduction
+    flavor:
+      - "The crystal sang one note and all the bolts got opinionated."
+  - id: hazard_equipment_jam
+    display_name: Equipment Jam
+    trigger:
+      source: repetitive_activity_pattern
+      base_chance: 0.06
+    effects:
+      production_penalty:
+        target: chonk_output
+        percent_min: 0.08
+        percent_max: 0.18
+    mitigated_by:
+      upgrade_id: upgrade_drill_power
+      mitigation_formula: drill_reliability_reduction
+    flavor:
+      - "The drill is not stuck. It is expressing boundaries."

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Sapphire Debris Field procedural asteroid">
+  <defs>
+    <radialGradient id="bg-asteroid_sapphire_debris_field" cx="35%" cy="28%" r="80%">
+      <stop offset="0" stop-color="#6ea8ff" stop-opacity="0.22"/>
+      <stop offset="0.45" stop-color="#0b1720" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#05080d" stop-opacity="0.28"/>
+    </radialGradient>
+    <linearGradient id="rock-asteroid_sapphire_debris_field" x1="62" y1="48" x2="190" y2="210">
+      <stop offset="0" stop-color="#536c98"/>
+      <stop offset="1" stop-color="#202e56"/>
+    </linearGradient>
+    <filter id="shadow-asteroid_sapphire_debris_field" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#041015" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="28" fill="url(#bg-asteroid_sapphire_debris_field)"/>
+  <circle cx="128" cy="128" r="102" fill="none" stroke="#6ea8ff" stroke-opacity="0.22" stroke-width="2"/>
+  <circle cx="128" cy="128" r="78" fill="none" stroke="#fff" stroke-opacity="0.13" stroke-width="2" stroke-dasharray="19 12"/>
+  <polygon points="198.1,123.8 181.2,156.6 182.5,178.2 167.4,184.4 146.0,209.4 121.6,195.5 96.5,189.6 79.5,185.3 75.2,158.5 46.4,135.4 58.2,117.1 76.7,96.7 81.1,80.2 95.8,59.6 125.2,47.9 149.4,53.7 174.0,72.5 177.0,82.3 190.7,110.5" fill="url(#rock-asteroid_sapphire_debris_field)" filter="url(#shadow-asteroid_sapphire_debris_field)"/>
+  <polygon points="198.1,123.8 181.2,156.6 182.5,178.2 167.4,184.4 146.0,209.4 121.6,195.5 96.5,189.6 79.5,185.3 75.2,158.5 46.4,135.4 58.2,117.1 76.7,96.7 81.1,80.2 95.8,59.6 125.2,47.9 149.4,53.7 174.0,72.5 177.0,82.3 190.7,110.5" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="2"/>
+  <ellipse cx="130" cy="137" rx="14" ry="10.7" fill="#202e56" opacity="0.35" transform="rotate(-26 130 137)"/>
+<path d="M116 136c9.799999999999999 6.3 18.2 7.0 28 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="151" cy="108" rx="8" ry="6.5" fill="#202e56" opacity="0.37" transform="rotate(2 151 108)"/>
+<path d="M143 107c5.6 3.6 10.4 4.0 16 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="137" cy="77" rx="17" ry="10.8" fill="#202e56" opacity="0.34" transform="rotate(-7 137 77)"/>
+<path d="M120 76c11.899999999999999 7.65 22.1 8.5 34 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="177" cy="146" rx="17" ry="12.6" fill="#202e56" opacity="0.29" transform="rotate(-21 177 146)"/>
+<path d="M160 145c11.899999999999999 7.65 22.1 8.5 34 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="76" cy="84" rx="17" ry="12.9" fill="#202e56" opacity="0.37" transform="rotate(-10 76 84)"/>
+<path d="M59 83c11.899999999999999 7.65 22.1 8.5 34 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="71" cy="149" rx="7" ry="5.4" fill="#202e56" opacity="0.35" transform="rotate(17 71 149)"/>
+<path d="M64 148c4.8999999999999995 3.15 9.1 3.5 14 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="78" cy="157" rx="16" ry="13.6" fill="#202e56" opacity="0.35" transform="rotate(-4 78 157)"/>
+<path d="M62 156c11.2 7.2 20.8 8.0 32 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="114" cy="75" rx="10" ry="8.0" fill="#202e56" opacity="0.33" transform="rotate(2 114 75)"/>
+<path d="M104 74c7.0 4.5 13.0 5.0 20 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="103" cy="79" rx="12" ry="7.1" fill="#202e56" opacity="0.23" transform="rotate(16 103 79)"/>
+<path d="M91 78c8.399999999999999 5.4 15.600000000000001 6.0 24 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="1" stroke-linecap="round"/>
+<ellipse cx="155" cy="132" rx="7" ry="6.2" fill="#202e56" opacity="0.37" transform="rotate(2 155 132)"/>
+<path d="M148 131c4.8999999999999995 3.15 9.1 3.5 14 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="1" stroke-linecap="round"/>
+
+  <polygon points="70,85 78,107 72.8,112.5 63.2,109.6" fill="#9fc7ff" fill-opacity="0.78" stroke="#fff" stroke-opacity="0.34" stroke-width="1.4" transform="rotate(-22 70 107)"/>
+<polygon points="125,143 137,171 129.2,178.0 114.8,174.4" fill="#5e8dff" fill-opacity="0.78" stroke="#fff" stroke-opacity="0.34" stroke-width="1.4" transform="rotate(-15 125 171)"/>
+<polygon points="88,77 100,97 92.2,102.0 77.8,99.4" fill="#e8f3ff" fill-opacity="0.78" stroke="#fff" stroke-opacity="0.34" stroke-width="1.4" transform="rotate(-16 88 97)"/>
+
+  <path d="M58 188c38 30 95 36 140 3" fill="none" stroke="#6ea8ff" stroke-width="6" stroke-linecap="round" stroke-opacity="0.72"/>
+  <circle cx="52" cy="58" r="3" fill="#fff" opacity="0.7"/>
+  <circle cx="209" cy="64" r="2.5" fill="#fff" opacity="0.55"/>
+  <circle cx="213" cy="207" r="2" fill="#fff" opacity="0.5"/>
+  <title>Sapphire Debris Field</title>
+</svg>

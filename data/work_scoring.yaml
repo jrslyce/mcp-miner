@@ -1,0 +1,60 @@
+work_events:
+  - id: work_session_start
+    category: research
+    base_score: 2
+    cooldown_seconds: 1800
+    daily_soft_cap: 6
+  - id: work_user_prompt
+    category: research
+    base_score: 1
+    cooldown_seconds: 10
+    daily_soft_cap: 120
+  - id: work_file_read
+    category: research
+    base_score: 1
+    cooldown_seconds: 5
+    daily_soft_cap: 120
+  - id: work_search
+    category: research
+    base_score: 2
+    cooldown_seconds: 10
+    daily_soft_cap: 80
+  - id: work_apply_patch
+    category: coding
+    base_score: 8
+    min_changed_lines: 1
+    score_per_changed_line: 0.12
+    max_score_per_event: 30
+  - id: work_create_file
+    category: coding
+    base_score: 10
+    score_per_changed_line: 0.08
+    max_score_per_event: 28
+  - id: work_test_pass
+    category: testing
+    base_score: 12
+    verification_bonus: 1.2
+  - id: work_test_fail
+    category: testing
+    base_score: 4
+    hazard_weight: 1.0
+  - id: work_review
+    category: review
+    base_score: 6
+    cooldown_seconds: 30
+    daily_soft_cap: 40
+  - id: work_write_docs
+    category: writing
+    base_score: 6
+    score_per_changed_line: 0.06
+    max_score_per_event: 24
+  - id: work_commit_or_pr
+    category: shipping
+    base_score: 18
+    cooldown_seconds: 300
+    daily_soft_cap: 12
+  - id: work_fabrication_artifact
+    category: fabrication
+    base_score: 10
+    cooldown_seconds: 60
+    daily_soft_cap: 40

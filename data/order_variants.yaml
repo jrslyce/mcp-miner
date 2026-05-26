@@ -1,0 +1,41 @@
+order_variants:
+  - id: order_variant_standard_batch
+    display_name: Standard Batch
+    recipe_quantity_multiplier: 1.0
+    payout_multiplier: 1.0
+    quality_grade_required: 0
+    adds_refined_primary: false
+    refined_primary_quantity: 0
+    adds_collector_accent: false
+    collector_accent_quantity: 0
+    deadline_multiplier: 1.0
+  - id: order_variant_rush_batch
+    display_name: Rush Batch
+    recipe_quantity_multiplier: 1.15
+    payout_multiplier: 1.2
+    quality_grade_required: 0
+    adds_refined_primary: false
+    refined_primary_quantity: 0
+    adds_collector_accent: false
+    collector_accent_quantity: 0
+    deadline_multiplier: 0.65
+  - id: order_variant_premium_spec
+    display_name: Premium Spec
+    recipe_quantity_multiplier: 1.25
+    payout_multiplier: 1.35
+    quality_grade_required: 1
+    adds_refined_primary: true
+    refined_primary_quantity: 1
+    adds_collector_accent: false
+    collector_accent_quantity: 0
+    deadline_multiplier: 1.0
+  - id: order_variant_collector_grade
+    display_name: Collector Grade
+    recipe_quantity_multiplier: 1.1
+    payout_multiplier: 1.55
+    quality_grade_required: 2
+    adds_refined_primary: false
+    refined_primary_quantity: 0
+    adds_collector_accent: true
+    collector_accent_quantity: 1
+    deadline_multiplier: 1.25

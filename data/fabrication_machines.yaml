@@ -1,0 +1,161 @@
+machines:
+  - id: machine_basic_3d_printer
+    display_name: Basic 3D Printer
+    progression_tier: 1
+    starts_unlocked: true
+    unlock:
+      space_bucks: 0
+      required_base_modules: []
+      required_upgrades: []
+    throughput:
+      base_progress_per_turn: 10
+      max_queue_size: 2
+    quality:
+      max_quality_grade: 1
+    allowed_material_bands:
+      - mat_chonks
+      - mat_scrap
+      - mat_element_c
+      - mat_element_fe
+      - mat_element_ni
+      - mat_element_cu
+      - mat_element_si
+      - mat_element_al
+      - mat_element_mg
+      - mat_element_na
+      - mat_element_k
+      - mat_element_ca
+      - mat_gem_quartz
+  - id: machine_circuit_loom
+    display_name: Circuit Loom
+    progression_tier: 2
+    starts_unlocked: false
+    unlock:
+      space_bucks: 750
+      required_base_modules:
+        - base_fabrication_bay
+      required_upgrades:
+        - upgrade_scanner_range: 3
+    throughput:
+      base_progress_per_turn: 8
+      max_queue_size: 2
+    quality:
+      max_quality_grade: 2
+    allowed_material_bands:
+      - mat_element_si
+      - mat_element_cu
+      - mat_element_al
+      - mat_element_li
+      - mat_element_co
+      - mat_element_ag
+      - mat_element_au
+      - mat_element_sn
+      - mat_element_ga
+      - mat_element_ge
+      - mat_element_in
+      - mat_element_sb
+      - mat_gem_quartz
+      - mat_fictional_sparkglass
+      - mat_gem_sapphire
+  - id: machine_microforge
+    display_name: Microforge
+    progression_tier: 3
+    starts_unlocked: false
+    unlock:
+      space_bucks: 2200
+      required_base_modules:
+        - base_fabrication_bay
+      required_upgrades:
+        - upgrade_drill_power: 6
+    throughput:
+      base_progress_per_turn: 6
+      max_queue_size: 2
+    quality:
+      max_quality_grade: 3
+    allowed_material_bands:
+      - mat_element_fe
+      - mat_element_ni
+      - mat_element_al
+      - mat_element_cu
+      - mat_element_ti
+      - mat_element_cr
+      - mat_element_mn
+      - mat_element_v
+      - mat_element_co
+      - mat_element_zr
+      - mat_element_mo
+      - mat_element_w
+      - mat_element_ta
+      - mat_element_hf
+      - mat_element_pt
+      - mat_element_ir
+      - mat_gem_ruby
+  - id: machine_biofoam_extruder
+    display_name: Biofoam Extruder
+    progression_tier: 3
+    starts_unlocked: false
+    unlock:
+      space_bucks: 1800
+      required_base_modules:
+        - base_fabrication_bay
+      required_upgrades:
+        - upgrade_suit_plating: 4
+    throughput:
+      base_progress_per_turn: 7
+      max_queue_size: 2
+    quality:
+      max_quality_grade: 3
+    allowed_material_bands:
+      - mat_element_c
+      - mat_cryo_hydrogen_ice
+      - mat_cryo_oxygen_ice
+      - mat_cryo_nitrogen_ice
+      - mat_element_p
+      - mat_element_s
+      - mat_element_si
+      - mat_element_na
+      - mat_element_k
+      - mat_element_ca
+      - mat_element_mg
+      - mat_compound_chlorine_salts
+      - mat_element_i
+      - mat_fictional_snaccite
+      - mat_fictional_sparkglass
+  - id: machine_weird_matter_press
+    display_name: Weird Matter Press
+    progression_tier: 5
+    starts_unlocked: false
+    unlock:
+      space_bucks: 12000
+      required_base_modules:
+        - base_fabrication_bay
+        - base_weird_matter_annex
+      required_upgrades:
+        - upgrade_refinery_purity: 12
+    throughput:
+      base_progress_per_turn: 4
+      max_queue_size: 1
+    quality:
+      max_quality_grade: 5
+    allowed_material_bands:
+      - mat_chonks
+      - mat_element_c
+      - mat_element_cu
+      - mat_element_si
+      - mat_element_ti
+      - mat_element_w
+      - mat_element_ta
+      - mat_element_hf
+      - mat_element_re
+      - mat_element_os
+      - mat_element_ir
+      - mat_element_pt
+      - mat_element_au
+      - mat_element_u
+      - mat_fictional_sparkglass
+      - mat_fictional_nebulite
+      - mat_fictional_chatterium
+      - mat_fictional_glitchsalt
+      - mat_fictional_snaccite
+      - mat_fictional_aetherium
+      - mat_gem_diamond

@@ -1,0 +1,78 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby \"$PLUGIN_ROOT/hooks/mcp_miner_hook.rb\" session_start",
+            "timeout": 10,
+            "statusMessage": "Powering MCP Miner"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby \"$PLUGIN_ROOT/hooks/mcp_miner_hook.rb\" user_prompt_submit",
+            "timeout": 10,
+            "statusMessage": "Scanning asteroid work signal"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby \"$PLUGIN_ROOT/hooks/mcp_miner_hook.rb\" subagent_start",
+            "timeout": 10,
+            "statusMessage": "Tagging MCP Miner agent shift"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby \"$PLUGIN_ROOT/hooks/mcp_miner_hook.rb\" subagent_stop",
+            "timeout": 10,
+            "statusMessage": "Closing MCP Miner agent shift"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby \"$PLUGIN_ROOT/hooks/mcp_miner_hook.rb\" post_tool_use",
+            "timeout": 10,
+            "statusMessage": "Mining Codex work"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruby \"$PLUGIN_ROOT/hooks/mcp_miner_hook.rb\" stop",
+            "timeout": 10,
+            "statusMessage": "Preparing MCP Miner report"
+          }
+        ]
+      }
+    ]
+  }
+}

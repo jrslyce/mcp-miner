@@ -1,0 +1,82 @@
+buyers:
+  - id: buyer_patchy_freighter_union
+    display_name: Patchy Freighter Union
+    unlock_tier: 1
+    reputation_multiplier: 1.0
+    preferred_machine_ids:
+      - machine_basic_3d_printer
+      - machine_microforge
+    preferred_material_ids:
+      - mat_element_fe
+      - mat_element_ni
+    flavor_tags:
+      - practical
+      - repairs
+  - id: buyer_nervous_satellite_collective
+    display_name: Nervous Satellite Collective
+    unlock_tier: 2
+    reputation_multiplier: 1.08
+    preferred_machine_ids:
+      - machine_circuit_loom
+    preferred_material_ids:
+      - mat_element_si
+      - mat_element_ge
+      - mat_fictional_sparkglass
+    flavor_tags:
+      - electronics
+      - twitchy
+  - id: buyer_cozy_reactor_coop
+    display_name: Cozy Reactor Co-op
+    unlock_tier: 2
+    reputation_multiplier: 1.04
+    preferred_machine_ids:
+      - machine_biofoam_extruder
+      - machine_microforge
+    preferred_material_ids:
+      - mat_element_c
+      - mat_element_ti
+      - mat_fictional_snaccite
+    flavor_tags:
+      - cozy
+      - life_support
+  - id: buyer_definitely_legal_thrusters
+    display_name: Definitely Legal Thrusters
+    unlock_tier: 3
+    reputation_multiplier: 1.18
+    preferred_machine_ids:
+      - machine_microforge
+      - machine_circuit_loom
+    preferred_material_ids:
+      - mat_element_co
+      - mat_element_li
+      - mat_fictional_sparkglass
+    flavor_tags:
+      - rush
+      - questionable
+  - id: buyer_amethyst_archive_procurement
+    display_name: Amethyst Archive Procurement
+    unlock_tier: 4
+    reputation_multiplier: 1.12
+    preferred_machine_ids:
+      - machine_weird_matter_press
+      - machine_circuit_loom
+    preferred_material_ids:
+      - mat_gem_amethyst
+      - mat_fictional_chatterium
+      - mat_element_pt
+    flavor_tags:
+      - archival
+      - precise
+  - id: buyer_oddly_specific_luxuries
+    display_name: Oddly Specific Luxuries
+    unlock_tier: 5
+    reputation_multiplier: 1.25
+    preferred_machine_ids:
+      - machine_weird_matter_press
+    preferred_material_ids:
+      - mat_fictional_aetherium
+      - mat_gem_diamond
+      - mat_element_ir
+    flavor_tags:
+      - luxury
+      - strange

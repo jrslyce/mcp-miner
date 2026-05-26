@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Starter Rubble procedural asteroid">
+  <defs>
+    <radialGradient id="bg-asteroid_starter_rubble" cx="35%" cy="28%" r="80%">
+      <stop offset="0" stop-color="#42d998" stop-opacity="0.22"/>
+      <stop offset="0.45" stop-color="#0b1720" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#05080d" stop-opacity="0.28"/>
+    </radialGradient>
+    <linearGradient id="rock-asteroid_starter_rubble" x1="62" y1="48" x2="190" y2="210">
+      <stop offset="0" stop-color="#8d8174"/>
+      <stop offset="1" stop-color="#544d45"/>
+    </linearGradient>
+    <filter id="shadow-asteroid_starter_rubble" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#041015" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="28" fill="url(#bg-asteroid_starter_rubble)"/>
+  <circle cx="128" cy="128" r="102" fill="none" stroke="#42d998" stroke-opacity="0.22" stroke-width="2"/>
+  <circle cx="128" cy="128" r="78" fill="none" stroke="#fff" stroke-opacity="0.13" stroke-width="2" stroke-dasharray="24 12"/>
+  <polygon points="192.3,124.9 207.6,152.3 185.3,172.2 174.9,180.9 161.5,186.2 148.1,189.8 121.7,202.4 102.7,205.7 81.7,187.4 75.9,175.8 53.4,155.3 43.9,141.4 45.1,121.4 52.3,98.7 64.1,87.9 73.9,67.9 95.2,51.8 126.0,44.2 145.3,61.6 168.9,53.4 179.3,68.3 201.2,92.7 205.8,110.4" fill="url(#rock-asteroid_starter_rubble)" filter="url(#shadow-asteroid_starter_rubble)"/>
+  <polygon points="192.3,124.9 207.6,152.3 185.3,172.2 174.9,180.9 161.5,186.2 148.1,189.8 121.7,202.4 102.7,205.7 81.7,187.4 75.9,175.8 53.4,155.3 43.9,141.4 45.1,121.4 52.3,98.7 64.1,87.9 73.9,67.9 95.2,51.8 126.0,44.2 145.3,61.6 168.9,53.4 179.3,68.3 201.2,92.7 205.8,110.4" fill="none" stroke="#fff" stroke-opacity="0.16" stroke-width="2"/>
+  <ellipse cx="115" cy="177" rx="7" ry="5.4" fill="#544d45" opacity="0.26" transform="rotate(15 115 177)"/>
+<path d="M108 176c4.8999999999999995 3.15 9.1 3.5 14 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="133" cy="114" rx="13" ry="8.5" fill="#544d45" opacity="0.24" transform="rotate(-19 133 114)"/>
+<path d="M120 113c9.1 5.8500000000000005 16.900000000000002 6.5 26 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="186" cy="107" rx="14" ry="8.7" fill="#544d45" opacity="0.26" transform="rotate(-26 186 107)"/>
+<path d="M172 106c9.799999999999999 6.3 18.2 7.0 28 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="142" cy="130" rx="17" ry="13.8" fill="#544d45" opacity="0.22" transform="rotate(-6 142 130)"/>
+<path d="M125 129c11.899999999999999 7.65 22.1 8.5 34 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="172" cy="132" rx="10" ry="7.4" fill="#544d45" opacity="0.23" transform="rotate(18 172 132)"/>
+<path d="M162 131c7.0 4.5 13.0 5.0 20 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="157" cy="119" rx="12" ry="7.3" fill="#544d45" opacity="0.37" transform="rotate(28 157 119)"/>
+<path d="M145 118c8.399999999999999 5.4 15.600000000000001 6.0 24 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="179" cy="90" rx="9" ry="6.4" fill="#544d45" opacity="0.22" transform="rotate(19 179 90)"/>
+<path d="M170 89c6.3 4.05 11.700000000000001 4.5 18 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="134" cy="156" rx="10" ry="6.1" fill="#544d45" opacity="0.32" transform="rotate(6 134 156)"/>
+<path d="M124 155c7.0 4.5 13.0 5.0 20 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="169" cy="132" rx="15" ry="9.2" fill="#544d45" opacity="0.31" transform="rotate(-6 169 132)"/>
+<path d="M154 131c10.5 6.75 19.5 7.5 30 0" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="1" stroke-linecap="round"/>
+
+  <polygon points="129,104 144,136 134.3,144.0 116.3,139.8" fill="#b7c0bd" fill-opacity="0.78" stroke="#fff" stroke-opacity="0.34" stroke-width="1.4" transform="rotate(-1 129 136)"/>
+<polygon points="139,114 151,150 143.2,159.0 128.8,154.3" fill="#7f8f89" fill-opacity="0.78" stroke="#fff" stroke-opacity="0.34" stroke-width="1.4" transform="rotate(21 139 150)"/>
+<polygon points="170,107 180,139 173.5,147.0 161.5,142.8" fill="#d8c5a5" fill-opacity="0.78" stroke="#fff" stroke-opacity="0.34" stroke-width="1.4" transform="rotate(-3 170 139)"/>
+<polygon points="160,54 168,87 162.8,95.3 153.2,91.0" fill="#b7c0bd" fill-opacity="0.78" stroke="#fff" stroke-opacity="0.34" stroke-width="1.4" transform="rotate(-17 160 87)"/>
+<polygon points="156,114 164,135 158.8,140.3 149.2,137.5" fill="#7f8f89" fill-opacity="0.78" stroke="#fff" stroke-opacity="0.34" stroke-width="1.4" transform="rotate(-10 156 135)"/>
+
+  <path d="M58 188c38 30 95 36 140 3" fill="none" stroke="#42d998" stroke-width="6" stroke-linecap="round" stroke-opacity="0.72"/>
+  <circle cx="52" cy="58" r="3" fill="#fff" opacity="0.7"/>
+  <circle cx="209" cy="64" r="2.5" fill="#fff" opacity="0.55"/>
+  <circle cx="213" cy="207" r="2" fill="#fff" opacity="0.5"/>
+  <title>Starter Rubble</title>
+</svg>

@@ -1,0 +1,219 @@
+asteroid_classes:
+  - id: asteroid_starter_rubble
+    display_name: Starter Rubble
+    unlock_tier: 1
+    depletion_size: 1000
+    yield_multiplier: 1.0
+    hazard_multiplier: 0.8
+    base_rare_rate: 0.02
+    composition:
+      - material_id: mat_chonks
+        weight: 0.38
+      - material_id: mat_element_fe
+        weight: 0.18
+      - material_id: mat_element_ni
+        weight: 0.13
+      - material_id: mat_element_si
+        weight: 0.10
+      - material_id: mat_element_c
+        weight: 0.09
+      - material_id: mat_scrap
+        weight: 0.08
+      - material_id: mat_gem_quartz
+        weight: 0.03
+      - material_id: mat_fictional_sparkglass
+        weight: 0.01
+  - id: asteroid_quartz_belt
+    display_name: Quartz Belt
+    unlock_tier: 2
+    depletion_size: 1800
+    yield_multiplier: 1.12
+    hazard_multiplier: 0.9
+    base_rare_rate: 0.035
+    composition:
+      - material_id: mat_chonks
+        weight: 0.22
+      - material_id: mat_element_si
+        weight: 0.22
+      - material_id: mat_gem_quartz
+        weight: 0.16
+      - material_id: mat_element_cu
+        weight: 0.10
+      - material_id: mat_element_al
+        weight: 0.09
+      - material_id: mat_element_li
+        weight: 0.06
+      - material_id: mat_element_ga
+        weight: 0.04
+      - material_id: mat_element_ge
+        weight: 0.04
+      - material_id: mat_fictional_sparkglass
+        weight: 0.04
+      - material_id: mat_gem_sapphire
+        weight: 0.03
+  - id: asteroid_iron_tumblers
+    display_name: Iron Tumblers
+    unlock_tier: 3
+    depletion_size: 2600
+    yield_multiplier: 1.25
+    hazard_multiplier: 1.0
+    base_rare_rate: 0.04
+    composition:
+      - material_id: mat_chonks
+        weight: 0.18
+      - material_id: mat_element_fe
+        weight: 0.20
+      - material_id: mat_element_ni
+        weight: 0.12
+      - material_id: mat_element_ti
+        weight: 0.11
+      - material_id: mat_element_cr
+        weight: 0.08
+      - material_id: mat_element_mn
+        weight: 0.08
+      - material_id: mat_element_v
+        weight: 0.07
+      - material_id: mat_element_co
+        weight: 0.06
+      - material_id: mat_element_w
+        weight: 0.04
+      - material_id: mat_gem_ruby
+        weight: 0.04
+      - material_id: mat_element_pt
+        weight: 0.02
+  - id: asteroid_sapphire_debris_field
+    display_name: Sapphire Debris Field
+    unlock_tier: 3
+    depletion_size: 2400
+    yield_multiplier: 1.18
+    hazard_multiplier: 1.05
+    base_rare_rate: 0.055
+    composition:
+      - material_id: mat_chonks
+        weight: 0.16
+      - material_id: mat_element_si
+        weight: 0.16
+      - material_id: mat_gem_sapphire
+        weight: 0.12
+      - material_id: mat_element_ag
+        weight: 0.08
+      - material_id: mat_element_au
+        weight: 0.05
+      - material_id: mat_element_in
+        weight: 0.07
+      - material_id: mat_element_ga
+        weight: 0.09
+      - material_id: mat_element_ge
+        weight: 0.09
+      - material_id: mat_fictional_sparkglass
+        weight: 0.10
+      - material_id: mat_element_pt
+        weight: 0.05
+      - material_id: mat_gem_amethyst
+        weight: 0.03
+  - id: asteroid_ember_rocks
+    display_name: Ember Rocks
+    unlock_tier: 4
+    depletion_size: 3600
+    yield_multiplier: 1.45
+    hazard_multiplier: 1.35
+    base_rare_rate: 0.06
+    composition:
+      - material_id: mat_chonks
+        weight: 0.13
+      - material_id: mat_element_co
+        weight: 0.12
+      - material_id: mat_element_li
+        weight: 0.10
+      - material_id: mat_element_u
+        weight: 0.05
+      - material_id: mat_element_hf
+        weight: 0.07
+      - material_id: mat_element_ta
+        weight: 0.07
+      - material_id: mat_element_w
+        weight: 0.08
+      - material_id: mat_element_mo
+        weight: 0.08
+      - material_id: mat_fictional_snaccite
+        weight: 0.08
+      - material_id: mat_cryo_hydrogen_ice
+        weight: 0.07
+      - material_id: mat_cryo_oxygen_ice
+        weight: 0.07
+      - material_id: mat_cryo_nitrogen_ice
+        weight: 0.04
+      - material_id: mat_fictional_nebulite
+        weight: 0.04
+  - id: asteroid_amethyst_archive_belt
+    display_name: Amethyst Archive Belt
+    unlock_tier: 4
+    depletion_size: 4200
+    yield_multiplier: 1.35
+    hazard_multiplier: 1.12
+    base_rare_rate: 0.07
+    composition:
+      - material_id: mat_chonks
+        weight: 0.12
+      - material_id: mat_gem_amethyst
+        weight: 0.14
+      - material_id: mat_fictional_chatterium
+        weight: 0.11
+      - material_id: mat_fictional_nebulite
+        weight: 0.09
+      - material_id: mat_fictional_glitchsalt
+        weight: 0.06
+      - material_id: mat_element_pt
+        weight: 0.08
+      - material_id: mat_element_ir
+        weight: 0.06
+      - material_id: mat_element_au
+        weight: 0.08
+      - material_id: mat_element_re
+        weight: 0.04
+      - material_id: mat_element_os
+        weight: 0.04
+      - material_id: mat_fictional_sparkglass
+        weight: 0.10
+      - material_id: mat_gem_diamond
+        weight: 0.02
+      - material_id: mat_scrap
+        weight: 0.06
+  - id: asteroid_diamond_class_body
+    display_name: Diamond-Class Body
+    unlock_tier: 5
+    depletion_size: 7000
+    yield_multiplier: 1.8
+    hazard_multiplier: 1.55
+    base_rare_rate: 0.09
+    composition:
+      - material_id: mat_chonks
+        weight: 0.08
+      - material_id: mat_gem_diamond
+        weight: 0.08
+      - material_id: mat_fictional_aetherium
+        weight: 0.05
+      - material_id: mat_fictional_glitchsalt
+        weight: 0.08
+      - material_id: mat_fictional_nebulite
+        weight: 0.09
+      - material_id: mat_fictional_chatterium
+        weight: 0.08
+      - material_id: mat_element_re
+        weight: 0.08
+      - material_id: mat_element_os
+        weight: 0.07
+      - material_id: mat_element_ir
+        weight: 0.07
+      - material_id: mat_element_pt
+        weight: 0.08
+      - material_id: mat_element_u
+        weight: 0.05
+      - material_id: mat_element_cf
+        weight: 0.02
+      - material_id: mat_element_cn
+        weight: 0.01
+      - material_id: mat_element_og
+        weight: 0.005
+      - material_id: mat_scrap
+        weight: 0.215
