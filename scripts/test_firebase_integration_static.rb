@@ -17,6 +17,7 @@ def read(path)
 end
 
 integration = read("scripts/firebase_integration_smoke.js")
+live_account_qa = read("scripts/firebase_live_account_link_qa.js")
 package = JSON.parse(read("package.json"))
 docs = read("docs/firebase-local.md") + "\n" + read("docs/firebase-integration-tests.md")
 
@@ -52,6 +53,15 @@ assert("integration smoke should cover functions sync and private field rejectio
     private_sync_rejected
     private_fields
   ].all? { |needle| integration.include?(needle) }
+end
+
+assert("live account-link QA should report malformed private-field rejection responses") do
+  live_account_qa.include?("const privateRejection = sync.result && Array.isArray(sync.result.rejected) ? sync.result.rejected[0] : null;") &&
+    live_account_qa.include?("{ events: [acceptedEvent, privateEvent] }") &&
+    live_account_qa.include?("private prompt field was not rejected:") &&
+    live_account_qa.include?("privateEventId: privateEvent.eventId") &&
+    live_account_qa.include?("privateResponse: sync") &&
+    live_account_qa.include?("rejectedReason: privateRejection.reason")
 end
 
 assert("integration smoke should cover dashboard hosting and no-auth/offline posture") do
