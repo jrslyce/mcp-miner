@@ -27,6 +27,7 @@ REQUIRED_FILES = %w[
   report_templates.yaml
   balance_constants.yaml
   subscription_plans.yaml
+  cosmetics.yaml
 ].freeze
 
 WORK_CATEGORIES = %w[
@@ -109,6 +110,27 @@ REPORT_MODES = Set.new(%w[
   milestones_only
 ]).freeze
 
+COSMETIC_CATEGORIES = Set.new(%w[
+  suit_trim
+  portal_theme
+  base_skin
+  profile_badge
+  seasonal_variant
+]).freeze
+
+COSMETIC_AVAILABILITY = Set.new(%w[
+  free
+  pro_included
+  unlockable
+  retired
+  beta
+]).freeze
+
+COSMETIC_RETENTION = Set.new(%w[
+  retain_after_downgrade
+  inactive_after_downgrade
+]).freeze
+
 PRIVATE_REPORT_TOKENS = %w[
   prompt
   source_code
@@ -146,6 +168,7 @@ class Validator
     validate_player_start
     validate_reports
     validate_subscription_plans
+    validate_cosmetics
     finish
   end
 
@@ -625,6 +648,61 @@ class Validator
     puts "  upgrades: #{upgrades.length}"
     puts "  hazards: #{hazards.length}"
     puts "  subscription plans: #{subscription_plans.length}"
+    puts "  cosmetics: #{cosmetics.length}"
+  end
+
+  def validate_cosmetics
+    catalog = @data.dig("cosmetics.yaml", "cosmetic_catalog") || {}
+    context = file_context("cosmetics.yaml", "cosmetic_catalog")
+    require_keys(catalog, context, %w[schema_version no_progression_effects categories retention_rules items])
+    error("#{context}.schema_version must be 1") unless catalog["schema_version"] == 1
+    error("#{context}.no_progression_effects must be true") unless catalog["no_progression_effects"] == true
+
+    categories = catalog["categories"] || {}
+    error("#{context}.categories must define exactly #{COSMETIC_CATEGORIES.to_a.sort.join(', ')}") unless Set.new(categories.keys) == COSMETIC_CATEGORIES
+    categories.each do |category, config|
+      category_context = "#{context}.categories.#{category}"
+      require_keys(config, category_context, %w[display_name default_item_id])
+      error("#{category_context}.display_name must be present") unless config["display_name"].is_a?(String) && !config["display_name"].empty?
+    end
+
+    retention_rules = catalog["retention_rules"] || {}
+    COSMETIC_AVAILABILITY.each do |availability|
+      error("#{context}.retention_rules.#{availability} must be clear copy") unless retention_rules[availability].is_a?(String) && retention_rules[availability].length >= 20
+    end
+
+    seen_ids = Set.new
+    default_ids = Set.new
+    cosmetics.each do |item|
+      item_context = file_context("cosmetics.yaml", "cosmetic #{item['id'] || '(missing id)'}")
+      require_keys(item, item_context, %w[id category display_name description availability retention swatch effects])
+      id = item["id"]
+      error("duplicate cosmetic id #{id}") unless seen_ids.add?(id)
+      ref_exists(item["category"], item_context, "category", COSMETIC_CATEGORIES, noun: "category")
+      ref_exists(item["availability"], item_context, "availability", COSMETIC_AVAILABILITY, noun: "availability")
+      ref_exists(item["retention"], item_context, "retention", COSMETIC_RETENTION, noun: "retention policy")
+      error("#{item_context}.display_name must be present") unless item["display_name"].is_a?(String) && !item["display_name"].empty?
+      error("#{item_context}.description must be present") unless item["description"].is_a?(String) && item["description"].length >= 12
+      error("#{item_context}.swatch must be a hex color") unless item["swatch"].to_s.match?(/\A#[0-9a-fA-F]{6}\z/)
+      error("#{item_context}.effects must stay empty; cosmetics cannot affect progression") unless item["effects"].is_a?(Array) && item["effects"].empty?
+      if %w[pro_included beta].include?(item["availability"])
+        error("#{item_context}.requires_entitlement must be configured") unless %w[premiumCosmetics priorityBetaAccess].include?(item["requires_entitlement"])
+        error("#{item_context}.retention must be inactive_after_downgrade") unless item["retention"] == "inactive_after_downgrade"
+      end
+      if item["availability"] == "unlockable"
+        error("#{item_context}.unlock_id must be present") unless item["unlock_id"].is_a?(String) && !item["unlock_id"].empty?
+        error("#{item_context}.retention must be retain_after_downgrade") unless item["retention"] == "retain_after_downgrade"
+      end
+      default_ids.add(id) if item["default_for_category"] == true
+    end
+
+    categories.each do |category, config|
+      default_id = config["default_item_id"]
+      item = cosmetics.find { |candidate| candidate["id"] == default_id }
+      error("#{context}.categories.#{category}.default_item_id references unknown cosmetic #{default_id}") unless item
+      error("#{context}.categories.#{category}.default_item_id must be a free item in the same category") unless item && item["category"] == category && item["availability"] == "free"
+      error("#{context}.categories.#{category}.default_item_id must mark default_for_category") unless default_ids.include?(default_id)
+    end
   end
 
   def validate_provider_price_ids(provider_price_ids, context)
@@ -1055,6 +1133,10 @@ class Validator
 
   def subscription_plans
     @data["subscription_plans.yaml"]["plans"] || []
+  end
+
+  def cosmetics
+    @data.dig("cosmetics.yaml", "cosmetic_catalog", "items") || []
   end
 end
 

@@ -36,6 +36,7 @@ expected_paths = [
   "players/{uid}/upgrades/current",
   "players/{uid}/orders/{orderId}",
   "players/{uid}/base/current",
+  "players/{uid}/cosmetics/current",
   "linkSessions/{sessionId}",
   "linkCodes/{code}",
   "deviceTokens/{tokenHash}",
@@ -67,7 +68,7 @@ assert("rules should reject practical private field names") do
 end
 
 assert("aggregate balances should be server-owned/read-only to clients") do
-  %w[gameState inventory upgrades orders base].all? do |collection|
+  %w[gameState inventory upgrades orders base cosmetics].all? do |collection|
     rules.include?("match /#{collection}/{docId}") && rules.include?("allow write: if false;")
   end &&
     schema.dig("collections", "players/{uid}/gameState/current", "serverOwned") == true
@@ -109,7 +110,9 @@ assert("emulator rule smoke script should cover allow and deny cases") do
     smoke.include?("aggregate_game_state_write_deny") &&
     smoke.include?("admin_entitlement_projection_read_allow") &&
     smoke.include?("client_entitlement_write_deny") &&
-    smoke.include?("client_billing_write_deny")
+    smoke.include?("client_billing_write_deny") &&
+    smoke.include?("server_cosmetics_read_allow") &&
+    smoke.include?("client_cosmetics_write_deny")
 end
 
 puts JSON.pretty_generate({

@@ -19,6 +19,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/players/{uid}/upgrades/current` | owner | owner read only | Cloud-reduced upgrade levels and effects. |
 | `/players/{uid}/orders/{orderId}` | owner | owner read only | Cloud-reduced active and completed order state. |
 | `/players/{uid}/base/current` | owner | owner read only | Cloud-reduced base module and drone state. |
+| `/players/{uid}/cosmetics/current` | owner | owner read only | Server-validated profile/portal cosmetic selections and retained cosmetic ownership. |
 | `/linkSessions/{sessionId}` | server | none | Short-lived device-link approval sessions created by callable Functions. |
 | `/linkCodes/{code}` | server | none | Atomic one-time code reservations that prevent active link-code collisions. |
 | `/deviceTokens/{tokenHash}` | server | none | Hash-only revocable device token records used by callable Functions. |
@@ -31,6 +32,8 @@ Clients may create profile/settings/sync metadata and append abstract reward eve
 Link sessions, link-code reservations, and device-token hashes are top-level server-owned collections. They are written only by Cloud Functions through the Admin SDK and remain blocked from direct dashboard/plugin Firestore access by the default deny rule.
 
 Billing and entitlement documents under `/players/{uid}` are owner-readable but server-owned. Stripe is the source of truth for paid subscription state; Firestore billing and entitlement documents are projections written by Cloud Functions with the Admin SDK. Clients may read the effective plan and feature limits, but clients cannot directly write `plan`, `billingStatus`, provider IDs, sync cadence, device limits, history retention, or feature flags.
+
+Cosmetic selections under `/players/{uid}/cosmetics/current` are also server-owned. Portal clients request cosmetic changes through `applyCosmeticSelection`; Functions re-read the server entitlement and profile ownership before writing the applied selections. Editing client state cannot unlock Pro, retired, beta, or earned cosmetics.
 
 If `/players/{uid}/entitlements/current` is missing, stale, unpaid, canceled beyond the paid period, or otherwise invalid, Functions must evaluate the effective entitlement as Free. `past_due` subscriptions can remain Pro only until the configured grace-period end; canceled subscriptions can remain Pro only through `currentPeriodEnd`.
 
@@ -57,7 +60,13 @@ Normalized entitlement fields:
   "historyRetentionDays": 365,
   "features": {
     "nearRealTimeSync": true,
-    "deviceManagement": true
+    "deviceManagement": true,
+    "backupRestore": true,
+    "advancedDashboard": true,
+    "premiumCosmetics": true,
+    "weeklyDigest": true,
+    "exports": true,
+    "priorityBetaAccess": true
   },
   "updatedAt": "2026-05-24T00:00:00.000Z"
 }

@@ -135,4 +135,22 @@ expect_failure(
   end
 end
 
-puts "Validator fixture checks passed: 11"
+expect_failure(
+  "cosmetic progression effect",
+  "data/cosmetics.yaml cosmetic suit_trim_basic.effects must stay empty; cosmetics cannot affect progression"
+) do |data_dir|
+  mutate_yaml(data_dir, "cosmetics.yaml") do |data|
+    data.fetch("cosmetic_catalog").fetch("items").first["effects"] = [{ "target" => "chonk_output", "formula" => "x2" }]
+  end
+end
+
+expect_failure(
+  "invalid premium cosmetic retention",
+  "data/cosmetics.yaml cosmetic suit_trim_aurora.retention must be inactive_after_downgrade"
+) do |data_dir|
+  mutate_yaml(data_dir, "cosmetics.yaml") do |data|
+    data.fetch("cosmetic_catalog").fetch("items").find { |item| item.fetch("id") == "suit_trim_aurora" }["retention"] = "retain_after_downgrade"
+  end
+end
+
+puts "Validator fixture checks passed: 13"

@@ -48,6 +48,12 @@ const {
   buildDashboardAnalytics,
   exportDashboardAnalytics
 } = require("./analytics");
+const {
+  COSMETIC_SCHEMA_VERSION,
+  normalizedCosmeticState,
+  publicCosmeticCatalog,
+  validateCosmeticSelection
+} = require("./cosmetics");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -236,6 +242,28 @@ function requireExportEntitlement(entitlement) {
       entitlement: publicEntitlement(entitlement)
     });
   }
+}
+
+function rethrowCosmeticError(error, entitlement) {
+  if (error instanceof HttpsError) {
+    throw error;
+  }
+  const reason = error && error.reason ? error.reason : "cosmetic_validation_failed";
+  const code = reason.startsWith("plan_limit_")
+    ? "resource-exhausted"
+    : (reason === "unknown_category" || reason === "unknown_cosmetic" ? "invalid-argument" : "failed-precondition");
+  throw new HttpsError(code, error.message || "Cosmetic selection failed validation.", {
+    reason,
+    entitlement: publicEntitlement(entitlement)
+  });
+}
+
+function publicCosmeticsFromSnapshots({ entitlement, profileSnap, cosmeticsSnap }) {
+  return publicCosmeticCatalog({
+    entitlement,
+    profile: profileSnap && profileSnap.exists ? profileSnap.data() : {},
+    cosmeticState: cosmeticsSnap && cosmeticsSnap.exists ? cosmeticsSnap.data() : {}
+  });
 }
 
 function snapshotDocs(snapshot) {
@@ -651,6 +679,96 @@ exports.getDashboardAnalytics = onCall({ region: "us-central1" }, async (request
   return {
     ...analytics,
     entitlement: publicEntitlement(entitlement)
+  };
+});
+
+exports.getCosmeticCatalog = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request, "sync:read");
+  const now = new Date().toISOString();
+  const [entitlementSnap, profileSnap, cosmeticsSnap] = await Promise.all([
+    db.doc(`players/${auth.uid}/entitlements/current`).get(),
+    db.doc(`players/${auth.uid}/profile/current`).get(),
+    db.doc(`players/${auth.uid}/cosmetics/current`).get()
+  ]);
+  const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+  const cosmetics = publicCosmeticsFromSnapshots({ entitlement, profileSnap, cosmeticsSnap });
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    entitlement: publicEntitlement(entitlement),
+    cosmetics
+  };
+});
+
+exports.applyCosmeticSelection = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request, "sync:write");
+  const requestedUid = request.data && request.data.uid ? String(request.data.uid) : null;
+  if (requestedUid && requestedUid !== auth.uid) {
+    throw new HttpsError("permission-denied", "Cosmetic selections are owner-scoped.");
+  }
+
+  const now = new Date().toISOString();
+  const profileRef = db.doc(`players/${auth.uid}/profile/current`);
+  const cosmeticsRef = db.doc(`players/${auth.uid}/cosmetics/current`);
+  const entitlementRef = db.doc(`players/${auth.uid}/entitlements/current`);
+
+  const result = await db.runTransaction(async (transaction) => {
+    const [entitlementSnap, profileSnap, cosmeticsSnap] = await Promise.all([
+      transaction.get(entitlementRef),
+      transaction.get(profileRef),
+      transaction.get(cosmeticsRef)
+    ]);
+    const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+    const profile = profileSnap.exists ? profileSnap.data() : {};
+    const cosmeticState = cosmeticsSnap.exists ? cosmeticsSnap.data() : {};
+    let selection;
+    try {
+      selection = validateCosmeticSelection({
+        selection: request.data || {},
+        entitlement,
+        profile,
+        cosmeticState
+      });
+    } catch (error) {
+      rethrowCosmeticError(error, entitlement);
+    }
+
+    const normalizedState = normalizedCosmeticState(cosmeticState);
+    const nextState = {
+      ownerUid: auth.uid,
+      schemaVersion: COSMETIC_SCHEMA_VERSION,
+      privacyClass: "abstract",
+      applied: selection.applied,
+      ownedCosmeticIds: normalizedState.ownedCosmeticIds,
+      retainedCosmeticIds: normalizedState.retainedCosmeticIds,
+      updatedAt: now,
+      noProgressionEffects: true
+    };
+    transaction.set(cosmeticsRef, nextState, { merge: true });
+
+    return {
+      entitlement,
+      cosmetics: publicCosmeticCatalog({
+        entitlement,
+        profile,
+        cosmeticState: nextState
+      }),
+      changedCategories: selection.changedCategories
+    };
+  });
+
+  logger.info("mcp_miner_cosmetic_selection_applied", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    authType: auth.authType,
+    changedCategories: result.changedCategories
+  });
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    entitlement: publicEntitlement(result.entitlement),
+    cosmetics: result.cosmetics
   };
 });
 

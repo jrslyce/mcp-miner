@@ -97,6 +97,12 @@
       "clientAccess": ["read"],
       "serverOwned": true
     },
+    "players/{uid}/cosmetics/current": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true,
+      "fields": ["ownerUid", "schemaVersion", "privacyClass", "applied", "ownedCosmeticIds", "retainedCosmeticIds", "updatedAt", "noProgressionEffects"]
+    },
     "linkSessions/{sessionId}": {
       "owner": "server",
       "clientAccess": [],

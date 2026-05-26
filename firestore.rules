@@ -331,6 +331,11 @@ service cloud.firestore {
         allow read: if isOwner(uid);
         allow write: if false;
       }
+
+      match /cosmetics/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
     }
 
     match /{document=**} {

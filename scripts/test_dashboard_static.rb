@@ -35,7 +35,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics asteroid asteroid-atlas inventory orders upgrades store reports base]
+required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics cosmetics asteroid asteroid-atlas inventory orders upgrades store reports base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -68,6 +68,9 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     analytics-list
     export-json
     export-csv
+    cosmetics-summary
+    cosmetics-list
+    cosmetics-status
     privacy-list
     base-detail
   ].all? { |id| index.include?(%(id="#{id}")) }
@@ -100,6 +103,12 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     exportDashboardHistory
     renderAnalytics
     requestHistoryExport
+    getCosmeticCatalog
+    applyCosmeticSelection
+    renderCosmetics
+    requestCosmeticApply
+    cosmetic-preview
+    cosmetic-apply
     renderStore
     createCheckoutSession
     createCustomerPortalSession
@@ -110,6 +119,23 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     ensureLinkedProfile
     requiresEmailVerification
   ].all? { |needle| auth_js.include?(needle) }
+end
+
+assert("dashboard should render cosmetic preview, apply, locked, and mobile-safe states") do
+  index.include?(%(data-panel="cosmetics")) &&
+    auth_js.include?("Cosmetics are visual only and do not affect mining rewards, Space Bucks, or orders.") &&
+    auth_js.include?("data-state=\"${escapeHtml(activeCosmeticPreview === item.id ? \"preview\"") &&
+    auth_js.include?("data-locked=\"${item.locked ? \"true\" : \"false\"}") &&
+    styles.include?(".cosmetics-list") &&
+    styles.include?(".cosmetic-row") &&
+    styles.include?(":root[data-cosmetic-theme=\"nebula\"]") &&
+    styles.include?("@media (max-width: 700px)") &&
+    styles.include?(".cosmetics-list,")
+end
+
+assert("dashboard brand copy should match the game instead of Firebase internals") do
+  index.include?("Space Mining Idle Game") &&
+    !index.include?("Firebase dashboard")
 end
 
 assert("dashboard pricing catalog should match subscription pricing config") do

@@ -52,6 +52,13 @@ History beyond the Free retention window is hidden from the portal and excluded 
 downgrade. It can be removed by retention jobs after the paid period ends. Existing backups remain
 recoverable during the grace period; restore actions require Pro after that.
 
+Cosmetics never change mining output, Space Bucks, rare-find odds, or order progress. Free cosmetics
+remain available for all accounts. Earned/unlockable cosmetics are retained after downgrade once the
+account owns them. Pro included and beta cosmetics can remain selected in the server record, but they
+become inactive after the effective entitlement falls back to Free; the portal renders the category's
+free default until Pro access returns. Retired cosmetics cannot be newly unlocked and are retained
+only for accounts with server-side ownership.
+
 ## Support Notes
 
 Support and admin tooling should be able to answer these questions from the config:

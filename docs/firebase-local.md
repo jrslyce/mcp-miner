@@ -42,6 +42,12 @@ Run the Firebase Hosting dashboard smoke case:
 npm run firebase:dashboard:smoke
 ```
 
+Run the server-validated cosmetics entitlement smoke case:
+
+```sh
+npm run firebase:cosmetics:smoke
+```
+
 Run the full Auth, Firestore rules, Functions sync, and dashboard integration smoke case:
 
 ```sh

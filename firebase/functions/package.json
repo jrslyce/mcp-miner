@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "lint": "node --check src/index.js && node --check src/linking.js && node --check src/sync.js && node --check src/entitlements.js && node --check src/billing.js && node --check src/stripe_webhooks.js && node --check src/backups.js && node --check src/analytics.js"
+    "lint": "node --check src/index.js && node --check src/linking.js && node --check src/sync.js && node --check src/entitlements.js && node --check src/billing.js && node --check src/stripe_webhooks.js && node --check src/backups.js && node --check src/analytics.js && node --check src/cosmetics.js"
   },
   "dependencies": {
     "firebase-admin": "^13.10.0",

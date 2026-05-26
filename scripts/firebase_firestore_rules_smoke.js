@@ -274,10 +274,33 @@ async function main() {
     },
     updatedAt: now
   });
+  await adminDb.doc(`players/${owner.localId}/cosmetics/current`).set({
+    ownerUid: owner.localId,
+    schemaVersion: 1,
+    privacyClass: "abstract",
+    applied: {
+      suit_trim: "suit_trim_aurora",
+      portal_theme: "portal_theme_nebula"
+    },
+    ownedCosmeticIds: [],
+    retainedCosmeticIds: [],
+    updatedAt: now,
+    noProgressionEffects: true
+  });
   await getDoc(`players/${owner.localId}/entitlements/current`, owner.idToken);
   await getDoc(`players/${owner.localId}/billing/current`, owner.idToken);
+  await getDoc(`players/${owner.localId}/cosmetics/current`, owner.idToken);
   await patchDoc(`players/${owner.localId}/entitlements/current`, owner.idToken, entitlementFields, 403);
   await patchDoc(`players/${owner.localId}/billing/current`, owner.idToken, entitlementFields, 403);
+  await patchDoc(`players/${owner.localId}/cosmetics/current`, owner.idToken, {
+    ownerUid: stringField(owner.localId),
+    schemaVersion: intField(1),
+    privacyClass: stringField("abstract"),
+    applied: mapField({
+      portal_theme: stringField("portal_theme_prism_beta")
+    }),
+    noProgressionEffects: boolField(true)
+  }, 403);
 
   console.log(JSON.stringify({
     ok: true,
@@ -291,7 +314,9 @@ async function main() {
       "aggregate_game_state_write_deny",
       "admin_entitlement_projection_read_allow",
       "client_entitlement_write_deny",
-      "client_billing_write_deny"
+      "client_billing_write_deny",
+      "server_cosmetics_read_allow",
+      "client_cosmetics_write_deny"
     ]
   }, null, 2));
 }

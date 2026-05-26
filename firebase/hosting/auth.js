@@ -48,13 +48,69 @@ const FREE_ENTITLEMENT = {
   historyRetentionDays: 7,
   features: {
     nearRealTimeSync: false,
-    deviceManagement: false
+    deviceManagement: false,
+    backupRestore: false,
+    advancedDashboard: false,
+    premiumCosmetics: false,
+    weeklyDigest: false,
+    exports: false,
+    priorityBetaAccess: false
   }
 };
 
 const PORTAL_POLLING = {
   minSeconds: 10,
   freeSeconds: 60
+};
+
+const DEMO_COSMETICS = {
+  schemaVersion: 1,
+  privacyClass: "abstract",
+  noProgressionEffects: true,
+  retentionRules: {
+    free: "Always available and retained.",
+    unlockable: "Retained after downgrade once earned or granted.",
+    pro_included: "Active only while Pro access is active.",
+    retired: "Retained only by accounts that already own it.",
+    beta: "Active only with Pro priority beta access."
+  },
+  applied: {
+    requested: {
+      suit_trim: "suit_trim_basic",
+      portal_theme: "portal_theme_standard",
+      base_skin: "base_skin_cabin_warm",
+      profile_badge: "profile_badge_rookie",
+      seasonal_variant: "seasonal_variant_none"
+    },
+    active: {
+      suit_trim: "suit_trim_basic",
+      portal_theme: "portal_theme_standard",
+      base_skin: "base_skin_cabin_warm",
+      profile_badge: "profile_badge_rookie",
+      seasonal_variant: "seasonal_variant_none"
+    },
+    inactive: {}
+  },
+  categories: {
+    suit_trim: [
+      { id: "suit_trim_basic", category: "suit_trim", displayName: "Standard Suit Trim", description: "Default pressure-suit trim.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#1f7a5a", noProgressionEffects: true },
+      { id: "suit_trim_aurora", category: "suit_trim", displayName: "Aurora Suit Trim", description: "Pro included suit accent.", availability: "pro_included", state: "locked", owned: false, locked: true, lockedReason: "plan_limit_premium_cosmetic", canPreview: true, canApply: false, active: false, swatch: "#58c79b", noProgressionEffects: true }
+    ],
+    portal_theme: [
+      { id: "portal_theme_standard", category: "portal_theme", displayName: "Standard Portal", description: "Default high-contrast portal theme.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#17201b", themeKey: "standard", noProgressionEffects: true },
+      { id: "portal_theme_nebula", category: "portal_theme", displayName: "Nebula Console", description: "Pro included portal colors.", availability: "pro_included", state: "locked", owned: false, locked: true, lockedReason: "plan_limit_premium_cosmetic", canPreview: true, canApply: false, active: false, swatch: "#2d5b91", themeKey: "nebula", noProgressionEffects: true }
+    ],
+    base_skin: [
+      { id: "base_skin_cabin_warm", category: "base_skin", displayName: "Warm Cabin", description: "Standard cozy base-room skin.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#92400e", noProgressionEffects: true }
+    ],
+    profile_badge: [
+      { id: "profile_badge_rookie", category: "profile_badge", displayName: "Rookie Miner Badge", description: "Starter profile badge.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#15583f", noProgressionEffects: true },
+      { id: "profile_badge_founder_legacy", category: "profile_badge", displayName: "Founder Legacy Badge", description: "Retired badge retained by existing owners.", availability: "retired", state: "locked", owned: false, locked: true, lockedReason: "retired", canPreview: true, canApply: false, active: false, swatch: "#334155", noProgressionEffects: true }
+    ],
+    seasonal_variant: [
+      { id: "seasonal_variant_none", category: "seasonal_variant", displayName: "Standard Season", description: "No seasonal overlay.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#66766d", noProgressionEffects: true }
+    ]
+  }
 };
 
 const DEMO_DASHBOARD = {
@@ -196,6 +252,7 @@ const DEMO_DASHBOARD = {
     },
     history: []
   },
+  cosmetics: DEMO_COSMETICS,
   entitlement: FREE_ENTITLEMENT
 };
 
@@ -295,6 +352,7 @@ const EMPTY_CLOUD_DASHBOARD = {
     },
     history: []
   },
+  cosmetics: DEMO_COSMETICS,
   entitlement: FREE_ENTITLEMENT
 };
 
@@ -460,6 +518,9 @@ const analyticsList = document.querySelector("#analytics-list");
 const exportJson = document.querySelector("#export-json");
 const exportCsv = document.querySelector("#export-csv");
 const exportStatus = document.querySelector("#export-status");
+const cosmeticsSummary = document.querySelector("#cosmetics-summary");
+const cosmeticsList = document.querySelector("#cosmetics-list");
+const cosmeticsStatus = document.querySelector("#cosmetics-status");
 const billingStatus = document.querySelector("#billing-status");
 const billingSummary = document.querySelector("#billing-summary");
 const billingPlan = document.querySelector("#billing-plan");
@@ -486,6 +547,7 @@ const pendingLink = {
 
 let currentUser = null;
 let activeDashboard = cloneDemo();
+let activeCosmeticPreview = null;
 let activeAsteroidVisual = ASTEROID_CLASSES[0];
 let activeAsteroidProgress = 0;
 let asteroidAnimationStarted = false;
@@ -1465,6 +1527,7 @@ function refreshWarning(reads) {
 async function loadDashboardForUser(user) {
   const getSyncState = httpsCallable(functions, "getSyncState");
   const getDashboardAnalytics = httpsCallable(functions, "getDashboardAnalytics");
+  const getCosmeticCatalog = httpsCallable(functions, "getCosmeticCatalog");
   const reads = await Promise.allSettled([
     getDoc(doc(db, "players", user.uid)),
     getDoc(doc(db, "players", user.uid, "profile", "current")),
@@ -1477,7 +1540,8 @@ async function loadDashboardForUser(user) {
     getDocs(query(collection(db, "players", user.uid, "orders"), limit(8))),
     getDocs(query(collection(db, "players", user.uid, "syncDevices"), limit(8))),
     getSyncState({}),
-    getDashboardAnalytics({})
+    getDashboardAnalytics({}),
+    getCosmeticCatalog({})
   ]);
 
   const player = docsData(reads, 0) || {};
@@ -1489,6 +1553,7 @@ async function loadDashboardForUser(user) {
   const directSync = docsData(reads, 4) || {};
   const callable = reads[10] && reads[10].status === "fulfilled" ? reads[10].value.data : {};
   const analytics = reads[11] && reads[11].status === "fulfilled" ? reads[11].value.data : null;
+  const cosmetics = reads[12] && reads[12].status === "fulfilled" ? reads[12].value.data.cosmetics : null;
   const cloudState = callable.state || directState;
   const syncMetadata = callable.syncMetadata || directSync;
   const inventory = normalizeInventoryRows(queryResult(reads, 7) || { forEach() {} }, cloudState);
@@ -1531,6 +1596,7 @@ async function loadDashboardForUser(user) {
   fallback.base = { ...fallback.base, ...base };
   fallback.reports = Array.isArray(cloudState.reports) && cloudState.reports.length ? cloudState.reports.slice(0, 5) : fallback.reports;
   fallback.analytics = analytics || fallback.analytics;
+  fallback.cosmetics = cosmetics || fallback.cosmetics;
   return fallback;
 }
 
@@ -1581,6 +1647,7 @@ function renderDashboard(data) {
   renderCloudDetail(cloudState, asteroid, data.syncDevices || []);
   renderBase(data.base || {});
   renderAnalytics(data.analytics || EMPTY_CLOUD_DASHBOARD.analytics, data.entitlement);
+  renderCosmetics(data.cosmetics || DEMO_COSMETICS);
   renderPrivacy(data);
   renderBilling(data.entitlement);
   renderLinkedDevices(data.syncDevices || [], data.entitlement);
@@ -1882,6 +1949,124 @@ function renderAnalytics(analytics, rawEntitlement) {
   `).join("");
 }
 
+function flattenCosmetics(cosmetics) {
+  if (!cosmetics || typeof cosmetics !== "object") {
+    return [];
+  }
+  if (Array.isArray(cosmetics.items)) {
+    return cosmetics.items;
+  }
+  return Object.values(cosmetics.categories || {}).flat();
+}
+
+function cosmeticStateLabel(item) {
+  if (activeCosmeticPreview === item.id) {
+    return "Preview";
+  }
+  if (item.active) {
+    return "Active";
+  }
+  if (item.inactive) {
+    return "Inactive";
+  }
+  if (item.locked) {
+    return displayNameFromId(item.lockedReason || "locked");
+  }
+  if (item.owned) {
+    return "Owned";
+  }
+  return displayNameFromId(item.state || item.availability || "available");
+}
+
+function cosmeticCategoryLabel(category) {
+  const labels = {
+    suit_trim: "Suit Trims",
+    portal_theme: "Portal Themes",
+    base_skin: "Base Skins",
+    profile_badge: "Profile Badges",
+    seasonal_variant: "Seasonal"
+  };
+  return labels[category] || displayNameFromId(category);
+}
+
+function cosmeticApplyLabel(item) {
+  if (item.active) {
+    return "Applied";
+  }
+  if (item.locked) {
+    return "Locked";
+  }
+  return "Apply";
+}
+
+function applyCosmeticTheme(cosmetics) {
+  const activeThemeId = cosmetics && cosmetics.applied && cosmetics.applied.active
+    ? cosmetics.applied.active.portal_theme
+    : null;
+  const previewItem = activeCosmeticPreview
+    ? flattenCosmetics(cosmetics).find((item) => item.id === activeCosmeticPreview)
+    : null;
+  const activeTheme = flattenCosmetics(cosmetics).find((item) => item.id === activeThemeId);
+  const themeKey = previewItem && previewItem.category === "portal_theme"
+    ? previewItem.themeKey
+    : activeTheme && activeTheme.themeKey;
+  if (themeKey && themeKey !== "standard") {
+    document.documentElement.dataset.cosmeticTheme = themeKey;
+  } else {
+    delete document.documentElement.dataset.cosmeticTheme;
+  }
+}
+
+function renderCosmetics(cosmetics) {
+  const catalog = cosmetics || DEMO_COSMETICS;
+  const items = flattenCosmetics(catalog);
+  const activeCount = items.filter((item) => item.active).length;
+  const lockedCount = items.filter((item) => item.locked).length;
+  cosmeticsSummary.textContent = `${formatNumber(activeCount)} active`;
+  cosmeticsStatus.textContent = catalog.noProgressionEffects
+    ? "Cosmetics are visual only and do not affect mining rewards, Space Bucks, or orders."
+    : "Cosmetic rules unavailable.";
+  cosmeticsStatus.dataset.tone = catalog.noProgressionEffects ? "success" : "error";
+  applyCosmeticTheme(catalog);
+
+  if (!items.length) {
+    cosmeticsList.innerHTML = "<p class=\"empty-state\">No cosmetic catalog is available.</p>";
+    return;
+  }
+
+  cosmeticsList.innerHTML = Object.entries(catalog.categories || {}).map(([category, categoryItems]) => `
+    <section class="cosmetic-category" aria-label="${escapeHtml(cosmeticCategoryLabel(category))}">
+      <div class="cosmetic-category-heading">
+        <strong>${escapeHtml(cosmeticCategoryLabel(category))}</strong>
+        <span>${formatNumber((categoryItems || []).filter((item) => item.locked).length)} locked</span>
+      </div>
+      ${(categoryItems || []).map((item) => {
+        const stateLabel = cosmeticStateLabel(item);
+        const applyLabel = cosmeticApplyLabel(item);
+        return `
+          <article class="cosmetic-row" data-cosmetic-id="${escapeHtml(item.id)}" data-category="${escapeHtml(item.category)}" data-state="${escapeHtml(activeCosmeticPreview === item.id ? "preview" : item.state || "available")}" data-locked="${item.locked ? "true" : "false"}">
+            <span class="cosmetic-swatch" style="--cosmetic-swatch: ${escapeHtml(item.swatch || "#66766d")}"></span>
+            <div>
+              <strong>${escapeHtml(item.displayName)}</strong>
+              <span>${escapeHtml(item.description || displayNameFromId(item.availability))}</span>
+              <small>${escapeHtml(displayNameFromId(item.availability))}</small>
+            </div>
+            <span class="store-state">${escapeHtml(stateLabel)}</span>
+            <div class="cosmetic-actions">
+              <button type="button" class="button-secondary cosmetic-preview" data-cosmetic-id="${escapeHtml(item.id)}">Preview</button>
+              <button type="button" class="button-secondary cosmetic-apply" data-cosmetic-id="${escapeHtml(item.id)}" data-category="${escapeHtml(item.category)}" ${!currentUser || !item.canApply || item.active ? "disabled" : ""}>${escapeHtml(applyLabel)}</button>
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </section>
+  `).join("");
+
+  if (lockedCount > 0 && !currentUser) {
+    cosmeticsSummary.textContent = "Demo preview";
+  }
+}
+
 function renderPrivacy(data) {
   const privacyItems = [
     ["Owner scope", currentUser ? "Private profile boundary" : "Local demo"],
@@ -2044,6 +2229,38 @@ async function requestHistoryExport(format) {
   }
 }
 
+async function requestCosmeticApply(category, cosmeticId) {
+  if (!currentUser) {
+    setMessage("Sign in before applying portal cosmetics.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+
+  cosmeticsList.setAttribute("aria-busy", "true");
+  cosmeticsStatus.textContent = "Applying cosmetic.";
+  try {
+    const callable = httpsCallable(functions, "applyCosmeticSelection");
+    const result = await callable({
+      uid: currentUser.uid,
+      category,
+      cosmeticId
+    });
+    activeDashboard.cosmetics = result.data && result.data.cosmetics ? result.data.cosmetics : activeDashboard.cosmetics;
+    activeDashboard.entitlement = result.data && result.data.entitlement ? result.data.entitlement : activeDashboard.entitlement;
+    activeCosmeticPreview = null;
+    renderDashboard(activeDashboard);
+    setMessage("Cosmetic applied.");
+  } catch (error) {
+    cosmeticsStatus.textContent = error.message || "Cosmetic update failed.";
+    cosmeticsStatus.dataset.tone = "error";
+  } finally {
+    cosmeticsList.removeAttribute("aria-busy");
+  }
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!validateAuthForm()) {
@@ -2105,6 +2322,20 @@ exportCsv.addEventListener("click", () => {
   requestHistoryExport("csv");
 });
 
+cosmeticsList.addEventListener("click", (event) => {
+  const preview = event.target.closest(".cosmetic-preview");
+  if (preview) {
+    activeCosmeticPreview = activeCosmeticPreview === preview.dataset.cosmeticId ? null : preview.dataset.cosmeticId;
+    renderCosmetics(activeDashboard.cosmetics || DEMO_COSMETICS);
+    return;
+  }
+  const apply = event.target.closest(".cosmetic-apply");
+  if (!apply || apply.disabled) {
+    return;
+  }
+  requestCosmeticApply(apply.dataset.category, apply.dataset.cosmeticId);
+});
+
 planCards.addEventListener("click", (event) => {
   const button = event.target.closest(".plan-action");
   if (!button || button.disabled) {
@@ -2157,6 +2388,7 @@ onAuthStateChanged(auth, async (user) => {
   renderDeviceLink(user);
   if (!user) {
     clearPortalRefreshTimer();
+    activeCosmeticPreview = null;
     authStatus.textContent = "Signed out";
     authIdentity.textContent = "Not signed in";
     emailVerificationStatus.textContent = "Not signed in";

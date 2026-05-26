@@ -23,6 +23,7 @@ Validated contents:
 - `player_start.yaml`: starting inventory, unlocked machine, starting asteroid, upgrades, and report mode.
 - `report_templates.yaml`: compact, full, no-progress, order-progress, and milestone report text.
 - `subscription_plans.yaml`: Free, Pro Monthly, and Pro Annual pricing, provider price references, entitlements, copy, and downgrade behavior.
+- `cosmetics.yaml`: portal/profile cosmetic categories, entitlement requirements, downgrade retention rules, and the no-progression-effect guarantee.
 
 Implementation rule:
 
