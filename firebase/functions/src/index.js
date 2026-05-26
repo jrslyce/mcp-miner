@@ -88,6 +88,34 @@ function requireVerifiedFirebaseAuth(request) {
   }
 }
 
+function requireSignedInOwner(request, action) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", `Sign in before ${action}.`);
+  }
+  requireVerifiedFirebaseAuth(request);
+  return request.auth.uid;
+}
+
+function cleanDeviceId(value) {
+  const deviceId = String(value || "").trim();
+  if (!/^device_[a-zA-Z0-9_-]{8,80}$/.test(deviceId)) {
+    throw new HttpsError("invalid-argument", "A valid MCP Miner device ID is required.");
+  }
+  return deviceId;
+}
+
+function cleanDeviceName(value) {
+  const name = String(value || "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+  if (!name) {
+    throw new HttpsError("invalid-argument", "Device name is required.");
+  }
+  return name;
+}
+
 function rethrowBillingError(error) {
   if (error instanceof HttpsError) {
     throw error;
@@ -891,5 +919,102 @@ exports.revokeDeviceToken = onCall({ region: "us-central1" }, async (request) =>
     ok: true,
     privacyClass: "abstract",
     status: "revoked"
+  };
+});
+
+exports.revokeSyncDevice = onCall({ region: "us-central1" }, async (request) => {
+  const uid = requireSignedInOwner(request, "revoking a Codex device");
+  const deviceId = cleanDeviceId(request.data && request.data.deviceId);
+  const now = new Date().toISOString();
+
+  const result = await db.runTransaction(async (transaction) => {
+    const deviceRef = db.doc(`players/${uid}/syncDevices/${deviceId}`);
+    const deviceSnap = await transaction.get(deviceRef);
+    if (!deviceSnap.exists) {
+      throw new HttpsError("not-found", "Linked Codex device not found.");
+    }
+    const device = deviceSnap.data() || {};
+    if (device.ownerUid && device.ownerUid !== uid) {
+      throw new HttpsError("permission-denied", "You can only revoke your own Codex devices.");
+    }
+
+    const tokenSnap = await transaction.get(db.collection("deviceTokens").where("uid", "==", uid));
+    const matchingTokens = tokenSnap.docs.filter((docSnap) => {
+      const token = docSnap.data() || {};
+      return token.deviceId === deviceId;
+    });
+    transaction.set(deviceRef, {
+      status: "revoked",
+      updatedAt: now,
+      revokedAt: now,
+      revokedBy: "owner"
+    }, { merge: true });
+    matchingTokens.forEach((docSnap) => {
+      transaction.set(docSnap.ref, {
+        status: "revoked",
+        updatedAt: now,
+        revokedAt: now,
+        revokedBy: "owner"
+      }, { merge: true });
+    });
+    return {
+      deviceName: device.deviceName || "Codex device",
+      tokenCount: matchingTokens.length
+    };
+  });
+
+  logger.info("mcp_miner_sync_device_revoked", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    deviceId,
+    tokenCount: result.tokenCount
+  });
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    deviceId,
+    deviceName: result.deviceName,
+    status: "revoked",
+    revokedTokenCount: result.tokenCount
+  };
+});
+
+exports.renameSyncDevice = onCall({ region: "us-central1" }, async (request) => {
+  const uid = requireSignedInOwner(request, "renaming a Codex device");
+  const deviceId = cleanDeviceId(request.data && request.data.deviceId);
+  const deviceName = cleanDeviceName(request.data && request.data.name);
+  const now = new Date().toISOString();
+
+  await db.runTransaction(async (transaction) => {
+    const deviceRef = db.doc(`players/${uid}/syncDevices/${deviceId}`);
+    const deviceSnap = await transaction.get(deviceRef);
+    if (!deviceSnap.exists) {
+      throw new HttpsError("not-found", "Linked Codex device not found.");
+    }
+    const device = deviceSnap.data() || {};
+    if (device.ownerUid && device.ownerUid !== uid) {
+      throw new HttpsError("permission-denied", "You can only rename your own Codex devices.");
+    }
+    transaction.set(deviceRef, {
+      deviceName,
+      updatedAt: now,
+      renamedAt: now,
+      renamedBy: "owner"
+    }, { merge: true });
+  });
+
+  logger.info("mcp_miner_sync_device_renamed", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    deviceId
+  });
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    deviceId,
+    deviceName,
+    status: "renamed"
   };
 });

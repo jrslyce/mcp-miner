@@ -32,7 +32,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth billing device-link sync-privacy status asteroid asteroid-atlas inventory orders upgrades store reports base]
+required_panels = %w[auth billing device-link linked-devices sync-privacy status asteroid asteroid-atlas inventory orders upgrades store reports base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -56,6 +56,8 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     checkout-monthly
     checkout-annual
     manage-billing
+    linked-devices-usage
+    linked-devices-list
     privacy-list
     base-detail
   ].all? { |id| index.include?(%(id="#{id}")) }
@@ -79,6 +81,9 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     renderDeviceLink
     approveLinkSession
     rejectLinkSession
+    revokeSyncDevice
+    renameSyncDevice
+    renderLinkedDevices
     renderStore
     createCheckoutSession
     createCustomerPortalSession
@@ -86,6 +91,18 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     ensureLinkedProfile
     requiresEmailVerification
   ].all? { |needle| auth_js.include?(needle) }
+end
+
+assert("dashboard should render linked device management without token secrets") do
+  index.include?(%(data-panel="linked-devices")) &&
+    index.include?(%(id="linked-devices-list")) &&
+    auth_js.include?("function renderLinkedDevices(devices = [], rawEntitlement = FREE_ENTITLEMENT)") &&
+    auth_js.include?("function updateLinkedDevice(action, deviceId, name = \"\")") &&
+    auth_js.include?("httpsCallable(functions, action === \"rename\" ? \"renameSyncDevice\" : \"revokeSyncDevice\")") &&
+    auth_js.include?("device-revoke") &&
+    auth_js.include?("device-rename") &&
+    !auth_js.include?("tokenHash") &&
+    !index.include?("token hash")
 end
 
 assert("refresh control should not expose placeholder icon text") do

@@ -4,9 +4,10 @@ The Firebase Hosting dashboard is a static web app in `firebase/hosting`. It ope
 
 ## Data Sources
 
-- Signed-out users see a local demo snapshot with status, inventory, active orders, asteroid progress, upgrades, Space Bucks store items, recent reports, sync state, and privacy state.
+- Signed-out users see a local demo snapshot with status, inventory, active orders, asteroid progress, upgrades, Space Bucks store items, recent reports, sync state, linked-device state, and privacy state.
 - Signed-in users use Firebase Auth, then read owner-scoped documents under `/players/{uid}`.
 - The dashboard reads `getSyncState` from Cloud Functions when available and falls back to direct owner reads for `gameState/current` and `syncMetadata/default`.
+- Linked device management reads owner-visible `/players/{uid}/syncDevices` metadata and uses `renameSyncDevice` / `revokeSyncDevice` callables for owner-only changes. Token hashes and secrets stay server-side.
 - Inventory, orders, upgrades, and base panels read their Firestore collections/documents where reducers have produced data. If cloud economy reducers have not produced those documents yet, the dashboard shows that the cloud profile is ready and is waiting for Codex sync.
 
 ## Privacy Boundary

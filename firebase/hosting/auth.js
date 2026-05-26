@@ -81,6 +81,15 @@ const DEMO_DASHBOARD = {
     duplicateCount: 0,
     rejectedCount: 0
   },
+  syncDevices: [
+    {
+      deviceId: "device_demo",
+      deviceName: "Demo Codex",
+      status: "active",
+      createdAt: "Demo snapshot",
+      lastUsedAt: "Demo snapshot"
+    }
+  ],
   inventory: [
     { materialId: "mat_chonks", displayName: "Chonks", category: "core", quantity: 1840, totalSpaceBucks: 0 },
     { materialId: "mat_iron", displayName: "Iron", category: "ore", quantity: 64, totalSpaceBucks: 128 },
@@ -165,6 +174,7 @@ const EMPTY_CLOUD_DASHBOARD = {
     duplicateCount: 0,
     rejectedCount: 0
   },
+  syncDevices: [],
   inventory: [],
   orders: [],
   asteroid: {
@@ -363,6 +373,9 @@ const deviceLinkSummary = document.querySelector("#device-link-summary");
 const deviceLinkCode = document.querySelector("#device-link-code");
 const approveDeviceLink = document.querySelector("#approve-device-link");
 const rejectDeviceLink = document.querySelector("#reject-device-link");
+const linkedDevicesUsage = document.querySelector("#linked-devices-usage");
+const linkedDevicesSummary = document.querySelector("#linked-devices-summary");
+const linkedDevicesList = document.querySelector("#linked-devices-list");
 const linkParams = new URLSearchParams(window.location.search);
 const pendingLink = {
   sessionId: linkParams.get("sessionId") || "",
@@ -514,6 +527,63 @@ function renderBilling(rawEntitlement) {
   checkoutMonthly.disabled = !signedIn || verificationRequired || pro;
   checkoutAnnual.disabled = !signedIn || verificationRequired || pro;
   manageBilling.disabled = !signedIn || verificationRequired || !entitlement.providerCustomerId;
+}
+
+function activeDeviceCount(devices) {
+  return devices.filter((device) => device.status !== "revoked").length;
+}
+
+function deviceLimitSummary(entitlement, devices) {
+  const activeCount = activeDeviceCount(devices);
+  const maxDevices = numberValue(entitlement.maxDevices, 1);
+  if (!currentUser) {
+    return "Sign in to manage connected Codex computers.";
+  }
+  if (maxDevices <= 1) {
+    return activeCount >= 1
+      ? "Free includes one active Codex device. Upgrade to Pro for up to five connected computers."
+      : "Free includes one active Codex device. Link this computer from Codex when ready.";
+  }
+  if (activeCount >= maxDevices) {
+    return `Pro device slots are full: ${formatNumber(activeCount)} of ${formatNumber(maxDevices)} active. Revoke a device before linking another.`;
+  }
+  return `Pro device slots used: ${formatNumber(activeCount)} of ${formatNumber(maxDevices)}.`;
+}
+
+function renderLinkedDevices(devices = [], rawEntitlement = FREE_ENTITLEMENT) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const activeCount = activeDeviceCount(devices);
+  const maxDevices = numberValue(entitlement.maxDevices, 1);
+  linkedDevicesUsage.textContent = `${formatNumber(activeCount)} / ${formatNumber(maxDevices)}`;
+  linkedDevicesSummary.textContent = deviceLimitSummary(entitlement, devices);
+  linkedDevicesSummary.dataset.tone = entitlement.entitlementStatus === "pro" ? "success" : "";
+
+  if (!currentUser) {
+    linkedDevicesList.innerHTML = "<p class=\"empty-state\">Sign in to manage linked Codex devices.</p>";
+    return;
+  }
+  if (!devices.length) {
+    linkedDevicesList.innerHTML = "<p class=\"empty-state\">No linked Codex devices yet.</p>";
+    return;
+  }
+
+  linkedDevicesList.innerHTML = devices.map((device) => {
+    const revoked = device.status === "revoked";
+    const name = device.deviceName || "Codex device";
+    return `
+      <article class="device-row" data-device-id="${escapeHtml(device.deviceId)}">
+        <div class="device-main">
+          <input class="device-name-input" value="${escapeHtml(name)}" aria-label="Device name" maxlength="80" ${revoked ? "disabled" : ""}>
+          <span>${escapeHtml(revoked ? "Revoked" : "Active")} - Created ${escapeHtml(timestampLabel(device.createdAt))}</span>
+          <span>Last sync ${escapeHtml(timestampLabel(device.lastUsedAt))}</span>
+        </div>
+        <div class="device-actions">
+          <button type="button" class="button-secondary device-rename" ${revoked ? "disabled" : ""}>Rename</button>
+          <button type="button" class="button-secondary device-revoke" ${revoked ? "disabled" : ""}>Revoke</button>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function hasPendingLink() {
@@ -996,10 +1066,22 @@ function normalizeDeviceRows(snapshot) {
       deviceId: data.deviceId || data.device_id || entry.id,
       deviceName: data.deviceName || data.device_name || "Codex device",
       status: data.status || "linked",
-      lastUsedAt: data.lastUsedAt || data.last_used_at || null
+      createdAt: data.createdAt || data.created_at || null,
+      updatedAt: data.updatedAt || data.updated_at || null,
+      lastUsedAt: data.lastUsedAt || data.last_used_at || null,
+      revokedAt: data.revokedAt || data.revoked_at || null
     });
   });
-  return rows.filter((device) => device.status !== "revoked").slice(0, 8);
+  return rows
+    .sort((left, right) => {
+      const leftRevoked = left.status === "revoked" ? 1 : 0;
+      const rightRevoked = right.status === "revoked" ? 1 : 0;
+      if (leftRevoked !== rightRevoked) {
+        return leftRevoked - rightRevoked;
+      }
+      return String(right.lastUsedAt || right.createdAt || "").localeCompare(String(left.lastUsedAt || left.createdAt || ""));
+    })
+    .slice(0, 12);
 }
 
 function normalizeUpgradeRows(data) {
@@ -1198,6 +1280,7 @@ function renderDashboard(data) {
   renderBase(data.base || {});
   renderPrivacy(data);
   renderBilling(data.entitlement);
+  renderLinkedDevices(data.syncDevices || [], data.entitlement);
 }
 
 function renderAsteroidArt(asteroid, progress) {
@@ -1525,6 +1608,34 @@ async function openBillingSession(callableName, payload = {}) {
   }
 }
 
+function friendlyDeviceError(error) {
+  const reason = error && error.details && error.details.reason;
+  if (reason === "plan_limit_device_count") {
+    return "This plan has no available Codex device slots.";
+  }
+  return error && error.message ? error.message : "Linked device update failed.";
+}
+
+async function updateLinkedDevice(action, deviceId, name = "") {
+  if (!currentUser) {
+    setMessage("Sign in before managing linked Codex devices.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+
+  const callable = httpsCallable(functions, action === "rename" ? "renameSyncDevice" : "revokeSyncDevice");
+  try {
+    await callable(action === "rename" ? { deviceId, name } : { deviceId });
+    await refreshForCurrentUser();
+    setMessage(action === "rename" ? "Device renamed." : "Device revoked.");
+  } catch (error) {
+    setMessage(friendlyDeviceError(error), true);
+  }
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!validateAuthForm()) {
@@ -1576,6 +1687,23 @@ checkoutAnnual.addEventListener("click", () => {
 
 manageBilling.addEventListener("click", () => {
   openBillingSession("createCustomerPortalSession");
+});
+
+linkedDevicesList.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  const row = event.target.closest("[data-device-id]");
+  if (!button || !row) {
+    return;
+  }
+  const deviceId = row.dataset.deviceId;
+  if (button.classList.contains("device-revoke")) {
+    updateLinkedDevice("revoke", deviceId);
+    return;
+  }
+  if (button.classList.contains("device-rename")) {
+    const input = row.querySelector(".device-name-input");
+    updateLinkedDevice("rename", deviceId, input ? input.value : "");
+  }
 });
 
 approveDeviceLink.addEventListener("click", () => {

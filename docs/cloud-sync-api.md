@@ -34,6 +34,19 @@ the token in the local auth file and uses it for future sync calls.
 Called by a linked plugin device with its current device token. It revokes that local device without
 deleting the player's web account or local save.
 
+### `renameSyncDevice`
+
+Called by the signed-in web portal with Firebase Auth. It validates that the target device lives
+under the caller's `/players/{uid}/syncDevices/{deviceId}` path, then updates owner-editable display
+metadata such as `deviceName`. Token hashes and device secrets are never returned to the portal.
+
+### `revokeSyncDevice`
+
+Called by the signed-in web portal with Firebase Auth. It revokes the selected owner device metadata
+and any matching server-side device token documents. A revoked token can no longer call sync APIs.
+Requests for another user's device resolve through the caller's own player path, so they fail without
+revealing the other user's device metadata.
+
 ### `syncRewardEvents`
 
 Input:

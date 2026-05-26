@@ -216,12 +216,12 @@ async function main() {
 
   const indexHtml = await requestText(`http://${HOSTING_HOST}/`);
   const dashboardJs = await requestText(`http://${HOSTING_HOST}/auth.js`);
-  const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "device-link", "sync-privacy"];
+  const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "device-link", "linked-devices", "sync-privacy"];
   const missingPanels = requiredPanels.filter((panel) => !indexHtml.includes(`data-panel="${panel}"`));
   if (missingPanels.length) {
     throw new Error(`dashboard hosting response missing panels: ${missingPanels.join(", ")}`);
   }
-  if (!dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("getSyncState") || !dashboardJs.includes("connectFunctionsEmulator")) {
+  if (!dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("getSyncState") || !dashboardJs.includes("connectFunctionsEmulator") || !dashboardJs.includes("renameSyncDevice")) {
     throw new Error("dashboard module missing demo/offline or Functions integration support");
   }
 

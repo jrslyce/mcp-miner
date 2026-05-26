@@ -302,6 +302,11 @@ button:hover:not(:disabled) {
   margin-top: 14px;
 }
 
+.device-list {
+  display: grid;
+  gap: 10px;
+}
+
 button:disabled {
   cursor: not-allowed;
   border-color: var(--line);
@@ -463,6 +468,7 @@ dd {
 }
 
 .row-item,
+.device-row,
 .store-row,
 .upgrade-row,
 .report-list article {
@@ -480,8 +486,39 @@ dd {
   padding: 12px;
 }
 
+.device-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+}
+
+.device-main {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.device-main span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.device-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(74px, 1fr));
+  gap: 8px;
+}
+
+.device-name-input {
+  min-height: 38px;
+}
+
 .row-item strong,
 .row-item span,
+.device-main span,
 .upgrade-row strong,
 .upgrade-row small {
   display: block;
@@ -651,6 +688,7 @@ dd {
   .metric-strip,
   .asteroid-atlas,
   .actions,
+  .device-row,
   .store-row,
   .inline-stats {
     grid-template-columns: 1fr;

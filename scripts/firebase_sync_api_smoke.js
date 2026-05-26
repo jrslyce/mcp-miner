@@ -256,6 +256,30 @@ async function main() {
     sessionId: freeLinkB.result.session.sessionId,
     deviceSecret: freeLinkB.result.deviceSecret
   }, false);
+  const renamedFreeDevice = await callFunction("renameSyncDevice", freeLimitUser.idToken, {
+    deviceId: freeDeviceA.result.deviceId,
+    name: "Kitchen Codex"
+  });
+  const renamedFreeDeviceDoc = await firestore().doc(`players/${freeLimitUser.localId}/syncDevices/${freeDeviceA.result.deviceId}`).get();
+  const otherDeviceUser = await signUp("device-cross-user");
+  const crossUserRename = await callFunction("renameSyncDevice", otherDeviceUser.idToken, {
+    deviceId: freeDeviceA.result.deviceId,
+    name: "Not Mine"
+  }, false);
+  const crossUserRevoke = await callFunction("revokeSyncDevice", otherDeviceUser.idToken, {
+    deviceId: freeDeviceA.result.deviceId
+  }, false);
+  const revokedFreeDevice = await callFunction("revokeSyncDevice", freeLimitUser.idToken, {
+    deviceId: freeDeviceA.result.deviceId
+  });
+  const revokedFreeDeviceDoc = await firestore().doc(`players/${freeLimitUser.localId}/syncDevices/${freeDeviceA.result.deviceId}`).get();
+  const revokedDeviceSync = await callFunction("syncRewardEvents", freeDeviceA.result.deviceToken, {
+    events: [event({
+      eventId: "evt_emulator_sync_revoked_device",
+      sequence: 1,
+      ownerUid: freeLimitUser.localId
+    })]
+  }, false);
 
   const proUser = await signUp("pro-devices");
   await setEntitlement(proUser.localId, "pro_monthly");
@@ -389,6 +413,15 @@ async function main() {
   if (!freeDeviceA.result || !freeDeviceA.result.deviceToken || errorReason(freeDeviceBRejected) !== "plan_limit_device_count") {
     throw new Error("Free device limit did not reject the second linked Codex device");
   }
+  if (!renamedFreeDevice.result || renamedFreeDeviceDoc.data().deviceName !== "Kitchen Codex") {
+    throw new Error("Device rename callable did not update owner device metadata");
+  }
+  if (!crossUserRename.error || crossUserRename.error.status !== "NOT_FOUND" || !crossUserRevoke.error || crossUserRevoke.error.status !== "NOT_FOUND") {
+    throw new Error("Cross-user device rename/revoke was not denied without exposing another user's device");
+  }
+  if (!revokedFreeDevice.result || revokedFreeDeviceDoc.data().status !== "revoked" || !revokedDeviceSync.error || revokedDeviceSync.error.status !== "UNAUTHENTICATED") {
+    throw new Error("Device revoke callable did not revoke metadata and block the device token");
+  }
   if (proDevices.length !== 5 || errorReason(proSixthRejected) !== "plan_limit_device_count") {
     throw new Error("Pro device limit did not allow five devices and reject the sixth");
   }
@@ -426,6 +459,9 @@ async function main() {
     billingMissingSecret: checkoutMissingSecret.error.status,
     freeSyncCadenceLimit: errorReason(freeCadence),
     freeDeviceLimit: errorReason(freeDeviceBRejected),
+    renamedDevice: renamedFreeDeviceDoc.data().deviceName,
+    revokedDeviceStatus: revokedFreeDeviceDoc.data().status,
+    revokedTokenSync: revokedDeviceSync.error.status,
     proDeviceLimit: errorReason(proSixthRejected),
     proAlternatingAccepted: proDeviceA.result.accepted.length + proDeviceB.result.accepted.length,
     proGlobalDuplicateCount: proDuplicateGlobal.result.duplicates.length,
