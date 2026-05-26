@@ -23,7 +23,10 @@ const {
   validateLinkSession
 } = require("./linking");
 const {
-  evaluateEntitlement
+  deviceLimitDecision,
+  evaluateEntitlement,
+  publicEntitlement,
+  syncCadenceDecision
 } = require("./entitlements");
 const {
   assertUidMatchesRequest,
@@ -98,6 +101,77 @@ function rethrowBillingError(error) {
     "internal"
   ]);
   throw new HttpsError(allowed.has(code) ? code : "internal", error.message || "Stripe billing failed.");
+}
+
+function activeDevicesQuery(uid) {
+  return db.collection(`players/${uid}/syncDevices`).where("status", "==", "active");
+}
+
+function activeDevicesFromSnapshot(snapshot, currentDeviceId = null) {
+  const devices = snapshot && snapshot.docs ? snapshot.docs.map((doc) => ({
+    deviceId: doc.id,
+    ...doc.data()
+  })) : [];
+  if (currentDeviceId && !devices.some((device) => device.deviceId === currentDeviceId)) {
+    devices.push({
+      deviceId: currentDeviceId,
+      status: "active",
+      createdAt: null
+    });
+  }
+  return devices;
+}
+
+function entitlementLimitMessage(decision, entitlement) {
+  const plan = entitlement && entitlement.plan ? entitlement.plan : "free";
+  if (decision.reason === "plan_limit_device_count") {
+    return plan === "free"
+      ? "Free accounts can link one active Codex device. Disconnect another device or upgrade to Pro for up to five."
+      : `Your MCP Miner plan allows ${decision.maxDevices} active Codex devices. Disconnect another device before linking this one.`;
+  }
+  if (decision.reason === "plan_limit_sync_cadence") {
+    const cadence = Number(decision.cadenceSeconds || 60);
+    const retry = Number(decision.retryAfterSeconds || cadence);
+    return plan === "free"
+      ? `Free cloud sync accepts one batch per minute. Local progress is still queued; retry in about ${retry} seconds or upgrade to Pro for near-real-time sync.`
+      : `Cloud sync is limited to one batch every ${cadence} seconds for this plan. Local progress is still queued; retry in about ${retry} seconds.`;
+  }
+  return "MCP Miner plan entitlement limit reached.";
+}
+
+function throwEntitlementDecision(decision, entitlement) {
+  if (decision.ok) {
+    return;
+  }
+  throw new HttpsError("resource-exhausted", entitlementLimitMessage(decision, entitlement), {
+    reason: decision.reason,
+    entitlement: publicEntitlement(entitlement),
+    maxDevices: decision.maxDevices || null,
+    activeDevices: decision.activeDevices || null,
+    cadenceSeconds: decision.cadenceSeconds || null,
+    retryAfterSeconds: decision.retryAfterSeconds || null
+  });
+}
+
+async function readEntitlementInTransaction(transaction, uid, now) {
+  const entitlementSnap = await transaction.get(db.doc(`players/${uid}/entitlements/current`));
+  return evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now });
+}
+
+async function readActiveDevicesInTransaction(transaction, uid, currentDeviceId = null) {
+  const snapshot = await transaction.get(activeDevicesQuery(uid));
+  return activeDevicesFromSnapshot(snapshot, currentDeviceId);
+}
+
+function enforceActiveDeviceAccess({ entitlement, activeDevices, auth }) {
+  if (!auth || auth.authType !== "device_token") {
+    return;
+  }
+  throwEntitlementDecision(deviceLimitDecision({
+    entitlement,
+    activeDevices,
+    deviceId: auth.deviceId
+  }), entitlement);
 }
 
 async function resolveLinkSessionRef(data) {
@@ -201,6 +275,7 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
   const playerRef = db.doc(`players/${uid}`);
   const stateRef = db.doc(`players/${uid}/gameState/current`);
   const syncRef = db.doc(`players/${uid}/syncMetadata/default`);
+  const entitlementNow = receivedAt;
   const eventRefs = events.map((event, index) => {
     const eventId = event && typeof event.eventId === "string" && /^evt_[a-zA-Z0-9_-]+$/.test(event.eventId)
       ? event.eventId
@@ -212,10 +287,13 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
     const result = await db.runTransaction(async (transaction) => {
       const stateSnap = await transaction.get(stateRef);
       const syncSnap = await transaction.get(syncRef);
+      const entitlement = await readEntitlementInTransaction(transaction, uid, entitlementNow);
+      const activeDevices = await readActiveDevicesInTransaction(transaction, uid, auth.deviceId);
       const eventSnaps = [];
       for (const ref of eventRefs) {
         eventSnaps.push(await transaction.get(ref));
       }
+      enforceActiveDeviceAccess({ entitlement, activeDevices, auth });
 
       const state = stateSnap.exists ? stateSnap.data() : {
         ownerUid: uid,
@@ -237,6 +315,12 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         lastSequence: Number(sync.lastSequence || state.lastSequence || 0),
         receivedAt
       });
+      throwEntitlementDecision(syncCadenceDecision({
+        entitlement,
+        lastAcceptedBatchAt: sync.lastAcceptedBatchAt,
+        now: receivedAt,
+        acceptedCount: batch.accepted.length
+      }), entitlement);
 
       let reducedState = {
         ...state,
@@ -267,7 +351,10 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
         lastSequence: Math.max(Number(sync.lastSequence || 0), Number(reducedState.lastSequence || 0), Number(batch.lastSequence || 0)),
         acceptedCount: FieldValue.increment(batch.accepted.length),
         duplicateCount: FieldValue.increment(batch.duplicates.length),
-        rejectedCount: FieldValue.increment(batch.rejected.length)
+        rejectedCount: FieldValue.increment(batch.rejected.length),
+        lastAcceptedBatchAt: batch.accepted.length > 0 ? receivedAt : sync.lastAcceptedBatchAt || null,
+        lastAcceptedBatchAuthType: batch.accepted.length > 0 ? auth.authType : sync.lastAcceptedBatchAuthType || null,
+        lastAcceptedBatchDeviceId: batch.accepted.length > 0 ? auth.deviceId : sync.lastAcceptedBatchDeviceId || null
       }, { merge: true });
       touchDeviceWrites(transaction, auth, receivedAt);
 
@@ -282,7 +369,8 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
           lastEventId: reducedState.lastEventId,
           lastSequence: reducedState.lastSequence,
           workEvents: reducedState.workEvents
-        }
+        },
+        entitlement
       };
     });
 
@@ -298,6 +386,7 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
 
     return {
       ...result,
+      entitlement: publicEntitlement(result.entitlement),
       privacyClass: "abstract"
     };
   } catch (error) {
@@ -318,12 +407,18 @@ exports.getSyncState = onCall({ region: "us-central1" }, async (request) => {
   const auth = await resolveSyncAuth(request, "sync:read");
   const uid = auth.uid;
   const entitlementNow = new Date().toISOString();
-  const [stateSnap, syncSnap, entitlementSnap] = await Promise.all([
+  const [stateSnap, syncSnap, entitlementSnap, activeDevicesSnap] = await Promise.all([
     db.doc(`players/${uid}/gameState/current`).get(),
     db.doc(`players/${uid}/syncMetadata/default`).get(),
-    db.doc(`players/${uid}/entitlements/current`).get()
+    db.doc(`players/${uid}/entitlements/current`).get(),
+    auth.authType === "device_token" ? activeDevicesQuery(uid).get() : Promise.resolve(null)
   ]);
   const entitlement = evaluateEntitlement(entitlementSnap.exists ? entitlementSnap.data() : null, { now: entitlementNow });
+  enforceActiveDeviceAccess({
+    entitlement,
+    activeDevices: activeDevicesFromSnapshot(activeDevicesSnap, auth.deviceId),
+    auth
+  });
   if (auth.authType === "device_token") {
     const now = new Date().toISOString();
     await Promise.all([
@@ -471,6 +566,7 @@ exports.stripeWebhook = onRequest({ region: "us-central1" }, async (request, res
 
 exports.createLinkSession = onCall({ region: "us-central1" }, async (request) => {
   const now = new Date();
+  const linkPolicy = evaluateEntitlement(null, { now: now.toISOString() });
   let nextSession = null;
   let nextDeviceSecret = null;
   let nextLinkUrl = null;
@@ -526,6 +622,7 @@ exports.createLinkSession = onCall({ region: "us-central1" }, async (request) =>
     privacyClass: "abstract",
     session: publicLinkSession(nextSession),
     linkUrl: nextLinkUrl,
+    linkPolicy: publicEntitlement(linkPolicy),
     deviceSecret: nextDeviceSecret,
     message: "Open the link while signed in to MCP Miner to approve this Codex device."
   };
@@ -543,10 +640,17 @@ exports.approveLinkSession = onCall({ region: "us-central1" }, async (request) =
   const result = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ref);
     const session = snapshot.exists ? snapshot.data() : null;
+    const entitlement = await readEntitlementInTransaction(transaction, uid, now);
+    const activeDevices = await readActiveDevicesInTransaction(transaction, uid);
     const validation = requirePendingSession(session);
     if (!validation.ok) {
       throw new HttpsError(validation.reason === "not_found" ? "not-found" : "failed-precondition", `Link session ${validation.reason}.`);
     }
+    throwEntitlementDecision(deviceLimitDecision({
+      entitlement,
+      activeDevices,
+      creatingNew: true
+    }), entitlement);
 
     const approved = {
       ...session,
@@ -568,19 +672,20 @@ exports.approveLinkSession = onCall({ region: "us-central1" }, async (request) =
       cloudSyncEnabled: true,
       updatedAt: now
     }, { merge: true });
-    return approved;
+    return { session: approved, entitlement };
   });
 
   logger.info("mcp_miner_link_session_approved", {
     privacyClass: "abstract",
     uidPresent: true,
-    sessionId: result.sessionId
+    sessionId: result.session.sessionId
   });
 
   return {
     ok: true,
     privacyClass: "abstract",
-    session: publicLinkSession(result),
+    session: publicLinkSession(result.session),
+    entitlement: publicEntitlement(result.entitlement),
     message: "Codex device approved. Return to Codex to complete linking."
   };
 });
@@ -650,6 +755,14 @@ exports.exchangeLinkSession = onCall({ region: "us-central1" }, async (request) 
     }
 
     const uid = session.approvedUid;
+    const entitlement = await readEntitlementInTransaction(transaction, uid, now);
+    const activeDevices = await readActiveDevicesInTransaction(transaction, uid);
+    throwEntitlementDecision(deviceLimitDecision({
+      entitlement,
+      activeDevices,
+      creatingNew: true
+    }), entitlement);
+
     transaction.set(db.doc(`deviceTokens/${hash}`), {
       uid,
       deviceId,
@@ -684,7 +797,7 @@ exports.exchangeLinkSession = onCall({ region: "us-central1" }, async (request) 
       deviceId
     }, { merge: true });
 
-    return { uid, deviceId };
+    return { uid, deviceId, entitlement };
   });
 
   logger.info("mcp_miner_link_session_exchanged", {
@@ -701,6 +814,7 @@ exports.exchangeLinkSession = onCall({ region: "us-central1" }, async (request) 
     deviceToken: token,
     tokenType: "mcp_miner_device",
     scopes: ["sync:read", "sync:write"],
+    entitlement: publicEntitlement(result.entitlement),
     message: "MCP Miner account linked. Store this device token locally; it will not be shown again."
   };
 });

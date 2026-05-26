@@ -34,6 +34,8 @@ Billing and entitlement documents under `/players/{uid}` are owner-readable but 
 
 If `/players/{uid}/entitlements/current` is missing, stale, unpaid, canceled beyond the paid period, or otherwise invalid, Functions must evaluate the effective entitlement as Free. `past_due` subscriptions can remain Pro only until the configured grace-period end; canceled subscriptions can remain Pro only through `currentPeriodEnd`.
 
+Cloud Functions enforce the evaluated entitlement for device linking, device-token sync, and sync state reads. Free accounts are limited to one active Codex device and one accepted sync batch per 60 seconds. Pro accounts are limited to five active Codex devices and the paid near-real-time cadence. Downgrades do not delete existing `syncDevices`; only the earliest allowed active device remains usable until the account upgrades or extra devices are disconnected.
+
 Normalized entitlement fields:
 
 ```json

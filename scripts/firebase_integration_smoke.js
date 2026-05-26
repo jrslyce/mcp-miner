@@ -41,6 +41,10 @@ function firebaseAdmin() {
   return admin;
 }
 
+function firestore() {
+  return firebaseAdmin().firestore();
+}
+
 async function verifyEmulatorUser(uid) {
   await firebaseAdmin().auth().updateUser(uid, { emailVerified: true });
 }
@@ -194,6 +198,9 @@ async function main() {
   const acceptedEvent = syncEvent(owner.localId, { sequence: 1 });
   const sync = await callFunction("syncRewardEvents", owner.idToken, { events: [acceptedEvent] });
   const duplicate = await callFunction("syncRewardEvents", owner.idToken, { events: [acceptedEvent] });
+  await firestore().doc(`players/${owner.localId}/syncMetadata/default`).set({
+    lastAcceptedBatchAt: new Date(Date.now() - 61 * 1000).toISOString()
+  }, { merge: true });
   const deviceEvent = syncEvent(owner.localId, { sequence: 2 });
   const deviceSync = await callFunction("syncRewardEvents", exchanged.result.deviceToken, { events: [deviceEvent] });
   const privateEvent = syncEvent(owner.localId, {

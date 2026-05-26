@@ -3,7 +3,11 @@
 const assert = require("assert");
 const {
   buildEntitlementProjection,
-  evaluateEntitlement
+  deviceLimitDecision,
+  evaluateEntitlement,
+  publicEntitlement,
+  sortActiveDevices,
+  syncCadenceDecision
 } = require("../firebase/functions/src/entitlements");
 
 let checks = 0;
@@ -139,6 +143,78 @@ check("buildEntitlementProjection should normalize provider billing into one obj
     result.provider === "stripe" &&
     result.providerCustomerId === "cus_test_123" &&
     result.maxDevices === 5;
+});
+
+check("device limit decisions should enforce Free single-device cap", () => {
+  const entitlement = evaluateEntitlement(null, { now: NOW });
+  const decision = deviceLimitDecision({
+    entitlement,
+    activeDevices: [{ deviceId: "device_1", status: "active", createdAt: NOW }],
+    creatingNew: true
+  });
+  return decision.ok === false &&
+    decision.reason === "plan_limit_device_count" &&
+    decision.maxDevices === 1;
+});
+
+check("device limit decisions should allow Pro devices 1 through 5 but reject sixth", () => {
+  const entitlement = evaluateEntitlement(doc(), { now: NOW });
+  const devices = [1, 2, 3, 4, 5].map((index) => ({
+    deviceId: `device_${index}`,
+    status: "active",
+    createdAt: `2026-05-24T00:00:0${index}.000Z`
+  }));
+  return deviceLimitDecision({ entitlement, activeDevices: devices.slice(0, 4), creatingNew: true }).ok === true &&
+    deviceLimitDecision({ entitlement, activeDevices: devices, creatingNew: true }).reason === "plan_limit_device_count";
+});
+
+check("downgraded accounts should keep earliest active device allowed without deleting others", () => {
+  const entitlement = evaluateEntitlement(null, { now: NOW });
+  const devices = sortActiveDevices([
+    { deviceId: "device_late", status: "active", createdAt: "2026-05-24T00:00:02.000Z" },
+    { deviceId: "device_early", status: "active", createdAt: "2026-05-24T00:00:01.000Z" }
+  ]);
+  return devices[0].deviceId === "device_early" &&
+    deviceLimitDecision({ entitlement, activeDevices: devices, deviceId: "device_early" }).ok === true &&
+    deviceLimitDecision({ entitlement, activeDevices: devices, deviceId: "device_late" }).reason === "plan_limit_device_count";
+});
+
+check("sync cadence decisions should throttle Free accepted batches within 60 seconds", () => {
+  const entitlement = evaluateEntitlement(null, { now: NOW });
+  const decision = syncCadenceDecision({
+    entitlement,
+    lastAcceptedBatchAt: "2026-05-23T23:59:30.000Z",
+    now: NOW,
+    acceptedCount: 1
+  });
+  return decision.ok === false &&
+    decision.reason === "plan_limit_sync_cadence" &&
+    decision.retryAfterSeconds === 30;
+});
+
+check("sync cadence decisions should allow Free after 60 seconds and Pro near-real-time", () => {
+  const free = evaluateEntitlement(null, { now: NOW });
+  const pro = evaluateEntitlement(doc(), { now: NOW });
+  return syncCadenceDecision({
+    entitlement: free,
+    lastAcceptedBatchAt: "2026-05-23T23:58:59.000Z",
+    now: NOW,
+    acceptedCount: 1
+  }).ok === true &&
+    syncCadenceDecision({
+      entitlement: pro,
+      lastAcceptedBatchAt: "2026-05-23T23:59:49.000Z",
+      now: NOW,
+      acceptedCount: 1
+    }).ok === true;
+});
+
+check("public entitlements should preserve already evaluated access reasons", () => {
+  const evaluated = evaluateEntitlement(null, { now: NOW });
+  const result = publicEntitlement(evaluated);
+  return result.plan === "free" &&
+    result.accessReason === "missing" &&
+    result.maxDevices === 1;
 });
 
 console.log(JSON.stringify({

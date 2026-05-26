@@ -216,6 +216,35 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
         conflict.dig("sync", "account_link", "status") == "sync_error" &&
         conflict.dig("sync", "metadata", "rejected_events").first["reason"] == "stale_sequence"
     end
+
+    engine.with_state do |state|
+      state["cloud_auth"]["status"] = "linked"
+      state["cloud_sync_metadata"]["last_pushed_sequence"] = 0
+    end
+    response_queue << {
+      status: 429,
+      body: {
+        error: {
+          status: "RESOURCE_EXHAUSTED",
+          message: "Free cloud sync accepts one batch per minute.",
+          details: {
+            reason: "plan_limit_sync_cadence",
+            retryAfterSeconds: 42
+          }
+        }
+      }
+    }
+    plan_limited = tool_payload(run_mcp(state_path, [
+      { jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin } } }
+    ]).last)
+    assert("plan-limited sync should keep local events queued with friendly guidance") do
+      plan_limited["ok"] == false &&
+        plan_limited["status"] == "plan_limited" &&
+        plan_limited["message"].include?("Free cloud sync accepts one batch per minute") &&
+        plan_limited["message"].include?("42 seconds") &&
+        plan_limited.dig("sync", "account_link", "status") == "linked" &&
+        plan_limited.dig("sync", "metadata", "status") == "plan_limited"
+    end
   ensure
     server.shutdown
     thread.join

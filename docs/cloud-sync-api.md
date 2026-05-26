@@ -71,6 +71,10 @@ Validation:
 
 - An authenticated Firebase UID is required, either directly from Firebase Auth or indirectly from a linked device token.
 - Device-token sync resolves the token hash to a Firebase Auth UID; writes are still stored under `/players/{uid}`.
+- Functions evaluate `/players/{uid}/entitlements/current` on every sync. Missing, stale, unpaid, or invalid entitlement projections fall back to Free.
+- Free accounts can have one active linked Codex device; Pro accounts can have five. Extra device tokens are rejected without deleting local saves or server device metadata.
+- Free accepts at most one new cloud batch per 60 seconds. Pro uses the paid `syncCadenceSeconds` limit for near-real-time sync within cost controls.
+- Plan-limit denials use structured reasons such as `plan_limit_device_count` and `plan_limit_sync_cadence`.
 - `schemaVersion` must match the current sync schema.
 - `privacyClass` must be `abstract`.
 - `source` must be `codex_hook`.
@@ -84,7 +88,7 @@ Reducer writes:
 
 - `/players/{uid}/rewardEvents/{eventId}` stores the sanitized event.
 - `/players/{uid}/gameState/current` stores aggregate abstract state such as event counts, score totals, work-event counters, last event ID, and last sequence.
-- `/players/{uid}/syncMetadata/default` stores sequence/counter metadata.
+- `/players/{uid}/syncMetadata/default` stores sequence/counter metadata, plus the last accepted batch timestamp used for entitlement cadence checks.
 
 ### `getSyncState`
 

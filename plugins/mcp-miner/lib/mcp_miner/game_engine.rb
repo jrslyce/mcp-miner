@@ -2242,10 +2242,12 @@ module McpMiner
 
     def record_cloud_sync_error(error, events, functions_origin)
       now = Time.now.utc.iso8601
+      plan_limited = cloud_plan_limit_error?(error)
+      status = plan_limited ? "plan_limited" : "sync_error"
       with_state do |state|
         state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
         retry_count = state["cloud_sync_metadata"]["retry_count"].to_i + 1
-        state["cloud_sync_metadata"]["status"] = "sync_error"
+        state["cloud_sync_metadata"]["status"] = status
         state["cloud_sync_metadata"]["last_attempt_at"] = now
         state["cloud_sync_metadata"]["retry_count"] = retry_count
         state["cloud_sync_metadata"]["next_retry_at"] = (Time.now.utc + [[60 * (2**[retry_count - 1, 0].max), 3600].min, 60].max).iso8601
@@ -2253,19 +2255,48 @@ module McpMiner
         state["cloud_sync_metadata"]["last_error"] = safe_string(error.message)[0, 240]
         state["cloud_sync_metadata"]["functions_origin"] = functions_origin
         state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
-        state["cloud_auth"]["status"] = "sync_error"
+        state["cloud_auth"]["status"] = plan_limited ? "linked" : "sync_error"
         state["cloud_auth"]["last_error"] = state["cloud_sync_metadata"]["last_error"]
         state["cloud_auth"]["updated_at"] = now
       end
 
       {
         ok: false,
-        status: "sync_error",
+        status: status,
         queued_event_count: events.length,
         error: safe_string(error.message)[0, 240],
+        message: plan_limited ? safe_string(error.message)[0, 240] : "Cloud sync failed; local progress remains queued for retry.",
         sync: sync_progress_payload[:sync],
         privacy: PRIVACY_NOTICE
       }
+    end
+
+    def cloud_error_details(body)
+      details = body.dig("error", "details")
+      details.is_a?(Hash) ? details : {}
+    end
+
+    def friendly_cloud_error_message(body, response)
+      details = cloud_error_details(body)
+      reason = safe_string(details["reason"])
+      message = safe_string(body.dig("error", "message") || response.message)
+      friendly =
+        case reason
+        when "plan_limit_device_count"
+          "This MCP Miner account has reached its active Codex device limit. Free supports 1 device; Pro supports up to 5. Disconnect another device or upgrade to Pro."
+        when "plan_limit_sync_cadence"
+          retry_after = details["retryAfterSeconds"].to_i
+          retry_text = retry_after.positive? ? " Retry in about #{retry_after} seconds." : ""
+          "Free cloud sync accepts one batch per minute; local progress remains queued.#{retry_text} Pro enables near-real-time sync."
+        else
+          message.empty? ? response.message : message
+        end
+      reason.empty? ? friendly : "#{reason}: #{friendly}"
+    end
+
+    def cloud_plan_limit_error?(error)
+      message = safe_string(error.message)
+      message.include?("plan_limit_device_count") || message.include?("plan_limit_sync_cadence")
     end
 
     def call_cloud_function(functions_origin, function_name, id_token, payload)
@@ -2285,8 +2316,8 @@ module McpMiner
         http.request(request)
       end
       body = response.body.to_s.empty? ? {} : JSON.parse(response.body)
-      raise "Cloud sync HTTP #{response.code}: #{body.dig('error', 'message') || response.message}" unless response.is_a?(Net::HTTPSuccess)
-      raise "Cloud sync rejected: #{body.dig('error', 'message')}" if body["error"]
+      raise "Cloud sync HTTP #{response.code}: #{friendly_cloud_error_message(body, response)}" unless response.is_a?(Net::HTTPSuccess)
+      raise "Cloud sync rejected: #{friendly_cloud_error_message(body, response)}" if body["error"]
 
       body
     end

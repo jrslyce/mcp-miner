@@ -192,11 +192,111 @@ function buildEntitlementProjection({ uid, billing, now = new Date().toISOString
   return evaluateEntitlement(source, { now });
 }
 
+function normalizedEntitlement(entitlement, options = {}) {
+  return entitlement && typeof entitlement === "object" && typeof entitlement.entitlementStatus === "string"
+    ? entitlement
+    : evaluateEntitlement(entitlement, options);
+}
+
+function publicEntitlement(entitlement) {
+  const evaluated = normalizedEntitlement(entitlement);
+  return {
+    plan: evaluated.plan,
+    entitlementStatus: evaluated.entitlementStatus,
+    accessReason: evaluated.accessReason,
+    syncCadenceSeconds: evaluated.syncCadenceSeconds,
+    maxDevices: evaluated.maxDevices,
+    historyRetentionDays: evaluated.historyRetentionDays,
+    features: {
+      ...(evaluated.features || {})
+    }
+  };
+}
+
+function sortActiveDevices(activeDevices = []) {
+  return [...activeDevices]
+    .filter((device) => device && typeof device === "object" && device.status !== "revoked")
+    .sort((left, right) => {
+      const leftTime = parseMillis(left.createdAt) || 0;
+      const rightTime = parseMillis(right.createdAt) || 0;
+      if (leftTime !== rightTime) {
+        return leftTime - rightTime;
+      }
+      return String(left.deviceId || "").localeCompare(String(right.deviceId || ""));
+    });
+}
+
+function deviceLimitDecision({ entitlement, activeDevices = [], deviceId = null, creatingNew = false }) {
+  const evaluated = normalizedEntitlement(entitlement);
+  const maxDevices = Number(evaluated.maxDevices || 0);
+  const devices = sortActiveDevices(activeDevices);
+
+  if (creatingNew && devices.length >= maxDevices) {
+    return {
+      ok: false,
+      reason: "plan_limit_device_count",
+      maxDevices,
+      activeDevices: devices.length
+    };
+  }
+
+  if (deviceId) {
+    const rank = devices.findIndex((device) => device.deviceId === deviceId);
+    if (rank >= maxDevices || (rank === -1 && devices.length >= maxDevices)) {
+      return {
+        ok: false,
+        reason: "plan_limit_device_count",
+        maxDevices,
+        activeDevices: devices.length,
+        deviceId
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    maxDevices,
+    activeDevices: devices.length
+  };
+}
+
+function syncCadenceDecision({ entitlement, lastAcceptedBatchAt = null, now = new Date().toISOString(), acceptedCount = 1 }) {
+  const evaluated = normalizedEntitlement(entitlement, { now });
+  const cadenceSeconds = Math.max(0, Number(evaluated.syncCadenceSeconds || 0));
+  if (Number(acceptedCount || 0) <= 0 || cadenceSeconds <= 0) {
+    return { ok: true, cadenceSeconds, retryAfterSeconds: 0 };
+  }
+
+  const lastMillis = parseMillis(lastAcceptedBatchAt);
+  const nowMillis = parseMillis(now) || Date.now();
+  if (lastMillis === null) {
+    return { ok: true, cadenceSeconds, retryAfterSeconds: 0 };
+  }
+
+  const elapsedMs = Math.max(0, nowMillis - lastMillis);
+  const cadenceMs = cadenceSeconds * 1000;
+  if (elapsedMs < cadenceMs) {
+    return {
+      ok: false,
+      reason: "plan_limit_sync_cadence",
+      cadenceSeconds,
+      retryAfterSeconds: Math.ceil((cadenceMs - elapsedMs) / 1000)
+    };
+  }
+
+  return { ok: true, cadenceSeconds, retryAfterSeconds: 0 };
+}
+
 module.exports = {
   DEFAULT_MAX_STALENESS_MS,
   ENTITLEMENT_SCHEMA_VERSION,
   PLAN_ENTITLEMENTS,
   buildEntitlementProjection,
+  deviceLimitDecision,
   evaluateEntitlement,
-  parseMillis
+  normalizedEntitlement,
+  parseMillis,
+  publicEntitlement,
+  sortActiveDevices,
+  syncCadenceDecision
 };
