@@ -58,9 +58,10 @@ Rate-limit state is stored in `operationalRateLimits/{operation_subjectHash}` wi
 only. Raw IPs, emails, tokens, prompts, code, paths, and payloads are not stored.
 
 For repeated release smoke passes, keep the default eight-account live QA sweep for the first pass,
-then reduce follow-up passes with `MCP_MINER_QA_WORDS=basalt MCP_MINER_QA_EXPECTED_WORD_COUNT=1`.
-That still covers account creation, linking, sync, privacy rejection, and cleanup without weakening
-the production `createLinkSession` cap.
+then reduce follow-up passes with `MCP_MINER_QA_WORDS=basalt`,
+`MCP_MINER_QA_EXPECTED_WORD_COUNT=1`, and `MCP_MINER_QA_LINK_SESSION_AUTH=1`. That still covers
+account creation, linking, sync, privacy rejection, and cleanup without weakening the production
+`createLinkSession` cap or waiting for an already-spent IP window to reset.
 
 ## Support Tooling
 
