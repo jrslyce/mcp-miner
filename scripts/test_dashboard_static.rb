@@ -207,6 +207,22 @@ assert("password auth should require email verification before cloud sync and de
     auth_js.include?("await currentUser.getIdToken(true)")
 end
 
+assert("link URLs should promote device linking above the demo dashboard") do
+  index.index(%(data-panel="device-link")) < index.index(%(data-panel="auth")) &&
+    auth_js.include?("const pendingLink = {") &&
+    auth_js.include?("function setLinkMode()") &&
+    auth_js.include?("document.body.dataset.linkMode = hasPendingLink() ? \"pending\" : \"dashboard\"") &&
+    auth_js.include?("function linkModeLabel(user)") &&
+    auth_js.include?("pill: \"Device link\"") &&
+    auth_js.include?("mode: \"Sign in to connect\"") &&
+    auth_js.include?("mode: \"Approve Codex device\"") &&
+    auth_js.include?("updated: \"Awaiting account\"") &&
+    auth_js.include?("lastUpdated.textContent = linkLabel ? linkLabel.updated") &&
+    auth_js.include?("const linkLabel = linkModeLabel(currentUser);") &&
+    styles.include?("body[data-link-mode=\"pending\"] .workspace-grid") &&
+    styles.include?("body[data-link-mode=\"pending\"] .link-panel")
+end
+
 assert("signed-in account panel should not render the raw Firebase UID") do
   index.include?("<dt>Account</dt>") &&
     index.include?(%(id="auth-identity">Not signed in</dd>)) &&

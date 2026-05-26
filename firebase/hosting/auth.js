@@ -475,12 +475,45 @@ function hasPendingLink() {
   return Boolean(pendingLink.sessionId || pendingLink.code);
 }
 
+function setLinkMode() {
+  document.body.dataset.linkMode = hasPendingLink() ? "pending" : "dashboard";
+}
+
+function linkModeLabel(user) {
+  if (!hasPendingLink()) {
+    return null;
+  }
+  if (!user) {
+    return {
+      pill: "Device link",
+      mode: "Sign in to connect",
+      source: "Codex link request",
+      updated: "Awaiting account"
+    };
+  }
+  if (requiresEmailVerification(user)) {
+    return {
+      pill: "Verify email",
+      mode: "Verify before approval",
+      source: "Codex link request",
+      updated: "Awaiting verification"
+    };
+  }
+  return {
+    pill: "Ready to approve",
+    mode: "Approve Codex device",
+    source: "Codex link request",
+    updated: "Awaiting approval"
+  };
+}
+
 function renderDeviceLink(user, status = "waiting") {
   if (!hasPendingLink()) {
     deviceLinkPanel.hidden = true;
     return;
   }
 
+  setLinkMode();
   const signedIn = Boolean(user);
   const verificationRequired = requiresEmailVerification(user);
   deviceLinkPanel.hidden = false;
@@ -1161,10 +1194,11 @@ function renderDashboard(data) {
   const hasCloudState = Boolean(data.hasCloudState);
   const conflictState = syncMetadata.conflictState || syncMetadata.conflict_state || (numberValue(syncMetadata.rejectedCount || syncMetadata.rejected_count) > 0 ? "needs review" : "none");
 
-  connectionPill.textContent = currentUser ? "Signed in" : "Demo mode";
-  dashboardMode.textContent = data.mode || (currentUser ? "Cloud profile ready" : "Signed-out demo");
-  dashboardSource.textContent = data.source || "Local demo snapshot";
-  lastUpdated.textContent = timestampLabel(cloudState.updatedAt || syncMetadata.updatedAt || new Date());
+  const linkLabel = linkModeLabel(currentUser);
+  connectionPill.textContent = linkLabel ? linkLabel.pill : (currentUser ? "Signed in" : "Demo mode");
+  dashboardMode.textContent = linkLabel ? linkLabel.mode : (data.mode || (currentUser ? "Cloud profile ready" : "Signed-out demo"));
+  dashboardSource.textContent = linkLabel ? linkLabel.source : (data.source || "Local demo snapshot");
+  lastUpdated.textContent = linkLabel ? linkLabel.updated : timestampLabel(cloudState.updatedAt || syncMetadata.updatedAt || new Date());
   metricSpaceBucks.textContent = formatNumber(data.player && data.player.spaceBucks);
   metricChonks.textContent = formatNumber(materialQuantity(inventory, "mat_chonks"));
   metricSuit.textContent = formatPercent(data.player && data.player.suitCondition);
@@ -1576,6 +1610,7 @@ storeList.addEventListener("click", (event) => {
 onAuthStateChanged(auth, async (user) => {
   const previousUser = currentUser;
   currentUser = user;
+  setLinkMode();
   updateAuthControls(user);
   renderDeviceLink(user);
   if (!user) {
@@ -1627,4 +1662,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 applyTheme(preferredTheme());
+setLinkMode();
+renderDeviceLink(currentUser);
 renderDashboard(cloneDemo());

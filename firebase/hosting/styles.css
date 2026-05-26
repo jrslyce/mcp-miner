@@ -184,6 +184,19 @@ h2 {
   font-weight: 750;
 }
 
+body[data-link-mode="pending"] .workspace-grid {
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+}
+
+body[data-link-mode="pending"] .link-panel {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 12px 34px var(--shadow);
+}
+
+body[data-link-mode="pending"] .auth-panel {
+  border-color: var(--pill-line);
+}
+
 .panel-heading {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
@@ -656,6 +669,10 @@ dd {
   .workspace-grid,
   .mode-strip,
   .scan-row {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-link-mode="pending"] .workspace-grid {
     grid-template-columns: 1fr;
   }
 
