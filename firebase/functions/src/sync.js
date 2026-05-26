@@ -327,7 +327,7 @@ function reduceCloudState(state, event, reducedAt) {
   next.workScoreTotal = Math.round((Number(next.workScoreTotal || 0) + score) * 100) / 100;
   next.workEvents[event.eventType] = Number(next.workEvents[event.eventType] || 0) + 1;
   next.lastEventId = event.eventId;
-  next.lastSequence = event.sequence;
+  next.lastSequence = Math.max(Number(next.lastSequence || 0), Number(event.sequence || 0));
   next.updatedAt = reducedAt;
   return next;
 }

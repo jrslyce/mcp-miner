@@ -41,6 +41,10 @@ function firebaseAdmin() {
   return admin;
 }
 
+function firestore() {
+  return firebaseAdmin().firestore();
+}
+
 async function verifyEmulatorUser(uid) {
   await firebaseAdmin().auth().updateUser(uid, { emailVerified: true });
 }
@@ -194,6 +198,9 @@ async function main() {
   const acceptedEvent = syncEvent(owner.localId, { sequence: 1 });
   const sync = await callFunction("syncRewardEvents", owner.idToken, { events: [acceptedEvent] });
   const duplicate = await callFunction("syncRewardEvents", owner.idToken, { events: [acceptedEvent] });
+  await firestore().doc(`players/${owner.localId}/syncMetadata/default`).set({
+    lastAcceptedBatchAt: new Date(Date.now() - 61 * 1000).toISOString()
+  }, { merge: true });
   const deviceEvent = syncEvent(owner.localId, { sequence: 2 });
   const deviceSync = await callFunction("syncRewardEvents", exchanged.result.deviceToken, { events: [deviceEvent] });
   const privateEvent = syncEvent(owner.localId, {
@@ -205,17 +212,27 @@ async function main() {
   privateEvent.checksum = eventChecksum(privateEvent);
   const rejected = await callFunction("syncRewardEvents", owner.idToken, { events: [privateEvent] });
   const state = await callFunction("getSyncState", owner.idToken, {});
+  const analytics = await callFunction("getDashboardAnalytics", owner.idToken, {});
+  const digest = await callFunction("getWeeklyDigest", owner.idToken, {});
+  const cosmetics = await callFunction("getCosmeticCatalog", owner.idToken, {});
   await getDoc(`players/${owner.localId}/gameState/current`, owner.idToken);
 
   const indexHtml = await requestText(`http://${HOSTING_HOST}/`);
   const dashboardJs = await requestText(`http://${HOSTING_HOST}/auth.js`);
-  const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "device-link", "sync-privacy"];
+  const planCatalog = JSON.parse(await requestText(`http://${HOSTING_HOST}/subscription-plans.json`));
+  const requiredPanels = ["status", "analytics", "weekly-digest", "cosmetics", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "device-link", "linked-devices", "sync-privacy"];
   const missingPanels = requiredPanels.filter((panel) => !indexHtml.includes(`data-panel="${panel}"`));
   if (missingPanels.length) {
     throw new Error(`dashboard hosting response missing panels: ${missingPanels.join(", ")}`);
   }
-  if (!dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("getSyncState") || !dashboardJs.includes("connectFunctionsEmulator")) {
+  if (!dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("getSyncState") || !dashboardJs.includes("getDashboardAnalytics") || !dashboardJs.includes("exportDashboardHistory") || !dashboardJs.includes("getWeeklyDigest") || !dashboardJs.includes("getCosmeticCatalog") || !dashboardJs.includes("applyCosmeticSelection") || !dashboardJs.includes("connectFunctionsEmulator") || !dashboardJs.includes("renameSyncDevice") || !dashboardJs.includes("syncCadenceModel")) {
     throw new Error("dashboard module missing demo/offline or Functions integration support");
+  }
+  if (!indexHtml.includes("id=\"sync-cadence\"") || !indexHtml.includes("id=\"sync-next-refresh\"")) {
+    throw new Error("dashboard hosting response missing cadence refresh fields");
+  }
+  if (!indexHtml.includes("id=\"plan-cards\"") || planCatalog.plans.length !== 3) {
+    throw new Error("dashboard hosting response missing subscription plan cards/catalog");
   }
 
   if (!sync.result || sync.result.accepted[0] !== acceptedEvent.eventId) {
@@ -232,6 +249,15 @@ async function main() {
   }
   if (!state.result || !state.result.state || state.result.state.eventCount < 2) {
     throw new Error("dashboard sync state read did not include reduced state");
+  }
+  if (!analytics.result || !analytics.result.trends || analytics.result.history.length < 2) {
+    throw new Error("dashboard analytics read did not include abstract history");
+  }
+  if (!digest.result || !digest.result.weeklyDigest || digest.result.weeklyDigest.status !== "locked") {
+    throw new Error("weekly digest should be locked for Free integration user");
+  }
+  if (!cosmetics.result || !cosmetics.result.cosmetics || !cosmetics.result.cosmetics.noProgressionEffects) {
+    throw new Error("cosmetic catalog did not return visual-only cosmetics");
   }
 
   console.log(JSON.stringify({
@@ -252,6 +278,9 @@ async function main() {
       "duplicate_sync_idempotent",
       "private_sync_rejected",
       "dashboard_state_read",
+      "dashboard_analytics_read",
+      "weekly_digest_read",
+      "cosmetic_catalog_read",
       "hosting_dashboard_served"
     ],
     accepted: sync.result.accepted.length + deviceSync.result.accepted.length,

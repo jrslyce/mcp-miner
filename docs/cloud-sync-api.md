@@ -34,6 +34,19 @@ the token in the local auth file and uses it for future sync calls.
 Called by a linked plugin device with its current device token. It revokes that local device without
 deleting the player's web account or local save.
 
+### `renameSyncDevice`
+
+Called by the signed-in web portal with Firebase Auth. It validates that the target device lives
+under the caller's `/players/{uid}/syncDevices/{deviceId}` path, then updates owner-editable display
+metadata such as `deviceName`. Token hashes and device secrets are never returned to the portal.
+
+### `revokeSyncDevice`
+
+Called by the signed-in web portal with Firebase Auth. It revokes the selected owner device metadata
+and any matching server-side device token documents. A revoked token can no longer call sync APIs.
+Requests for another user's device resolve through the caller's own player path, so they fail without
+revealing the other user's device metadata.
+
 ### `syncRewardEvents`
 
 Input:
@@ -51,7 +64,7 @@ Input:
       "turnId": "turn_sync",
       "observedFields": {
         "scoreHint": 8.5,
-        "category": "coding",
+        "category": "implementation",
         "rewardControlReasons": []
       },
       "privacyClass": "abstract",
@@ -63,11 +76,6 @@ Input:
 }
 ```
 
-Schema v2 entries are receipts, not final reward events. The server calculates the stored
-`observedFields.score` from the receipt's allowed abstract fields and caps score hints by event
-type. Legacy schema v1 events are accepted during rollout, but new plugin clients should send
-schema v2 receipts.
-
 Authentication:
 
 - Firebase Auth ID token from the web app or emulator in the standard `Authorization` header; or
@@ -77,50 +85,54 @@ Validation:
 
 - An authenticated Firebase UID is required, either directly from Firebase Auth or indirectly from a linked device token.
 - Device-token sync resolves the token hash to a Firebase Auth UID; writes are still stored under `/players/{uid}`.
-- `schemaVersion` must be either the legacy event schema or the current receipt schema.
-- schema v2 receipts must use `receiptType: "abstract_work"` and must not include final client
-  `observedFields.score` values.
+- Functions evaluate `/players/{uid}/entitlements/current` on every sync. Missing, stale, unpaid, or invalid entitlement projections fall back to Free.
+- Free accounts can have one active linked Codex device; Pro accounts can have five. Extra device tokens are rejected without deleting local saves or server device metadata.
+- Free accepts at most one new cloud batch per 60 seconds. Pro uses the paid `syncCadenceSeconds` limit for near-real-time sync within cost controls.
+- Sequence and cadence are checked against the caller's sync cursor: `/players/{uid}/syncMetadata/default` for Firebase Auth and `/players/{uid}/syncMetadata/{deviceId}` for linked Codex device tokens.
+- Accepted sync responses include `syncCadence` with the config-driven cadence, mode, retry seconds, and `nextEligibleSyncAt` so the plugin can show current cadence and debounce locally.
+- Plan-limit denials use structured reasons such as `plan_limit_device_count` and `plan_limit_sync_cadence`. Cadence denials include the same retry metadata so local progress can remain queued until the next eligible batch.
+- `schemaVersion` must match the current receipt schema.
+- V2 receipts must not provide final client score fields; Functions calculate score server-side from bounded abstract hints.
 - `privacyClass` must be `abstract`.
 - `source` must be `codex_hook`.
 - `sequence` must be monotonic for new event IDs.
 - `eventId` dedupes repeated submissions.
 - `checksum` must match the canonical abstract payload.
-- `signature` must use the V2 receipt placeholder format until plugin signing is finalized.
-- private field names such as prompts, code, terminal output, commands, paths, repo names,
-  browser/app content, transcripts, tokens, API keys, and secrets are rejected recursively.
+- `signature` must use the V2 placeholder format until plugin signing is finalized.
+- private field names such as prompts, code, terminal output, commands, paths, repo names, browser/app content, and transcripts are rejected recursively.
 
 Reducer writes:
 
 - `/players/{uid}/rewardEvents/{eventId}` stores the sanitized event.
 - `/players/{uid}/gameState/current` stores aggregate abstract state such as event counts, score totals, work-event counters, last event ID, and last sequence.
-- `/players/{uid}/syncMetadata/default` stores sequence/counter metadata.
-- `/players/{uid}/entitlements/current` optionally stores normalized plan limits. Missing
-  entitlement docs resolve to Free defaults.
-
-Sync cadence:
-
-- Free defaults to one accepted batch per 60 seconds.
-- Pro defaults to a shorter accepted-batch cadence.
-- The cadence changes portal freshness, not reward math. Free and Pro receipts use the same
-  server-side score calculation.
-- Throttled calls return `status: "throttled"` plus `throttle.nextEligibleSyncAt`; the local plugin
-  keeps events queued and retries later.
+- `/players/{uid}/syncMetadata/default` stores aggregate sequence/counter metadata for the account and the legacy Firebase Auth cursor.
+- `/players/{uid}/syncMetadata/{deviceId}` stores the per-device cursor for linked Codex instances. Reward event IDs remain globally idempotent under `/players/{uid}/rewardEvents/{eventId}`.
 
 ### `getSyncState`
 
-Returns the current server-owned `gameState/current`, `syncMetadata/default`, and public entitlement
-summary for the authenticated UID.
+Returns the current server-owned `gameState/current`, aggregate `syncMetadata/default`, the caller's `deviceSyncMetadata`, and the evaluated entitlement for the authenticated UID.
 
-## Payload Inspection
+### `getDashboardAnalytics`
 
-The local plugin exposes `preview_sync_payload`, which builds the next `syncRewardEvents` request
-without sending it. It shows the exact abstract JSON request body that would be posted and redacts
-Firebase ID tokens or device sync tokens in headers.
+Returns owner-scoped, aggregate dashboard analytics for the effective retention window. Free returns a limited recent history window; Pro returns the longer paid window. Query limits cap dashboard reads for large accounts. Trend payloads cover work score over time, events by category, current Space Bucks, material value, sync health, and order efficiency without raw work content.
 
-The web portal reads the owner-scoped `/players/{uid}/rewardEvents` collection and shows recent
-stored receipt payloads. This portal view is a sanitized audit view of abstract sync data; it does
-not fetch or render auth headers, Codex/OpenAI account data, prompts, code, terminal output,
-commands, paths, repo names, browser/app content, transcripts, tokens, API keys, or secrets.
+### `exportDashboardHistory`
+
+Returns Pro-gated JSON or CSV export content for the same abstract history rows. Requests can include the caller's UID for confirmation, but any other UID is rejected. Export rows include event ID, event type, timestamp, sequence, score, category, and privacy class only.
+
+### `getCloudBackupStatus`
+
+Returns the evaluated entitlement and current cloud backup metadata for the authenticated UID. Free users receive `eligible: false`; local play is unchanged and no local save data is uploaded by this status call.
+
+### `createCloudBackup`
+
+Creates or replaces `/players/{uid}/cloudBackups/current` for Pro-entitled users. The callable accepts only allowlisted abstract backup sections: `profile`, `progress`, `inventory`, `orders`, `upgrades`, `base`, `cosmetics`, `settings`, and `syncMetadata`.
+
+The sanitizer rejects prompt fields, code, commands, terminal output, file paths, repo names, browser/app content, transcripts, and workspace-looking values. Stored metadata includes schema version, checksum, byte size, source device ID, and source local update time.
+
+### `restoreCloudBackup`
+
+Returns the current backup payload only after `confirm: true`. Restore checks the same Pro entitlement as creation and returns conflict metadata for local-newer, cloud-newer, same-age, same-device, and cross-device cases. The server never writes a local Codex save; the plugin applies the restore only after user confirmation and preserves a rollback copy.
 
 ## Logging
 
@@ -128,11 +140,11 @@ Cloud Logging entries include operational metadata only: privacy class, UID pres
 
 ## Emulator Smoke
 
-`npm run firebase:sync:smoke` starts Auth, Firestore, and Functions emulators and covers authenticated sync, duplicate idempotency, invalid private fields, and state reduction. It requires the Firebase CLI and Java runtime because Firestore is Java-based.
+`npm run firebase:sync:smoke` starts Auth, Firestore, and Functions emulators and covers authenticated sync, duplicate idempotency, invalid private fields, and state reduction. `npm run firebase:backup:smoke` covers Pro backup/restore, Free denial, explicit restore confirmation, and private backup field rejection. Both require the Firebase CLI and Java runtime because Firestore is Java-based.
 
 ## Plugin Client
 
-The local plugin exposes `sync_cloud`, which converts local journal reward entries into the canonical abstract event format and posts them to `syncRewardEvents`.
+The local plugin exposes `sync_cloud`, which converts local journal reward entries into V2 abstract receipts and posts them to `syncRewardEvents`. It also exposes `preview_sync_payload` so players can inspect the exact request body with redacted auth headers before sending. The plugin also exposes `get_backup_status`, `create_cloud_backup`, and `restore_cloud_backup` for Pro backup workflows.
 
 Local metadata records:
 
@@ -145,3 +157,5 @@ Local metadata records:
 - configured Functions origin
 
 If sync is disabled, unauthenticated, offline, or missing a Firebase ID token, local events stay queued and gameplay progress remains local. Duplicate responses are treated as success because cloud event IDs are idempotent. Rejected stale/private events set local conflict metadata and leave local rewards untouched.
+
+Backup restore requires `confirm: true`; if local progress is newer than the cloud backup, the plugin also requires `allow_overwrite: true`. A timestamped `state.json.backup-before-cloud-restore-*` file is written before applying cloud sections.

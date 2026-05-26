@@ -147,7 +147,9 @@ service cloud.firestore {
           "reportMode",
           "cloudSyncEnabled",
           "dashboardTheme",
-          "appCheckDebugEnabled"
+          "appCheckDebugEnabled",
+          "weeklyDigestEnabled",
+          "betaFeaturesEnabled"
         ]) &&
         data.keys().hasAll(["ownerUid", "schemaVersion", "updatedAt", "privacyClass"]) &&
         data.schemaVersion is int &&
@@ -155,7 +157,9 @@ service cloud.firestore {
         optionalString(data, "reportMode") &&
         optionalString(data, "dashboardTheme") &&
         optionalBool(data, "cloudSyncEnabled") &&
-        optionalBool(data, "appCheckDebugEnabled");
+        optionalBool(data, "appCheckDebugEnabled") &&
+        optionalBool(data, "weeklyDigestEnabled") &&
+        optionalBool(data, "betaFeaturesEnabled");
     }
 
     function validSyncMetadata(uid, data) {
@@ -226,6 +230,11 @@ service cloud.firestore {
         allow create, update, delete: if false;
       }
 
+      match /billing/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
       match /entitlements/{docId} {
         allow read: if isOwner(uid);
         allow write: if false;
@@ -257,6 +266,11 @@ service cloud.firestore {
       }
 
       match /base/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /cosmetics/{docId} {
         allow read: if isOwner(uid);
         allow write: if false;
       }

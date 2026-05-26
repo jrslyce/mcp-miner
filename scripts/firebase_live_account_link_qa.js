@@ -14,6 +14,8 @@ const RUN_ID = (process.env.MCP_MINER_QA_RUN_ID || new Date().toISOString().repl
 const EXACT_WORD_ADDRESSES = process.env.MCP_MINER_QA_EXACT_WORDS === "1";
 const CLEANUP = process.env.MCP_MINER_QA_CLEANUP === "1";
 const MARK_EMAIL_VERIFIED = process.env.MCP_MINER_QA_MARK_EMAIL_VERIFIED !== "0";
+const LINK_SESSION_WITH_AUTH = process.env.MCP_MINER_QA_LINK_SESSION_AUTH === "1";
+const EXPECTED_WORD_COUNT = Number.parseInt(process.env.MCP_MINER_QA_EXPECTED_WORD_COUNT || "8", 10);
 const WORDS = (process.env.MCP_MINER_QA_WORDS || "basalt,quartz,cobalt,nickel,orbit,rover,beacon,comet")
   .split(",")
   .map((word) => word.trim().toLowerCase())
@@ -153,7 +155,7 @@ async function runCycle(word, index) {
   const email = qaEmail(word);
   let auth = await signUp(email);
   auth = await markEmailVerified(auth);
-  const link = await callFunction("createLinkSession", null, {
+  const link = await callFunction("createLinkSession", LINK_SESSION_WITH_AUTH ? auth.idToken : null, {
     dashboardUrl: DASHBOARD_URL,
     deviceName: `Live QA ${index + 1} ${word}`
   });
@@ -229,8 +231,11 @@ async function cleanupAccounts(results) {
 }
 
 async function main() {
-  if (WORDS.length !== 8) {
-    throw new Error(`Expected exactly 8 QA words, got ${WORDS.length}.`);
+  if (!Number.isInteger(EXPECTED_WORD_COUNT) || EXPECTED_WORD_COUNT < 1) {
+    throw new Error(`Expected MCP_MINER_QA_EXPECTED_WORD_COUNT to be a positive integer, got ${process.env.MCP_MINER_QA_EXPECTED_WORD_COUNT}.`);
+  }
+  if (WORDS.length !== EXPECTED_WORD_COUNT) {
+    throw new Error(`Expected exactly ${EXPECTED_WORD_COUNT} QA words, got ${WORDS.length}.`);
   }
 
   const results = [];
@@ -246,7 +251,9 @@ async function main() {
     runId: RUN_ID,
     cleanupEnabled: CLEANUP,
     emailVerifiedByAdmin: MARK_EMAIL_VERIFIED,
+    linkSessionWithAuth: LINK_SESSION_WITH_AUTH,
     cleanup,
+    expectedAccountCount: EXPECTED_WORD_COUNT,
     accountCount: results.length,
     accounts: results.map(({ tokenHash, sessionId, linkCode, ...result }) => result)
   }, null, 2));

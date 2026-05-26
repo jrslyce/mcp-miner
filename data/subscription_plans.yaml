@@ -1,0 +1,105 @@
+subscription_pricing:
+  currency: usd
+  supported_currencies:
+    - usd
+  trial_eligibility:
+    enabled: false
+    days: 0
+    one_trial_per_account: true
+  grace_period_days: 3
+  annual_months_charged: 11
+  provider_price_ids:
+    stripe:
+      test:
+        pro_monthly: price_test_mcp_miner_pro_monthly
+        pro_annual: price_test_mcp_miner_pro_annual
+      live:
+        pro_monthly: env:STRIPE_PRO_MONTHLY_PRICE_ID
+        pro_annual: env:STRIPE_PRO_ANNUAL_PRICE_ID
+    crypto_wallet:
+      test:
+        pro_monthly: crypto_test_mcp_miner_pro_monthly
+        pro_annual: crypto_test_mcp_miner_pro_annual
+      live:
+        pro_monthly: env:CRYPTO_PRO_MONTHLY_PLAN_ID
+        pro_annual: env:CRYPTO_PRO_ANNUAL_PLAN_ID
+
+plans:
+  - id: free
+    public_name: Free
+    internal_name: free
+    billing_interval: none
+    monthly_price_cents: 0
+    annual_price_cents: 0
+    short_copy: Batch cloud sync every minute for one Codex device.
+    privacy_copy: Syncs abstract MCP Miner game progress only, not prompts, code, files, terminal output, or transcripts.
+    progression_copy: Does not boost mining output, payouts, rarity, or order progress.
+    entitlements:
+      max_codex_devices: 1
+      sync_cadence_seconds: 60
+      near_real_time_sync: false
+      manual_refresh: true
+      device_management: false
+      backup_restore: false
+      history_retention_days: 7
+      advanced_dashboard: false
+      premium_cosmetics: false
+      weekly_digest: false
+      exports: false
+      priority_beta_access: false
+
+  - id: pro_monthly
+    public_name: Pro Monthly
+    internal_name: pro_monthly
+    billing_interval: monthly
+    monthly_price_cents: 500
+    annual_price_cents: null
+    short_copy: Near-real-time sync and richer portal tools for up to five Codex devices.
+    privacy_copy: Syncs abstract MCP Miner game progress only, not prompts, code, files, terminal output, or transcripts.
+    progression_copy: Does not boost mining output, payouts, rarity, or order progress.
+    entitlements:
+      max_codex_devices: 5
+      sync_cadence_seconds: 10
+      near_real_time_sync: true
+      manual_refresh: true
+      device_management: true
+      backup_restore: true
+      history_retention_days: 365
+      advanced_dashboard: true
+      premium_cosmetics: true
+      weekly_digest: true
+      exports: true
+      priority_beta_access: true
+
+  - id: pro_annual
+    public_name: Pro Annual
+    internal_name: pro_annual
+    billing_interval: annual
+    monthly_price_cents: 500
+    annual_price_cents: 5500
+    short_copy: Same Pro benefits, billed yearly for the price of eleven months.
+    privacy_copy: Syncs abstract MCP Miner game progress only, not prompts, code, files, terminal output, or transcripts.
+    progression_copy: Does not boost mining output, payouts, rarity, or order progress.
+    entitlements:
+      max_codex_devices: 5
+      sync_cadence_seconds: 10
+      near_real_time_sync: true
+      manual_refresh: true
+      device_management: true
+      backup_restore: true
+      history_retention_days: 365
+      advanced_dashboard: true
+      premium_cosmetics: true
+      weekly_digest: true
+      exports: true
+      priority_beta_access: true
+
+downgrade_policy:
+  effective_at: subscription_period_end
+  entitlement_after_cancellation: free
+  failed_payment_grace_period_days: 3
+  max_active_devices_after_downgrade: 1
+  extra_devices_after_downgrade: Extra devices remain listed but stop cloud syncing until the user selects one active Free device or upgrades again.
+  history_after_downgrade: History beyond the Free retention window is hidden from the portal and excluded from exports; retention jobs may delete it after the paid period ends.
+  backup_restore_after_downgrade: Existing backups remain recoverable during the grace period, then restore actions require Pro.
+  support_summary: Support can explain upgrade, cancel, failed payment, downgrade, annual renewal, and device limit outcomes from this file.

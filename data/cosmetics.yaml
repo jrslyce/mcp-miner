@@ -1,0 +1,151 @@
+cosmetic_catalog:
+  schema_version: 1
+  no_progression_effects: true
+  categories:
+    suit_trim:
+      display_name: Suit Trims
+      default_item_id: suit_trim_basic
+    portal_theme:
+      display_name: Portal Themes
+      default_item_id: portal_theme_standard
+    base_skin:
+      display_name: Base-Room Skins
+      default_item_id: base_skin_cabin_warm
+    profile_badge:
+      display_name: Profile Badges
+      default_item_id: profile_badge_rookie
+    seasonal_variant:
+      display_name: Seasonal Variants
+      default_item_id: seasonal_variant_none
+  retention_rules:
+    free: Always available and retained.
+    unlockable: Retained after downgrade once earned or granted.
+    pro_included: Active only while the effective entitlement is Pro, including paid-period cancellation or grace access.
+    retired: Not newly unlockable; retained only for accounts that already own the cosmetic.
+    beta: Active only while Pro priority beta access is present.
+  items:
+    - id: suit_trim_basic
+      category: suit_trim
+      display_name: Standard Suit Trim
+      description: The default pressure-suit trim for every miner.
+      availability: free
+      retention: retain_after_downgrade
+      default_for_category: true
+      swatch: "#1f7a5a"
+      effects: []
+    - id: suit_trim_teal
+      category: suit_trim
+      display_name: Teal Survey Trim
+      description: Earned Space Bucks trim from the local store.
+      availability: unlockable
+      unlock_id: suit_trim_teal
+      retention: retain_after_downgrade
+      swatch: "#0f9f8f"
+      effects: []
+    - id: suit_trim_aurora
+      category: suit_trim
+      display_name: Aurora Suit Trim
+      description: Pro included trim with a soft polar-light edge.
+      availability: pro_included
+      requires_entitlement: premiumCosmetics
+      retention: inactive_after_downgrade
+      swatch: "#58c79b"
+      effects: []
+    - id: portal_theme_standard
+      category: portal_theme
+      display_name: Standard Portal
+      description: The default high-contrast portal theme.
+      availability: free
+      retention: retain_after_downgrade
+      default_for_category: true
+      swatch: "#17201b"
+      contrast_pair:
+        background: "#f4f6f2"
+        foreground: "#17201b"
+      effects: []
+    - id: portal_theme_nebula
+      category: portal_theme
+      display_name: Nebula Console
+      description: Pro included portal colors for late-shift mining.
+      availability: pro_included
+      requires_entitlement: premiumCosmetics
+      retention: inactive_after_downgrade
+      swatch: "#2d5b91"
+      contrast_pair:
+        background: "#101413"
+        foreground: "#eef5ef"
+      effects: []
+    - id: portal_theme_prism_beta
+      category: portal_theme
+      display_name: Prism Beta Console
+      description: Priority beta portal colors with extra visual polish.
+      availability: beta
+      requires_entitlement: priorityBetaAccess
+      retention: inactive_after_downgrade
+      swatch: "#7c3aed"
+      contrast_pair:
+        background: "#fbfcfb"
+        foreground: "#17201b"
+      effects: []
+    - id: base_skin_cabin_warm
+      category: base_skin
+      display_name: Warm Cabin
+      description: The standard cozy base-room skin.
+      availability: free
+      retention: retain_after_downgrade
+      default_for_category: true
+      swatch: "#92400e"
+      effects: []
+    - id: base_skin_foundry_glass
+      category: base_skin
+      display_name: Foundry Glass
+      description: Pro included base-room skin with clean refinery windows.
+      availability: pro_included
+      requires_entitlement: premiumCosmetics
+      retention: inactive_after_downgrade
+      swatch: "#3b82f6"
+      effects: []
+    - id: profile_badge_rookie
+      category: profile_badge
+      display_name: Rookie Miner Badge
+      description: Starter profile badge for every account.
+      availability: free
+      retention: retain_after_downgrade
+      default_for_category: true
+      swatch: "#15583f"
+      effects: []
+    - id: profile_badge_survey_gold
+      category: profile_badge
+      display_name: Gold Survey Badge
+      description: Earned badge from the local Space Bucks store.
+      availability: unlockable
+      unlock_id: survey_badge_gold
+      retention: retain_after_downgrade
+      swatch: "#b45309"
+      effects: []
+    - id: profile_badge_founder_legacy
+      category: profile_badge
+      display_name: Founder Legacy Badge
+      description: Retired badge retained only by existing owners.
+      availability: retired
+      retention: retain_after_downgrade
+      swatch: "#334155"
+      effects: []
+    - id: seasonal_variant_none
+      category: seasonal_variant
+      display_name: Standard Season
+      description: No seasonal overlay.
+      availability: free
+      retention: retain_after_downgrade
+      default_for_category: true
+      swatch: "#66766d"
+      effects: []
+    - id: seasonal_variant_solstice
+      category: seasonal_variant
+      display_name: Solstice Sparkline
+      description: Pro included seasonal sparkline treatment.
+      availability: pro_included
+      requires_entitlement: premiumCosmetics
+      retention: inactive_after_downgrade
+      swatch: "#dc2626"
+      effects: []

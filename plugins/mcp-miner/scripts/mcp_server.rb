@@ -361,6 +361,9 @@ class McpMinerServer
           },
           functions_origin: {
             type: "string"
+          },
+          force: {
+            type: "boolean"
           }
         })
       },
@@ -368,6 +371,57 @@ class McpMinerServer
         name: "preview_sync_payload",
         description: "Preview the exact abstract sync request body and redacted auth headers without sending it.",
         inputSchema: object_schema({
+          device_token: {
+            type: "string"
+          },
+          id_token: {
+            type: "string"
+          },
+          functions_origin: {
+            type: "string"
+          }
+        })
+      },
+      {
+        name: "get_backup_status",
+        description: "Check Pro cloud backup eligibility and current backup metadata for the linked MCP Miner account.",
+        inputSchema: object_schema({
+          device_token: {
+            type: "string"
+          },
+          id_token: {
+            type: "string"
+          },
+          functions_origin: {
+            type: "string"
+          }
+        })
+      },
+      {
+        name: "create_cloud_backup",
+        description: "Create a privacy-safe Pro cloud backup of local MCP Miner progress after entitlement checks.",
+        inputSchema: object_schema({
+          device_token: {
+            type: "string"
+          },
+          id_token: {
+            type: "string"
+          },
+          functions_origin: {
+            type: "string"
+          }
+        })
+      },
+      {
+        name: "restore_cloud_backup",
+        description: "Restore a Pro cloud backup after explicit confirmation, preserving a local rollback file.",
+        inputSchema: object_schema({
+          confirm: {
+            type: "boolean"
+          },
+          allow_overwrite: {
+            type: "boolean"
+          },
           device_token: {
             type: "string"
           },
@@ -484,6 +538,12 @@ class McpMinerServer
         @engine.sync_cloud_payload(args)
       when "preview_sync_payload"
         @engine.preview_sync_payload(args)
+      when "get_backup_status"
+        @engine.cloud_backup_status_payload(args)
+      when "create_cloud_backup"
+        @engine.create_cloud_backup_payload(args)
+      when "restore_cloud_backup"
+        @engine.restore_cloud_backup_payload(args)
       when "claim_milestone"
         @engine.claim_milestone_payload(args)
       when "open_dashboard"

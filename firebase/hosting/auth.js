@@ -37,6 +37,158 @@ const firebaseConfig = window.MCP_MINER_FIREBASE_CONFIG || {
   appId: "1:000000000000:web:mcpminerlocal"
 };
 
+const FREE_ENTITLEMENT = {
+  plan: "free",
+  billingStatus: "free",
+  entitlementStatus: "free",
+  providerCustomerId: null,
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
+  syncCadenceSeconds: 60,
+  maxDevices: 1,
+  historyRetentionDays: 7,
+  features: {
+    nearRealTimeSync: false,
+    deviceManagement: false,
+    backupRestore: false,
+    advancedDashboard: false,
+    premiumCosmetics: false,
+    weeklyDigest: false,
+    exports: false,
+    priorityBetaAccess: false
+  }
+};
+
+const PORTAL_POLLING = {
+  minSeconds: 10,
+  freeSeconds: 60
+};
+
+const DEMO_COSMETICS = {
+  schemaVersion: 1,
+  privacyClass: "abstract",
+  noProgressionEffects: true,
+  retentionRules: {
+    free: "Always available and retained.",
+    unlockable: "Retained after downgrade once earned or granted.",
+    pro_included: "Active only while Pro access is active.",
+    retired: "Retained only by accounts that already own it.",
+    beta: "Active only with Pro priority beta access."
+  },
+  applied: {
+    requested: {
+      suit_trim: "suit_trim_basic",
+      portal_theme: "portal_theme_standard",
+      base_skin: "base_skin_cabin_warm",
+      profile_badge: "profile_badge_rookie",
+      seasonal_variant: "seasonal_variant_none"
+    },
+    active: {
+      suit_trim: "suit_trim_basic",
+      portal_theme: "portal_theme_standard",
+      base_skin: "base_skin_cabin_warm",
+      profile_badge: "profile_badge_rookie",
+      seasonal_variant: "seasonal_variant_none"
+    },
+    inactive: {}
+  },
+  categories: {
+    suit_trim: [
+      { id: "suit_trim_basic", category: "suit_trim", displayName: "Standard Suit Trim", description: "Default pressure-suit trim.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#1f7a5a", noProgressionEffects: true },
+      { id: "suit_trim_aurora", category: "suit_trim", displayName: "Aurora Suit Trim", description: "Pro included suit accent.", availability: "pro_included", state: "locked", owned: false, locked: true, lockedReason: "plan_limit_premium_cosmetic", canPreview: true, canApply: false, active: false, swatch: "#58c79b", noProgressionEffects: true }
+    ],
+    portal_theme: [
+      { id: "portal_theme_standard", category: "portal_theme", displayName: "Standard Portal", description: "Default high-contrast portal theme.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#17201b", themeKey: "standard", noProgressionEffects: true },
+      { id: "portal_theme_nebula", category: "portal_theme", displayName: "Nebula Console", description: "Pro included portal colors.", availability: "pro_included", state: "locked", owned: false, locked: true, lockedReason: "plan_limit_premium_cosmetic", canPreview: true, canApply: false, active: false, swatch: "#2d5b91", themeKey: "nebula", noProgressionEffects: true }
+    ],
+    base_skin: [
+      { id: "base_skin_cabin_warm", category: "base_skin", displayName: "Warm Cabin", description: "Standard cozy base-room skin.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#92400e", noProgressionEffects: true }
+    ],
+    profile_badge: [
+      { id: "profile_badge_rookie", category: "profile_badge", displayName: "Rookie Miner Badge", description: "Starter profile badge.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#15583f", noProgressionEffects: true },
+      { id: "profile_badge_founder_legacy", category: "profile_badge", displayName: "Founder Legacy Badge", description: "Retired badge retained by existing owners.", availability: "retired", state: "locked", owned: false, locked: true, lockedReason: "retired", canPreview: true, canApply: false, active: false, swatch: "#334155", noProgressionEffects: true }
+    ],
+    seasonal_variant: [
+      { id: "seasonal_variant_none", category: "seasonal_variant", displayName: "Standard Season", description: "No seasonal overlay.", availability: "free", state: "owned", owned: true, locked: false, lockedReason: null, canPreview: true, canApply: true, active: true, swatch: "#66766d", noProgressionEffects: true }
+    ]
+  }
+};
+
+const DEMO_WEEKLY_DIGEST = {
+  ok: true,
+  schemaVersion: 1,
+  privacyClass: "abstract",
+  status: "locked",
+  week: {
+    label: "Demo week",
+    startAt: null,
+    endAt: null
+  },
+  preferences: {
+    weeklyDigestEnabled: true,
+    betaFeaturesEnabled: false,
+    betaAvailable: false,
+    effectiveBetaAccess: false
+  },
+  summary: {
+    events: {
+      eventCount: 18,
+      workScore: 842,
+      categories: [
+        { category: "implementation", events: 9, score: 420 },
+        { category: "validation", events: 5, score: 260 }
+      ]
+    },
+    chonks: {
+      mined: 1840
+    },
+    spaceBucks: {
+      current: 1240
+    },
+    materials: {
+      types: 4,
+      units: 1925,
+      valueSpaceBucks: 533
+    },
+    orders: {
+      activeOrders: 2,
+      fulfillableOrders: 1,
+      rewardSpaceBucks: 530
+    },
+    sync: {
+      acceptedCount: 18,
+      duplicateCount: 0,
+      rejectedCount: 0,
+      conflictState: "none",
+      activeDevices: 1
+    },
+    milestones: {
+      eventMilestones: 0,
+      scoreMilestones: 3,
+      asteroidMilestones: 3,
+      orderReadyMilestone: true,
+      materialMilestone: true
+    },
+    base: {
+      moduleCount: 2,
+      droneLevel: 1
+    },
+    cosmetics: {
+      activeSelections: 5,
+      categories: ["base_skin", "portal_theme", "profile_badge", "seasonal_variant", "suit_trim"]
+    }
+  },
+  highlights: [
+    "18 abstract work events scored this week.",
+    "1840 Chonks are reflected in synced inventory.",
+    "1 order ready for fulfillment."
+  ],
+  delivery: {
+    inPortal: true,
+    email: "not_enabled"
+  }
+};
+
 const DEMO_DASHBOARD = {
   mode: "Signed-out demo",
   source: "Local demo snapshot",
@@ -50,7 +202,9 @@ const DEMO_DASHBOARD = {
   },
   settings: {
     reportMode: "meaningful_turns_only",
-    cloudSyncEnabled: false
+    cloudSyncEnabled: false,
+    weeklyDigestEnabled: true,
+    betaFeaturesEnabled: false
   },
   cloudState: {
     eventCount: 18,
@@ -63,14 +217,26 @@ const DEMO_DASHBOARD = {
     lastSequence: 18,
     conflictState: "none",
     acceptedCount: 18,
+    lastAcceptedBatchAt: "Demo snapshot",
     duplicateCount: 0,
     rejectedCount: 0
   },
-  entitlement: {
-    plan: "free",
-    displayName: "Free",
-    syncCadenceSeconds: 60
+  syncCadence: {
+    cadenceSeconds: 60,
+    mode: "batch",
+    nextEligibleSyncAt: null,
+    retryAfterSeconds: 0,
+    canAcceptNow: true
   },
+  syncDevices: [
+    {
+      deviceId: "device_demo",
+      deviceName: "Demo Codex",
+      status: "active",
+      createdAt: "Demo snapshot",
+      lastUsedAt: "Demo snapshot"
+    }
+  ],
   inventory: [
     { materialId: "mat_chonks", displayName: "Chonks", category: "core", quantity: 1840, totalSpaceBucks: 0 },
     { materialId: "mat_iron", displayName: "Iron", category: "ore", quantity: 64, totalSpaceBucks: 128 },
@@ -121,22 +287,72 @@ const DEMO_DASHBOARD = {
     {
       eventId: "evt_demo_018",
       eventType: "work_apply_patch",
+      schemaVersion: 2,
       receiptSchemaVersion: 2,
+      receiptType: "abstract_work",
       sequence: 18,
       observedFields: {
-        score: 8.5,
+        score: 8,
+        scoreHint: 8,
+        category: "implementation",
         scoreSource: "server_receipt_v2",
         serverCalculated: true
       },
       privacyClass: "abstract",
-      source: "codex_hook"
+      source: "codex_hook",
+      receivedAt: "Demo snapshot"
     }
   ],
   base: {
     moduleCount: 2,
     droneLevel: 1,
     storageBonus: "1.10x"
-  }
+  },
+  analytics: {
+    retention: {
+      days: 7,
+      limited: true,
+      returnedEvents: 18
+    },
+    trends: {
+      workScoreOverTime: [
+        { day: "Demo", score: 842, events: 18 }
+      ],
+      eventsByCategory: [
+        { category: "implementation", events: 9, score: 420 },
+        { category: "validation", events: 5, score: 260 }
+      ],
+      spaceBucksTrend: [
+        { day: "Demo", value: 1240 }
+      ],
+      materialValueTrend: [
+        { day: "Demo", value: 533 }
+      ],
+      orderEfficiency: [
+        { day: "Demo", value: 50 }
+      ]
+    },
+    syncHealth: {
+      acceptedCount: 18,
+      duplicateCount: 0,
+      rejectedCount: 0,
+      conflictState: "none",
+      activeDevices: 1
+    },
+    current: {
+      spaceBucks: 1240,
+      materialValue: 533,
+      orderEfficiency: {
+        readyPercent: 50,
+        activeOrders: 2,
+        fulfillableOrders: 1
+      }
+    },
+    history: []
+  },
+  cosmetics: DEMO_COSMETICS,
+  weeklyDigest: DEMO_WEEKLY_DIGEST,
+  entitlement: FREE_ENTITLEMENT
 };
 
 const EMPTY_CLOUD_DASHBOARD = {
@@ -153,7 +369,9 @@ const EMPTY_CLOUD_DASHBOARD = {
   },
   settings: {
     reportMode: "meaningful_turns_only",
-    cloudSyncEnabled: true
+    cloudSyncEnabled: true,
+    weeklyDigestEnabled: true,
+    betaFeaturesEnabled: false
   },
   cloudState: {
     eventCount: 0,
@@ -166,14 +384,18 @@ const EMPTY_CLOUD_DASHBOARD = {
     lastSequence: 0,
     conflictState: "none",
     acceptedCount: 0,
+    lastAcceptedBatchAt: null,
     duplicateCount: 0,
     rejectedCount: 0
   },
-  entitlement: {
-    plan: "free",
-    displayName: "Free",
-    syncCadenceSeconds: 60
+  syncCadence: {
+    cadenceSeconds: 60,
+    mode: "batch",
+    nextEligibleSyncAt: null,
+    retryAfterSeconds: 0,
+    canAcceptNow: true
   },
+  syncDevices: [],
   inventory: [],
   orders: [],
   asteroid: {
@@ -200,7 +422,69 @@ const EMPTY_CLOUD_DASHBOARD = {
     moduleCount: 0,
     droneLevel: 0,
     storageBonus: "1.00x"
-  }
+  },
+  analytics: {
+    retention: {
+      days: 7,
+      limited: true,
+      returnedEvents: 0
+    },
+    trends: {
+      workScoreOverTime: [],
+      eventsByCategory: [],
+      spaceBucksTrend: [],
+      materialValueTrend: [],
+      orderEfficiency: []
+    },
+    syncHealth: {
+      acceptedCount: 0,
+      duplicateCount: 0,
+      rejectedCount: 0,
+      conflictState: "none",
+      activeDevices: 0
+    },
+    current: {
+      spaceBucks: 0,
+      materialValue: 0,
+      orderEfficiency: {
+        readyPercent: 0,
+        activeOrders: 0,
+        fulfillableOrders: 0
+      }
+    },
+    history: []
+  },
+  cosmetics: DEMO_COSMETICS,
+  weeklyDigest: {
+    ...DEMO_WEEKLY_DIGEST,
+    status: "locked",
+    highlights: [],
+    summary: {
+      ...DEMO_WEEKLY_DIGEST.summary,
+      events: {
+        eventCount: 0,
+        workScore: 0,
+        categories: []
+      },
+      chonks: {
+        mined: 0
+      },
+      spaceBucks: {
+        current: 0
+      },
+      materials: {
+        types: 0,
+        units: 0,
+        valueSpaceBucks: 0
+      },
+      orders: {
+        activeOrders: 0,
+        fulfillableOrders: 0,
+        rewardSpaceBucks: 0
+      }
+    }
+  },
+  entitlement: FREE_ENTITLEMENT
 };
 
 const AUTH_ERROR_MESSAGES = {
@@ -341,6 +625,8 @@ const syncStatus = document.querySelector("#sync-status");
 const syncEvents = document.querySelector("#sync-events");
 const syncSequence = document.querySelector("#sync-sequence");
 const syncConflicts = document.querySelector("#sync-conflicts");
+const syncCadence = document.querySelector("#sync-cadence");
+const syncNextRefresh = document.querySelector("#sync-next-refresh");
 const privacyList = document.querySelector("#privacy-list");
 const asteroidName = document.querySelector("#asteroid-name");
 const asteroidProgressLabel = document.querySelector("#asteroid-progress-label");
@@ -360,12 +646,38 @@ const reportsList = document.querySelector("#reports-list");
 const rawSyncList = document.querySelector("#raw-sync-list");
 const rawSyncCount = document.querySelector("#raw-sync-count");
 const baseDetail = document.querySelector("#base-detail");
+const analyticsSummary = document.querySelector("#analytics-summary");
+const analyticsList = document.querySelector("#analytics-list");
+const exportJson = document.querySelector("#export-json");
+const exportCsv = document.querySelector("#export-csv");
+const exportStatus = document.querySelector("#export-status");
+const weeklyDigestStatus = document.querySelector("#weekly-digest-status");
+const weeklyDigestSummary = document.querySelector("#weekly-digest-summary");
+const weeklyDigestList = document.querySelector("#weekly-digest-list");
+const weeklyDigestEnabled = document.querySelector("#weekly-digest-enabled");
+const betaFeaturesEnabled = document.querySelector("#beta-features-enabled");
+const betaAccessStatus = document.querySelector("#beta-access-status");
+const cosmeticsSummary = document.querySelector("#cosmetics-summary");
+const cosmeticsList = document.querySelector("#cosmetics-list");
+const cosmeticsStatus = document.querySelector("#cosmetics-status");
+const billingStatus = document.querySelector("#billing-status");
+const billingSummary = document.querySelector("#billing-summary");
+const billingPlan = document.querySelector("#billing-plan");
+const billingDevices = document.querySelector("#billing-devices");
+const billingSync = document.querySelector("#billing-sync");
+const planCards = document.querySelector("#plan-cards");
+const checkoutMonthly = document.querySelector("#checkout-monthly");
+const checkoutAnnual = document.querySelector("#checkout-annual");
+const manageBilling = document.querySelector("#manage-billing");
 const deviceLinkPanel = document.querySelector("[data-panel=\"device-link\"]");
 const deviceLinkStatus = document.querySelector("#device-link-status");
 const deviceLinkSummary = document.querySelector("#device-link-summary");
 const deviceLinkCode = document.querySelector("#device-link-code");
 const approveDeviceLink = document.querySelector("#approve-device-link");
 const rejectDeviceLink = document.querySelector("#reject-device-link");
+const linkedDevicesUsage = document.querySelector("#linked-devices-usage");
+const linkedDevicesSummary = document.querySelector("#linked-devices-summary");
+const linkedDevicesList = document.querySelector("#linked-devices-list");
 const linkParams = new URLSearchParams(window.location.search);
 const pendingLink = {
   sessionId: linkParams.get("sessionId") || "",
@@ -374,15 +686,39 @@ const pendingLink = {
 
 let currentUser = null;
 let activeDashboard = cloneDemo();
+let activeCosmeticPreview = null;
 let activeAsteroidVisual = ASTEROID_CLASSES[0];
 let activeAsteroidProgress = 0;
 let asteroidAnimationStarted = false;
 let verificationEmailSentAt = 0;
+let portalRefreshTimer = null;
+let portalRefreshInFlight = false;
+let planCatalog = {
+  currency: "usd",
+  annualMonthsCharged: 11,
+  plans: []
+};
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function setMessage(text, isError = false) {
   message.textContent = text;
   message.dataset.tone = isError ? "error" : "success";
+}
+
+async function loadPlanCatalog() {
+  try {
+    const response = await fetch("/subscription-plans.json", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+    const catalog = await response.json();
+    if (Array.isArray(catalog.plans)) {
+      planCatalog = catalog;
+      renderBilling(activeDashboard.entitlement);
+    }
+  } catch (error) {
+    // The dashboard still renders the signed-out demo if the public catalog cannot be fetched.
+  }
 }
 
 function preferredTheme() {
@@ -471,40 +807,282 @@ function updateAuthControls(user) {
   updateVerificationControls(user);
 }
 
-function hasPendingLink() {
-  return Boolean(pendingLink.sessionId || pendingLink.code);
+function planLabel(plan) {
+  const labels = {
+    free: "Free",
+    pro_monthly: "Pro Monthly",
+    pro_annual: "Pro Annual"
+  };
+  return labels[plan] || displayNameFromId(plan || "free");
 }
 
-function setLinkMode() {
-  document.body.dataset.linkMode = hasPendingLink() ? "pending" : "dashboard";
+function moneyFromCents(cents, suffix = "") {
+  const value = numberValue(cents) / 100;
+  return value <= 0 ? "$0" : `$${value.toFixed(value % 1 === 0 ? 0 : 2)}${suffix}`;
 }
 
-function linkModeLabel(user) {
-  if (!hasPendingLink()) {
+function planPriceLabel(plan) {
+  if (plan.billingInterval === "annual") {
+    return `${moneyFromCents(plan.annualPriceCents)}/yr`;
+  }
+  if (plan.billingInterval === "monthly") {
+    return `${moneyFromCents(plan.monthlyPriceCents)}/mo`;
+  }
+  return "$0";
+}
+
+function annualDiscountCopy() {
+  const monthly = planCatalog.plans.find((plan) => plan.id === "pro_monthly");
+  const annual = planCatalog.plans.find((plan) => plan.id === "pro_annual");
+  const monthsCharged = numberValue(planCatalog.annualMonthsCharged, 11);
+  if (!monthly || !annual || !monthly.monthlyPriceCents || !annual.annualPriceCents) {
+    return "Annual billing gives 12 months for the price of 11.";
+  }
+  const expectedAnnual = monthly.monthlyPriceCents * monthsCharged;
+  const consistent = expectedAnnual === annual.annualPriceCents;
+  return consistent
+    ? `Annual: 12 months for the price of ${formatNumber(monthsCharged)}.`
+    : "Annual discount follows the configured yearly price.";
+}
+
+function normalizedEntitlement(entitlement) {
+  return {
+    ...FREE_ENTITLEMENT,
+    ...(entitlement || {}),
+    features: {
+      ...FREE_ENTITLEMENT.features,
+      ...((entitlement && entitlement.features) || {})
+    }
+  };
+}
+
+function billingSummaryText(entitlement) {
+  if (!currentUser) {
+    return "Free works locally; Pro adds faster cloud sync and portal convenience without collecting private work data.";
+  }
+  if (requiresEmailVerification(currentUser)) {
+    return "Verify your email before starting checkout or managing billing.";
+  }
+  if (entitlement.billingStatus === "past_due") {
+    const grace = entitlement.gracePeriodEnd ? ` through ${timestampLabel(entitlement.gracePeriodEnd)}` : "";
+    return `Payment needs attention. Pro access remains active${grace}, then Free limits apply until billing is fixed.`;
+  }
+  if (entitlement.billingStatus === "unpaid") {
+    return "Payment failed. This account is on Free limits until billing is updated.";
+  }
+  if (entitlement.cancelAtPeriodEnd) {
+    const end = entitlement.currentPeriodEnd ? ` on ${timestampLabel(entitlement.currentPeriodEnd)}` : " at period end";
+    return `Cancellation scheduled. Pro access ends${end}, then Free cadence and one-device limits apply.`;
+  }
+  if (entitlement.entitlementStatus === "pro") {
+    const renewal = entitlement.cancelAtPeriodEnd ? "ends" : "renews";
+    const period = entitlement.currentPeriodEnd ? ` ${renewal} ${timestampLabel(entitlement.currentPeriodEnd)}` : "";
+    return `${planLabel(entitlement.plan)}${period}. Up to ${formatNumber(entitlement.maxDevices)} Codex devices with near-real-time sync.`;
+  }
+  if (entitlement.accessReason === "canceled" || entitlement.billingStatus === "canceled") {
+    return "Pro access has ended. Free cloud sync remains available for one Codex device every minute.";
+  }
+  if (entitlement.billingStatus === "checkout_pending") {
+    return "Checkout started. Pro unlocks only after Stripe confirms the subscription webhook.";
+  }
+  return "Free sync batches every minute for one Codex device.";
+}
+
+function renderBilling(rawEntitlement) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const signedIn = Boolean(currentUser);
+  const verificationRequired = requiresEmailVerification(currentUser);
+  const pro = entitlement.entitlementStatus === "pro";
+  billingStatus.textContent = pro ? "Pro" : "Free";
+  billingPlan.textContent = planLabel(entitlement.plan);
+  billingDevices.textContent = `${formatNumber(entitlement.maxDevices)} Codex`;
+  billingSync.textContent = entitlement.features.nearRealTimeSync ? "Near real time" : `${formatNumber(entitlement.syncCadenceSeconds)} sec`;
+  billingSummary.textContent = billingSummaryText(entitlement);
+  billingSummary.dataset.tone = pro ? "success" : "";
+  checkoutMonthly.disabled = !signedIn || verificationRequired || pro;
+  checkoutAnnual.disabled = !signedIn || verificationRequired || pro;
+  manageBilling.disabled = !signedIn || verificationRequired || !entitlement.providerCustomerId;
+  renderPlanCards(entitlement);
+}
+
+function planActionState(plan, entitlement, signedIn, verificationRequired) {
+  const current = entitlement.plan === plan.id || (entitlement.entitlementStatus !== "pro" && plan.id === "free");
+  if (current) {
+    return { label: "Current", disabled: true };
+  }
+  if (plan.id === "free") {
+    return { label: "Included", disabled: true };
+  }
+  if (!signedIn) {
+    return { label: "Sign in", disabled: true };
+  }
+  if (verificationRequired) {
+    return { label: "Verify email", disabled: true };
+  }
+  if (entitlement.entitlementStatus === "pro") {
+    return { label: "Manage", disabled: true };
+  }
+  return { label: plan.billingInterval === "annual" ? "Upgrade annual" : "Upgrade monthly", disabled: false };
+}
+
+function renderPlanCards(entitlement) {
+  const signedIn = Boolean(currentUser);
+  const verificationRequired = requiresEmailVerification(currentUser);
+  if (!planCatalog.plans.length) {
+    planCards.innerHTML = "<p class=\"empty-state\">Loading subscription plans.</p>";
+    return;
+  }
+
+  planCards.innerHTML = planCatalog.plans.map((plan) => {
+    const action = planActionState(plan, entitlement, signedIn, verificationRequired);
+    const entitlements = plan.entitlements || {};
+    const cadence = entitlements.nearRealTimeSync ? `${formatNumber(entitlements.syncCadenceSeconds)} sec sync` : `${formatNumber(entitlements.syncCadenceSeconds)} sec batches`;
+    const annual = plan.billingInterval === "annual" ? `<span>${escapeHtml(annualDiscountCopy())}</span>` : "";
+    return `
+      <article class="plan-card" role="listitem" data-current="${action.label === "Current" ? "true" : "false"}">
+        <div class="plan-card-top">
+          <strong>${escapeHtml(plan.publicName)}</strong>
+          <span>${escapeHtml(planPriceLabel(plan))}</span>
+        </div>
+        <p>${escapeHtml(plan.shortCopy)}</p>
+        <div class="plan-facts">
+          <span>${escapeHtml(formatNumber(entitlements.maxCodexDevices || 1))} Codex ${numberValue(entitlements.maxCodexDevices, 1) === 1 ? "device" : "devices"}</span>
+          <span>${escapeHtml(cadence)}</span>
+          <span>${escapeHtml(formatNumber(entitlements.historyRetentionDays || 7))} day history</span>
+          ${annual}
+        </div>
+        <p class="plan-privacy">${escapeHtml(plan.privacyCopy)}</p>
+        <button type="button" class="button-secondary plan-action" data-plan="${escapeHtml(plan.id)}" ${action.disabled ? "disabled" : ""}>${escapeHtml(action.label)}</button>
+      </article>
+    `;
+  }).join("");
+}
+
+function activeDeviceCount(devices) {
+  return devices.filter((device) => device.status !== "revoked").length;
+}
+
+function deviceLimitSummary(entitlement, devices) {
+  const activeCount = activeDeviceCount(devices);
+  const maxDevices = numberValue(entitlement.maxDevices, 1);
+  if (!currentUser) {
+    return "Sign in to manage connected Codex computers.";
+  }
+  if (maxDevices <= 1) {
+    return activeCount >= 1
+      ? "Free includes one active Codex device. Upgrade to Pro for up to five connected computers."
+      : "Free includes one active Codex device. Link this computer from Codex when ready.";
+  }
+  if (activeCount >= maxDevices) {
+    return `Pro device slots are full: ${formatNumber(activeCount)} of ${formatNumber(maxDevices)} active. Revoke a device before linking another.`;
+  }
+  return `Pro device slots used: ${formatNumber(activeCount)} of ${formatNumber(maxDevices)}.`;
+}
+
+function renderLinkedDevices(devices = [], rawEntitlement = FREE_ENTITLEMENT) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const activeCount = activeDeviceCount(devices);
+  const maxDevices = numberValue(entitlement.maxDevices, 1);
+  linkedDevicesUsage.textContent = `${formatNumber(activeCount)} / ${formatNumber(maxDevices)}`;
+  linkedDevicesSummary.textContent = deviceLimitSummary(entitlement, devices);
+  linkedDevicesSummary.dataset.tone = entitlement.entitlementStatus === "pro" ? "success" : "";
+
+  if (!currentUser) {
+    linkedDevicesList.innerHTML = "<p class=\"empty-state\">Sign in to manage linked Codex devices.</p>";
+    return;
+  }
+  if (!devices.length) {
+    linkedDevicesList.innerHTML = "<p class=\"empty-state\">No linked Codex devices yet.</p>";
+    return;
+  }
+
+  linkedDevicesList.innerHTML = devices.map((device) => {
+    const revoked = device.status === "revoked";
+    const name = device.deviceName || "Codex device";
+    return `
+      <article class="device-row" data-device-id="${escapeHtml(device.deviceId)}">
+        <div class="device-main">
+          <input class="device-name-input" value="${escapeHtml(name)}" aria-label="Device name" maxlength="80" ${revoked ? "disabled" : ""}>
+          <span>${escapeHtml(revoked ? "Revoked" : "Active")} - Created ${escapeHtml(timestampLabel(device.createdAt))}</span>
+          <span>Last sync ${escapeHtml(timestampLabel(device.lastUsedAt))}</span>
+        </div>
+        <div class="device-actions">
+          <button type="button" class="button-secondary device-rename" ${revoked ? "disabled" : ""}>Rename</button>
+          <button type="button" class="button-secondary device-revoke" ${revoked ? "disabled" : ""}>Revoke</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function nextEligibleFromMetadata(syncMetadata, cadenceSeconds) {
+  const lastAccepted = syncMetadata && (syncMetadata.lastAcceptedBatchAt || syncMetadata.last_accepted_batch_at);
+  const lastMillis = Date.parse(lastAccepted || "");
+  if (Number.isNaN(lastMillis) || cadenceSeconds <= 0) {
     return null;
   }
-  if (!user) {
-    return {
-      pill: "Device link",
-      mode: "Sign in to connect",
-      source: "Codex link request",
-      updated: "Awaiting account"
-    };
-  }
-  if (requiresEmailVerification(user)) {
-    return {
-      pill: "Verify email",
-      mode: "Verify before approval",
-      source: "Codex link request",
-      updated: "Awaiting verification"
-    };
-  }
+  return new Date(lastMillis + (cadenceSeconds * 1000)).toISOString();
+}
+
+function syncCadenceModel(rawCadence, rawEntitlement, syncMetadata = {}) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const cadence = rawCadence || {};
+  const cadenceSeconds = numberValue(cadence.cadenceSeconds || cadence.cadence_seconds, entitlement.syncCadenceSeconds);
+  const nextEligibleSyncAt = cadence.nextEligibleSyncAt || cadence.next_eligible_sync_at || nextEligibleFromMetadata(syncMetadata, cadenceSeconds);
+  const retryAfterSeconds = numberValue(cadence.retryAfterSeconds || cadence.retry_after_seconds, 0);
+  const nextMillis = Date.parse(nextEligibleSyncAt || "");
+  const canAcceptNow = Object.prototype.hasOwnProperty.call(cadence, "canAcceptNow") || Object.prototype.hasOwnProperty.call(cadence, "can_accept_now")
+    ? cadence.canAcceptNow !== false && cadence.can_accept_now !== false
+    : Number.isNaN(nextMillis) || nextMillis <= Date.now();
   return {
-    pill: "Ready to approve",
-    mode: "Approve Codex device",
-    source: "Codex link request",
-    updated: "Awaiting approval"
+    cadenceSeconds,
+    mode: cadence.mode || (entitlement.features.nearRealTimeSync ? "near_real_time" : "batch"),
+    nextEligibleSyncAt,
+    retryAfterSeconds,
+    canAcceptNow
   };
+}
+
+function syncCadenceLabel(details) {
+  return details.mode === "near_real_time"
+    ? `${formatNumber(details.cadenceSeconds)} sec`
+    : `${formatNumber(details.cadenceSeconds)} sec batch`;
+}
+
+function clearPortalRefreshTimer() {
+  if (portalRefreshTimer) {
+    window.clearTimeout(portalRefreshTimer);
+    portalRefreshTimer = null;
+  }
+}
+
+function portalPollingSeconds(rawEntitlement) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  if (!currentUser || requiresEmailVerification(currentUser)) {
+    return 0;
+  }
+  const cadenceSeconds = numberValue(entitlement.syncCadenceSeconds, PORTAL_POLLING.freeSeconds);
+  return entitlement.features.nearRealTimeSync
+    ? Math.max(PORTAL_POLLING.minSeconds, cadenceSeconds)
+    : Math.max(PORTAL_POLLING.freeSeconds, cadenceSeconds);
+}
+
+function schedulePortalRefresh(rawEntitlement) {
+  clearPortalRefreshTimer();
+  const seconds = portalPollingSeconds(rawEntitlement);
+  if (!seconds) {
+    return null;
+  }
+  const nextRefreshAt = new Date(Date.now() + (seconds * 1000)).toISOString();
+  portalRefreshTimer = window.setTimeout(() => {
+    portalRefreshTimer = null;
+    refreshForCurrentUser({ quiet: true, scheduled: true });
+  }, seconds * 1000);
+  return nextRefreshAt;
+}
+
+function hasPendingLink() {
+  return Boolean(pendingLink.sessionId || pendingLink.code);
 }
 
 function renderDeviceLink(user, status = "waiting") {
@@ -513,7 +1091,6 @@ function renderDeviceLink(user, status = "waiting") {
     return;
   }
 
-  setLinkMode();
   const signedIn = Boolean(user);
   const verificationRequired = requiresEmailVerification(user);
   deviceLinkPanel.hidden = false;
@@ -662,7 +1239,9 @@ async function ensureLinkedProfile(user) {
     updatedAt: serverTimestamp(),
     privacyClass: "abstract",
     reportMode: "meaningful_turns_only",
-    cloudSyncEnabled: true
+    cloudSyncEnabled: true,
+    weeklyDigestEnabled: true,
+    betaFeaturesEnabled: false
   }, { merge: true });
 
   return existing.exists() ? "Loaded" : "Created";
@@ -984,10 +1563,22 @@ function normalizeDeviceRows(snapshot) {
       deviceId: data.deviceId || data.device_id || entry.id,
       deviceName: data.deviceName || data.device_name || "Codex device",
       status: data.status || "linked",
-      lastUsedAt: data.lastUsedAt || data.last_used_at || null
+      createdAt: data.createdAt || data.created_at || null,
+      updatedAt: data.updatedAt || data.updated_at || null,
+      lastUsedAt: data.lastUsedAt || data.last_used_at || null,
+      revokedAt: data.revokedAt || data.revoked_at || null
     });
   });
-  return rows.filter((device) => device.status !== "revoked").slice(0, 8);
+  return rows
+    .sort((left, right) => {
+      const leftRevoked = left.status === "revoked" ? 1 : 0;
+      const rightRevoked = right.status === "revoked" ? 1 : 0;
+      if (leftRevoked !== rightRevoked) {
+        return leftRevoked - rightRevoked;
+      }
+      return String(right.lastUsedAt || right.createdAt || "").localeCompare(String(left.lastUsedAt || left.createdAt || ""));
+    })
+    .slice(0, 12);
 }
 
 function normalizeRawSyncRows(snapshot) {
@@ -1007,22 +1598,19 @@ function rawSyncEventPayload(event) {
     receiptSchemaVersion: event.receiptSchemaVersion || event.receipt_schema_version || null,
     receiptType: event.receiptType || event.receipt_type || null,
     sequence: numberValue(event.sequence),
-    timestamp: event.timestamp || null,
-    sessionId: event.sessionId || event.session_id || null,
-    turnId: event.turnId || event.turn_id || null,
     observedFields: {
+      score: numberValue(observedFields.score),
+      scoreHint: observedFields.scoreHint,
       category: observedFields.category || null,
-      rewardControlReasons: Array.isArray(observedFields.rewardControlReasons) ? observedFields.rewardControlReasons : [],
-      scoreHint: observedFields.scoreHint ?? null,
-      score: observedFields.score ?? null,
       scoreSource: observedFields.scoreSource || null,
       serverCalculated: observedFields.serverCalculated === true,
       scoreCapped: observedFields.scoreCapped === true
     },
-    privacyClass: event.privacyClass || event.privacy_class || "abstract",
-    source: event.source || "codex_hook",
-    checksum: event.checksum || null,
-    signature: event.signature || null,
+    privacyClass: event.privacyClass || event.privacy_class || "",
+    source: event.source || "",
+    checksum: event.checksum || "",
+    signature: event.signature ? "<redacted-signature>" : "",
+    timestamp: event.timestamp || null,
     receivedAt: event.receivedAt || event.received_at || null,
     reducedAt: event.reducedAt || event.reduced_at || null
   };
@@ -1115,6 +1703,9 @@ function refreshWarning(reads) {
 
 async function loadDashboardForUser(user) {
   const getSyncState = httpsCallable(functions, "getSyncState");
+  const getDashboardAnalytics = httpsCallable(functions, "getDashboardAnalytics");
+  const getWeeklyDigest = httpsCallable(functions, "getWeeklyDigest");
+  const getCosmeticCatalog = httpsCallable(functions, "getCosmeticCatalog");
   const reads = await Promise.allSettled([
     getDoc(doc(db, "players", user.uid)),
     getDoc(doc(db, "players", user.uid, "profile", "current")),
@@ -1127,7 +1718,10 @@ async function loadDashboardForUser(user) {
     getDocs(query(collection(db, "players", user.uid, "orders"), limit(8))),
     getDocs(query(collection(db, "players", user.uid, "syncDevices"), limit(8))),
     getDocs(query(collection(db, "players", user.uid, "rewardEvents"), orderBy("receivedAt", "desc"), limit(8))),
-    getSyncState({})
+    getSyncState({}),
+    getDashboardAnalytics({}),
+    getWeeklyDigest({}),
+    getCosmeticCatalog({})
   ]);
 
   const player = docsData(reads, 0) || {};
@@ -1138,6 +1732,9 @@ async function loadDashboardForUser(user) {
   const directState = docsData(reads, 3) || {};
   const directSync = docsData(reads, 4) || {};
   const callable = reads[11] && reads[11].status === "fulfilled" ? reads[11].value.data : {};
+  const analytics = reads[12] && reads[12].status === "fulfilled" ? reads[12].value.data : null;
+  const weeklyDigest = reads[13] && reads[13].status === "fulfilled" ? reads[13].value.data.weeklyDigest : null;
+  const cosmetics = reads[14] && reads[14].status === "fulfilled" ? reads[14].value.data.cosmetics : null;
   const cloudState = callable.state || directState;
   const syncMetadata = callable.syncMetadata || directSync;
   const inventory = normalizeInventoryRows(queryResult(reads, 7) || { forEach() {} }, cloudState);
@@ -1170,7 +1767,8 @@ async function loadDashboardForUser(user) {
   fallback.settings = { ...fallback.settings, ...settings, cloudSyncEnabled: settings.cloudSyncEnabled ?? player.cloudSyncEnabled ?? true };
   fallback.cloudState = { ...fallback.cloudState, ...cloudState };
   fallback.syncMetadata = { ...fallback.syncMetadata, ...syncMetadata };
-  fallback.entitlement = callable.entitlement || {};
+  fallback.entitlement = normalizedEntitlement(callable.entitlement);
+  fallback.syncCadence = syncCadenceModel(callable.syncCadence, fallback.entitlement, fallback.syncMetadata);
   fallback.inventory = inventory.length ? inventory : fallback.inventory;
   fallback.orders = orders.length ? orders : fallback.orders;
   fallback.syncDevices = syncDevices;
@@ -1180,6 +1778,9 @@ async function loadDashboardForUser(user) {
   fallback.store = cloudState.store || fallback.store;
   fallback.base = { ...fallback.base, ...base };
   fallback.reports = Array.isArray(cloudState.reports) && cloudState.reports.length ? cloudState.reports.slice(0, 5) : fallback.reports;
+  fallback.analytics = analytics || fallback.analytics;
+  fallback.weeklyDigest = weeklyDigest || fallback.weeklyDigest;
+  fallback.cosmetics = cosmetics || fallback.cosmetics;
   return fallback;
 }
 
@@ -1188,17 +1789,17 @@ function renderDashboard(data) {
   const inventory = data.inventory || [];
   const cloudState = data.cloudState || {};
   const syncMetadata = data.syncMetadata || {};
+  const cadence = syncCadenceModel(data.syncCadence, data.entitlement, syncMetadata);
   const asteroid = data.asteroid || {};
   const progress = Math.max(0, Math.min(100, numberValue(asteroid.percentComplete)));
   const syncOn = Boolean(data.settings && data.settings.cloudSyncEnabled);
   const hasCloudState = Boolean(data.hasCloudState);
   const conflictState = syncMetadata.conflictState || syncMetadata.conflict_state || (numberValue(syncMetadata.rejectedCount || syncMetadata.rejected_count) > 0 ? "needs review" : "none");
 
-  const linkLabel = linkModeLabel(currentUser);
-  connectionPill.textContent = linkLabel ? linkLabel.pill : (currentUser ? "Signed in" : "Demo mode");
-  dashboardMode.textContent = linkLabel ? linkLabel.mode : (data.mode || (currentUser ? "Cloud profile ready" : "Signed-out demo"));
-  dashboardSource.textContent = linkLabel ? linkLabel.source : (data.source || "Local demo snapshot");
-  lastUpdated.textContent = linkLabel ? linkLabel.updated : timestampLabel(cloudState.updatedAt || syncMetadata.updatedAt || new Date());
+  connectionPill.textContent = currentUser ? "Signed in" : "Demo mode";
+  dashboardMode.textContent = data.mode || (currentUser ? "Cloud profile ready" : "Signed-out demo");
+  dashboardSource.textContent = data.source || "Local demo snapshot";
+  lastUpdated.textContent = timestampLabel(cloudState.updatedAt || syncMetadata.updatedAt || new Date());
   metricSpaceBucks.textContent = formatNumber(data.player && data.player.spaceBucks);
   metricChonks.textContent = formatNumber(materialQuantity(inventory, "mat_chonks"));
   metricSuit.textContent = formatPercent(data.player && data.player.suitCondition);
@@ -1207,6 +1808,8 @@ function renderDashboard(data) {
   syncEvents.textContent = formatNumber(cloudState.eventCount || syncMetadata.acceptedCount || 0);
   syncSequence.textContent = formatNumber(syncMetadata.lastSequence || cloudState.lastSequence || 0);
   syncConflicts.textContent = conflictState === "none" ? "None" : displayNameFromId(conflictState);
+  syncCadence.textContent = syncCadenceLabel(cadence);
+  syncNextRefresh.textContent = cadence.canAcceptNow ? "Now" : timestampLabel(cadence.nextEligibleSyncAt);
   const hasAsteroidProgress = numberValue(asteroid.depletionSize) > 0;
   asteroidName.textContent = asteroid.displayName || "-";
   asteroidProgressLabel.textContent = hasAsteroidProgress
@@ -1228,7 +1831,12 @@ function renderDashboard(data) {
   renderRawSyncEvents(data.rawSyncEvents || []);
   renderCloudDetail(cloudState, asteroid, data.syncDevices || []);
   renderBase(data.base || {});
+  renderAnalytics(data.analytics || EMPTY_CLOUD_DASHBOARD.analytics, data.entitlement);
+  renderWeeklyDigest(data.weeklyDigest || DEMO_WEEKLY_DIGEST, data.entitlement, data.settings || {});
+  renderCosmetics(data.cosmetics || DEMO_COSMETICS);
   renderPrivacy(data);
+  renderBilling(data.entitlement);
+  renderLinkedDevices(data.syncDevices || [], data.entitlement);
 }
 
 function renderAsteroidArt(asteroid, progress) {
@@ -1501,6 +2109,231 @@ function renderBase(base) {
   `;
 }
 
+function trendLastValue(rows, key = "value") {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    return 0;
+  }
+  const last = list[list.length - 1];
+  return numberValue(last[key]);
+}
+
+function topCategoryLabel(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) {
+    return "No categories";
+  }
+  const top = list[0];
+  return `${displayNameFromId(top.category)} (${formatNumber(top.events)})`;
+}
+
+function renderAnalytics(analytics, rawEntitlement) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const retention = analytics.retention || {};
+  const trends = analytics.trends || {};
+  const current = analytics.current || {};
+  const syncHealth = analytics.syncHealth || {};
+  const orderEfficiency = current.orderEfficiency || {};
+  const pro = entitlement.entitlementStatus === "pro";
+  analyticsSummary.textContent = `${formatNumber(retention.days || entitlement.historyRetentionDays || 7)} day ${retention.limited ? "sample" : "history"}`;
+  exportJson.disabled = !currentUser || !pro;
+  exportCsv.disabled = !currentUser || !pro;
+  exportStatus.textContent = pro ? "Exports contain abstract gameplay history only." : "Pro unlocks history export.";
+  exportStatus.dataset.tone = pro ? "success" : "";
+  analyticsList.innerHTML = [
+    ["Work score", formatNumber(trendLastValue(trends.workScoreOverTime, "score")), `${formatNumber((analytics.history || []).length)} retained events`],
+    ["Events by category", topCategoryLabel(trends.eventsByCategory), "Aggregated abstract work types"],
+    ["Space Bucks", formatNumber(current.spaceBucks ?? trendLastValue(trends.spaceBucksTrend)), "Current cloud aggregate"],
+    ["Material value", `${formatNumber(current.materialValue ?? trendLastValue(trends.materialValueTrend))} SB`, "Current synced inventory value"],
+    ["Order efficiency", `${formatPercent(orderEfficiency.readyPercent ?? trendLastValue(trends.orderEfficiency))}`, `${formatNumber(orderEfficiency.fulfillableOrders)} / ${formatNumber(orderEfficiency.activeOrders)} ready`],
+    ["Sync health", syncHealth.conflictState === "none" ? "Clear" : displayNameFromId(syncHealth.conflictState), `${formatNumber(syncHealth.activeDevices)} active devices`]
+  ].map(([label, value, detail]) => `
+    <article class="analytics-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </article>
+  `).join("");
+}
+
+function digestStatusLabel(status, entitlement) {
+  if (status === "ready") {
+    return "Ready";
+  }
+  if (status === "disabled") {
+    return "Disabled";
+  }
+  return normalizedEntitlement(entitlement).entitlementStatus === "pro" ? "Paused" : "Pro";
+}
+
+function topDigestCategory(categories = []) {
+  if (!Array.isArray(categories) || !categories.length) {
+    return "No categories";
+  }
+  const top = categories[0];
+  return `${displayNameFromId(top.category)} (${formatNumber(top.events)})`;
+}
+
+function renderWeeklyDigest(digest, rawEntitlement, settings = {}) {
+  const entitlement = normalizedEntitlement(rawEntitlement);
+  const summary = (digest && digest.summary) || DEMO_WEEKLY_DIGEST.summary;
+  const events = summary.events || {};
+  const chonks = summary.chonks || {};
+  const spaceBucks = summary.spaceBucks || {};
+  const materials = summary.materials || {};
+  const orders = summary.orders || {};
+  const sync = summary.sync || {};
+  const milestones = summary.milestones || {};
+  const preferences = (digest && digest.preferences) || {};
+  const pro = entitlement.entitlementStatus === "pro";
+  weeklyDigestStatus.textContent = digestStatusLabel(digest && digest.status, entitlement);
+  weeklyDigestStatus.dataset.tone = digest && digest.status === "ready" ? "success" : "";
+  weeklyDigestEnabled.checked = preferences.weeklyDigestEnabled !== false && settings.weeklyDigestEnabled !== false;
+  weeklyDigestEnabled.disabled = !currentUser;
+  betaFeaturesEnabled.checked = preferences.betaFeaturesEnabled === true || settings.betaFeaturesEnabled === true;
+  betaFeaturesEnabled.disabled = !currentUser || !pro || preferences.betaAvailable !== true;
+  betaAccessStatus.textContent = preferences.effectiveBetaAccess ? "Beta on" : (preferences.betaAvailable ? "Beta off" : "Beta locked");
+
+  weeklyDigestSummary.innerHTML = [
+    ["Week", digest && digest.week ? digest.week.label : "Demo week", digest && digest.delivery && digest.delivery.inPortal ? "Portal" : "Portal only"],
+    ["Work", `${formatNumber(events.eventCount)} events`, `${formatNumber(events.workScore)} score`],
+    ["Chonks", formatNumber(chonks.mined), `${formatNumber(materials.types)} material types`],
+    ["Space Bucks", formatNumber(spaceBucks.current), `${formatNumber(materials.valueSpaceBucks)} material value`],
+    ["Orders", `${formatNumber(orders.fulfillableOrders)} / ${formatNumber(orders.activeOrders)} ready`, `${formatNumber(orders.rewardSpaceBucks)} SB queued`],
+    ["Sync", sync.conflictState === "none" ? "Clear" : displayNameFromId(sync.conflictState), `${formatNumber(sync.activeDevices)} active devices`],
+    ["Milestones", formatNumber(numberValue(milestones.eventMilestones) + numberValue(milestones.scoreMilestones) + numberValue(milestones.asteroidMilestones)), topDigestCategory(events.categories)]
+  ].map(([label, value, detail]) => `
+    <article class="digest-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(detail)}</small>
+    </article>
+  `).join("");
+
+  const highlights = Array.isArray(digest && digest.highlights) ? digest.highlights : [];
+  weeklyDigestList.innerHTML = highlights.length
+    ? highlights.map((highlight) => `<p>${escapeHtml(highlight)}</p>`).join("")
+    : `<p class="empty-state">${pro ? "No weekly highlights yet." : "Pro unlocks the weekly portal digest."}</p>`;
+}
+
+function flattenCosmetics(cosmetics) {
+  if (!cosmetics || typeof cosmetics !== "object") {
+    return [];
+  }
+  if (Array.isArray(cosmetics.items)) {
+    return cosmetics.items;
+  }
+  return Object.values(cosmetics.categories || {}).flat();
+}
+
+function cosmeticStateLabel(item) {
+  if (activeCosmeticPreview === item.id) {
+    return "Preview";
+  }
+  if (item.active) {
+    return "Active";
+  }
+  if (item.inactive) {
+    return "Inactive";
+  }
+  if (item.locked) {
+    return displayNameFromId(item.lockedReason || "locked");
+  }
+  if (item.owned) {
+    return "Owned";
+  }
+  return displayNameFromId(item.state || item.availability || "available");
+}
+
+function cosmeticCategoryLabel(category) {
+  const labels = {
+    suit_trim: "Suit Trims",
+    portal_theme: "Portal Themes",
+    base_skin: "Base Skins",
+    profile_badge: "Profile Badges",
+    seasonal_variant: "Seasonal"
+  };
+  return labels[category] || displayNameFromId(category);
+}
+
+function cosmeticApplyLabel(item) {
+  if (item.active) {
+    return "Applied";
+  }
+  if (item.locked) {
+    return "Locked";
+  }
+  return "Apply";
+}
+
+function applyCosmeticTheme(cosmetics) {
+  const activeThemeId = cosmetics && cosmetics.applied && cosmetics.applied.active
+    ? cosmetics.applied.active.portal_theme
+    : null;
+  const previewItem = activeCosmeticPreview
+    ? flattenCosmetics(cosmetics).find((item) => item.id === activeCosmeticPreview)
+    : null;
+  const activeTheme = flattenCosmetics(cosmetics).find((item) => item.id === activeThemeId);
+  const themeKey = previewItem && previewItem.category === "portal_theme"
+    ? previewItem.themeKey
+    : activeTheme && activeTheme.themeKey;
+  if (themeKey && themeKey !== "standard") {
+    document.documentElement.dataset.cosmeticTheme = themeKey;
+  } else {
+    delete document.documentElement.dataset.cosmeticTheme;
+  }
+}
+
+function renderCosmetics(cosmetics) {
+  const catalog = cosmetics || DEMO_COSMETICS;
+  const items = flattenCosmetics(catalog);
+  const activeCount = items.filter((item) => item.active).length;
+  const lockedCount = items.filter((item) => item.locked).length;
+  cosmeticsSummary.textContent = `${formatNumber(activeCount)} active`;
+  cosmeticsStatus.textContent = catalog.noProgressionEffects
+    ? "Cosmetics are visual only and do not affect mining rewards, Space Bucks, or orders."
+    : "Cosmetic rules unavailable.";
+  cosmeticsStatus.dataset.tone = catalog.noProgressionEffects ? "success" : "error";
+  applyCosmeticTheme(catalog);
+
+  if (!items.length) {
+    cosmeticsList.innerHTML = "<p class=\"empty-state\">No cosmetic catalog is available.</p>";
+    return;
+  }
+
+  cosmeticsList.innerHTML = Object.entries(catalog.categories || {}).map(([category, categoryItems]) => `
+    <section class="cosmetic-category" aria-label="${escapeHtml(cosmeticCategoryLabel(category))}">
+      <div class="cosmetic-category-heading">
+        <strong>${escapeHtml(cosmeticCategoryLabel(category))}</strong>
+        <span>${formatNumber((categoryItems || []).filter((item) => item.locked).length)} locked</span>
+      </div>
+      ${(categoryItems || []).map((item) => {
+        const stateLabel = cosmeticStateLabel(item);
+        const applyLabel = cosmeticApplyLabel(item);
+        return `
+          <article class="cosmetic-row" data-cosmetic-id="${escapeHtml(item.id)}" data-category="${escapeHtml(item.category)}" data-state="${escapeHtml(activeCosmeticPreview === item.id ? "preview" : item.state || "available")}" data-locked="${item.locked ? "true" : "false"}">
+            <span class="cosmetic-swatch" style="--cosmetic-swatch: ${escapeHtml(item.swatch || "#66766d")}"></span>
+            <div>
+              <strong>${escapeHtml(item.displayName)}</strong>
+              <span>${escapeHtml(item.description || displayNameFromId(item.availability))}</span>
+              <small>${escapeHtml(displayNameFromId(item.availability))}</small>
+            </div>
+            <span class="store-state">${escapeHtml(stateLabel)}</span>
+            <div class="cosmetic-actions">
+              <button type="button" class="button-secondary cosmetic-preview" data-cosmetic-id="${escapeHtml(item.id)}">Preview</button>
+              <button type="button" class="button-secondary cosmetic-apply" data-cosmetic-id="${escapeHtml(item.id)}" data-category="${escapeHtml(item.category)}" ${!currentUser || !item.canApply || item.active ? "disabled" : ""}>${escapeHtml(applyLabel)}</button>
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </section>
+  `).join("");
+
+  if (lockedCount > 0 && !currentUser) {
+    cosmeticsSummary.textContent = "Demo preview";
+  }
+}
+
 function renderPrivacy(data) {
   const privacyItems = [
     ["Owner scope", currentUser ? "Private profile boundary" : "Local demo"],
@@ -1513,12 +2346,20 @@ function renderPrivacy(data) {
   `).join("");
 }
 
-async function refreshForCurrentUser() {
+async function refreshForCurrentUser(options = {}) {
+  if (portalRefreshInFlight) {
+    return;
+  }
+  portalRefreshInFlight = true;
+  clearPortalRefreshTimer();
   refreshDashboard.disabled = true;
+  const quiet = options.quiet === true;
   try {
     if (!currentUser) {
       renderDashboard(cloneDemo());
-      setMessage("Demo preview refreshed.");
+      if (!quiet) {
+        setMessage("Demo preview refreshed.");
+      }
       return;
     }
     await reloadCurrentUser();
@@ -1530,9 +2371,12 @@ async function refreshForCurrentUser() {
     }
     const data = await loadDashboardForUser(currentUser);
     renderDashboard(data);
+    schedulePortalRefresh(data.entitlement);
     if (data.refreshWarning) {
-      setMessage(data.refreshWarning, true);
-    } else {
+      if (!quiet) {
+        setMessage(data.refreshWarning, true);
+      }
+    } else if (!quiet) {
       setMessage(DASHBOARD_REFRESH_SUCCESS);
     }
   } catch (error) {
@@ -1540,9 +2384,180 @@ async function refreshForCurrentUser() {
       mode: "Demo fallback",
       source: "Firebase read failed; showing local preview"
     }));
-    setMessage(error.message || "Dashboard refresh failed.", true);
+    if (!quiet) {
+      setMessage(error.message || "Dashboard refresh failed.", true);
+    }
   } finally {
     refreshDashboard.disabled = false;
+    portalRefreshInFlight = false;
+  }
+}
+
+async function openBillingSession(callableName, payload = {}) {
+  if (!currentUser) {
+    setMessage("Sign in before managing MCP Miner Pro.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+
+  checkoutMonthly.disabled = true;
+  checkoutAnnual.disabled = true;
+  manageBilling.disabled = true;
+  planCards.setAttribute("aria-busy", "true");
+  planCards.querySelectorAll("button").forEach((button) => {
+    button.disabled = true;
+  });
+  setMessage("Opening secure billing.");
+  try {
+    const callable = httpsCallable(functions, callableName);
+    const result = await callable({
+      ...payload,
+      uid: currentUser.uid,
+      dashboardUrl: window.location.origin
+    });
+    const url = result && result.data && result.data.url;
+    if (!url) {
+      throw new Error("Stripe did not return a billing URL.");
+    }
+    window.location.assign(url);
+  } catch (error) {
+    planCards.removeAttribute("aria-busy");
+    setMessage(error.message || "Stripe billing session failed.", true);
+    renderBilling(activeDashboard && activeDashboard.entitlement);
+  }
+}
+
+function friendlyDeviceError(error) {
+  const reason = error && error.details && error.details.reason;
+  if (reason === "plan_limit_device_count") {
+    return "This plan has no available Codex device slots.";
+  }
+  return error && error.message ? error.message : "Linked device update failed.";
+}
+
+async function updateLinkedDevice(action, deviceId, name = "") {
+  if (!currentUser) {
+    setMessage("Sign in before managing linked Codex devices.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+
+  const callable = httpsCallable(functions, action === "rename" ? "renameSyncDevice" : "revokeSyncDevice");
+  try {
+    await callable(action === "rename" ? { deviceId, name } : { deviceId });
+    await refreshForCurrentUser();
+    setMessage(action === "rename" ? "Device renamed." : "Device revoked.");
+  } catch (error) {
+    setMessage(friendlyDeviceError(error), true);
+  }
+}
+
+async function requestHistoryExport(format) {
+  if (!currentUser) {
+    setMessage("Sign in before exporting history.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+
+  exportJson.disabled = true;
+  exportCsv.disabled = true;
+  exportStatus.textContent = "Preparing export.";
+  try {
+    const callable = httpsCallable(functions, "exportDashboardHistory");
+    const result = await callable({ format });
+    const payload = result.data || {};
+    const blob = new Blob([payload.content || ""], { type: payload.mimeType || "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = payload.filename || `mcp-miner-history.${format}`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    exportStatus.textContent = `${format.toUpperCase()} export ready.`;
+    exportStatus.dataset.tone = "success";
+  } catch (error) {
+    exportStatus.textContent = error.message || "History export failed.";
+    exportStatus.dataset.tone = "error";
+  } finally {
+    const pro = normalizedEntitlement(activeDashboard.entitlement).entitlementStatus === "pro";
+    exportJson.disabled = !currentUser || !pro;
+    exportCsv.disabled = !currentUser || !pro;
+  }
+}
+
+async function requestCosmeticApply(category, cosmeticId) {
+  if (!currentUser) {
+    setMessage("Sign in before applying portal cosmetics.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+
+  cosmeticsList.setAttribute("aria-busy", "true");
+  cosmeticsStatus.textContent = "Applying cosmetic.";
+  try {
+    const callable = httpsCallable(functions, "applyCosmeticSelection");
+    const result = await callable({
+      uid: currentUser.uid,
+      category,
+      cosmeticId
+    });
+    activeDashboard.cosmetics = result.data && result.data.cosmetics ? result.data.cosmetics : activeDashboard.cosmetics;
+    activeDashboard.entitlement = result.data && result.data.entitlement ? result.data.entitlement : activeDashboard.entitlement;
+    activeCosmeticPreview = null;
+    renderDashboard(activeDashboard);
+    setMessage("Cosmetic applied.");
+  } catch (error) {
+    cosmeticsStatus.textContent = error.message || "Cosmetic update failed.";
+    cosmeticsStatus.dataset.tone = "error";
+  } finally {
+    cosmeticsList.removeAttribute("aria-busy");
+  }
+}
+
+async function updatePortalPreference(field, value) {
+  if (!currentUser) {
+    setMessage("Sign in before updating portal preferences.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+  const allowed = new Set(["weeklyDigestEnabled", "betaFeaturesEnabled"]);
+  if (!allowed.has(field)) {
+    setMessage("Portal preference is unavailable.", true);
+    return;
+  }
+
+  weeklyDigestEnabled.disabled = true;
+  betaFeaturesEnabled.disabled = true;
+  try {
+    await setDoc(doc(db, "players", currentUser.uid, "settings", "current"), {
+      ownerUid: currentUser.uid,
+      schemaVersion: 1,
+      updatedAt: serverTimestamp(),
+      privacyClass: "abstract",
+      [field]: value
+    }, { merge: true });
+    await refreshForCurrentUser({ quiet: true });
+    setMessage("Portal preference updated.");
+  } catch (error) {
+    setMessage(error.message || "Portal preference update failed.", true);
+    renderWeeklyDigest(activeDashboard.weeklyDigest || DEMO_WEEKLY_DIGEST, activeDashboard.entitlement, activeDashboard.settings || {});
   }
 }
 
@@ -1587,6 +2602,73 @@ refreshDashboard.addEventListener("click", () => {
   refreshForCurrentUser();
 });
 
+checkoutMonthly.addEventListener("click", () => {
+  openBillingSession("createCheckoutSession", { plan: "pro_monthly" });
+});
+
+checkoutAnnual.addEventListener("click", () => {
+  openBillingSession("createCheckoutSession", { plan: "pro_annual" });
+});
+
+manageBilling.addEventListener("click", () => {
+  openBillingSession("createCustomerPortalSession");
+});
+
+exportJson.addEventListener("click", () => {
+  requestHistoryExport("json");
+});
+
+exportCsv.addEventListener("click", () => {
+  requestHistoryExport("csv");
+});
+
+cosmeticsList.addEventListener("click", (event) => {
+  const preview = event.target.closest(".cosmetic-preview");
+  if (preview) {
+    activeCosmeticPreview = activeCosmeticPreview === preview.dataset.cosmeticId ? null : preview.dataset.cosmeticId;
+    renderCosmetics(activeDashboard.cosmetics || DEMO_COSMETICS);
+    return;
+  }
+  const apply = event.target.closest(".cosmetic-apply");
+  if (!apply || apply.disabled) {
+    return;
+  }
+  requestCosmeticApply(apply.dataset.category, apply.dataset.cosmeticId);
+});
+
+weeklyDigestEnabled.addEventListener("change", () => {
+  updatePortalPreference("weeklyDigestEnabled", weeklyDigestEnabled.checked);
+});
+
+betaFeaturesEnabled.addEventListener("change", () => {
+  updatePortalPreference("betaFeaturesEnabled", betaFeaturesEnabled.checked);
+});
+
+planCards.addEventListener("click", (event) => {
+  const button = event.target.closest(".plan-action");
+  if (!button || button.disabled) {
+    return;
+  }
+  openBillingSession("createCheckoutSession", { plan: button.dataset.plan });
+});
+
+linkedDevicesList.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  const row = event.target.closest("[data-device-id]");
+  if (!button || !row) {
+    return;
+  }
+  const deviceId = row.dataset.deviceId;
+  if (button.classList.contains("device-revoke")) {
+    updateLinkedDevice("revoke", deviceId);
+    return;
+  }
+  if (button.classList.contains("device-rename")) {
+    const input = row.querySelector(".device-name-input");
+    updateLinkedDevice("rename", deviceId, input ? input.value : "");
+  }
+});
+
 approveDeviceLink.addEventListener("click", () => {
   submitDeviceLink("approve");
 });
@@ -1610,10 +2692,11 @@ storeList.addEventListener("click", (event) => {
 onAuthStateChanged(auth, async (user) => {
   const previousUser = currentUser;
   currentUser = user;
-  setLinkMode();
   updateAuthControls(user);
   renderDeviceLink(user);
   if (!user) {
+    clearPortalRefreshTimer();
+    activeCosmeticPreview = null;
     authStatus.textContent = "Signed out";
     authIdentity.textContent = "Not signed in";
     emailVerificationStatus.textContent = "Not signed in";
@@ -1632,6 +2715,7 @@ onAuthStateChanged(auth, async (user) => {
   email.value = "";
 
   if (requiresEmailVerification(user)) {
+    clearPortalRefreshTimer();
     authStatus.textContent = "Verify email";
     authIdentity.textContent = "Email pending";
     profileStatus.textContent = "Verification required";
@@ -1662,6 +2746,5 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 applyTheme(preferredTheme());
-setLinkMode();
-renderDeviceLink(currentUser);
 renderDashboard(cloneDemo());
+loadPlanCatalog();

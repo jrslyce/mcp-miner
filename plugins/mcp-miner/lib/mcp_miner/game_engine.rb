@@ -11,11 +11,22 @@ require "yaml"
 
 module McpMiner
   class GameEngine
+    class CloudFunctionError < StandardError
+      attr_reader :details, :status
+
+      def initialize(message, details: {}, status: nil)
+        super(message)
+        @details = details.is_a?(Hash) ? details : {}
+        @status = status
+      end
+    end
+
     STATE_DIR = File.join(Dir.home, ".mcp-miner")
     DEFAULT_STATE_PATH = File.join(STATE_DIR, "state.json")
     DEFAULT_JOURNAL_FILENAME = "journal.jsonl"
     DEFAULT_FUNCTIONS_ORIGIN = "https://us-central1-mcp-miner.cloudfunctions.net"
     DEFAULT_DASHBOARD_URL = "https://mcp-miner.web.app"
+    DEFAULT_SYNC_CADENCE_SECONDS = 60
     CURRENT_STATE_SCHEMA_VERSION = 1
     MAX_DEDUPE_KEYS = 300
     REPORT_PREFIX = "MCP Miner:"
@@ -221,6 +232,11 @@ module McpMiner
       state["cloud_sync_metadata"]["rejected_events"] ||= []
       state["cloud_sync_metadata"]["last_pushed_sequence"] = state["cloud_sync_metadata"]["last_pushed_sequence"].to_i
       state["cloud_sync_metadata"]["retry_count"] = state["cloud_sync_metadata"]["retry_count"].to_i
+      cadence = state["cloud_sync_metadata"]["sync_cadence_seconds"].to_i
+      state["cloud_sync_metadata"]["sync_cadence_seconds"] = cadence.positive? ? cadence : DEFAULT_SYNC_CADENCE_SECONDS
+      state["cloud_sync_metadata"]["sync_mode"] = optional_string(state["cloud_sync_metadata"]["sync_mode"]) || "batch"
+      state["cloud_sync_metadata"]["next_eligible_sync_at"] = optional_string(state["cloud_sync_metadata"]["next_eligible_sync_at"])
+      state["cloud_sync_metadata"]["entitlement_plan"] = optional_string(state["cloud_sync_metadata"]["entitlement_plan"]) || "free"
       state["reward_controls"] = default_reward_controls.merge(state["reward_controls"].is_a?(Hash) ? state["reward_controls"] : {})
       state["reward_controls"]["event_stats"] ||= {}
       state["reward_controls"]["daily_category_counts"] ||= {}
@@ -323,17 +339,15 @@ module McpMiner
         "rejected_events" => [],
         "last_error" => nil,
         "functions_origin" => nil,
+        "sync_cadence_seconds" => DEFAULT_SYNC_CADENCE_SECONDS,
+        "sync_mode" => "batch",
+        "next_eligible_sync_at" => nil,
+        "entitlement_plan" => "free",
         "link_session_id" => nil,
         "link_code" => nil,
         "link_url" => nil,
         "link_expires_at" => nil,
-        "device_id" => nil,
-        "plan" => "free",
-        "billing_status" => "free",
-        "sync_cadence_seconds" => 60,
-        "max_devices" => 1,
-        "history_retention_days" => 14,
-        "next_eligible_sync_at" => nil
+        "device_id" => nil
       }
     end
 
@@ -985,6 +999,7 @@ module McpMiner
           available: account_link[:status] == "linked",
           cloud_sync_enabled: current_state["cloud_sync"],
           account_link: account_link,
+          cadence: cloud_sync_cadence_payload(current_state),
           metadata: cloud_sync_metadata_payload(current_state),
           materialized_state: "available",
           journal: {
@@ -1007,11 +1022,7 @@ module McpMiner
       metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
       entries = read_journal_entries
       events = build_cloud_sync_events(entries, uid || "unlinked", last_sequence: metadata["last_pushed_sequence"].to_i)
-      token = optional_string(args["device_token"]) ||
-              optional_string(args["id_token"]) ||
-              stored_device_token ||
-              optional_string(ENV["MCP_MINER_DEVICE_TOKEN"]) ||
-              optional_string(ENV["MCP_MINER_FIREBASE_ID_TOKEN"])
+      token = cloud_auth_token(args)
       functions_origin = configured_functions_origin(args, metadata)
 
       if !current_state["cloud_sync"]
@@ -1062,6 +1073,11 @@ module McpMiner
         }
       end
 
+      cadence = cloud_sync_cadence_payload(current_state)
+      if !force_cloud_sync?(args) && cadence[:retry_after_seconds].positive?
+        return record_cadence_wait(events, functions_origin, cadence)
+      end
+
       begin
         result = call_cloud_function(functions_origin, "syncRewardEvents", token, { events: events })
         apply_cloud_sync_result(result, events, functions_origin)
@@ -1076,11 +1092,7 @@ module McpMiner
       metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
       entries = read_journal_entries
       events = build_cloud_sync_events(entries, uid || "unlinked", last_sequence: metadata["last_pushed_sequence"].to_i)
-      token = optional_string(args["device_token"]) ||
-              optional_string(args["id_token"]) ||
-              stored_device_token ||
-              optional_string(ENV["MCP_MINER_DEVICE_TOKEN"]) ||
-              optional_string(ENV["MCP_MINER_FIREBASE_ID_TOKEN"])
+      token = cloud_auth_token(args)
       functions_origin = configured_functions_origin(args, metadata)
 
       {
@@ -1099,23 +1111,200 @@ module McpMiner
         },
         redaction: {
           auth_headers: "redacted",
-          sensitive_fields_rejected: [
-            "prompt",
-            "code",
-            "command",
-            "filePath",
-            "repoName",
-            "terminalOutput",
-            "browserContent",
-            "transcript",
-            "token",
-            "apiKey",
-            "secret"
+          sensitive_fields_rejected: %w[
+            prompt
+            code
+            command
+            filePath
+            repoName
+            terminalOutput
+            browserContent
+            transcript
+            token
+            apiKey
+            secret
           ]
         },
         sync: sync_progress_payload(current_state)[:sync],
         privacy: PRIVACY_NOTICE
       }
+    end
+
+    def cloud_backup_status_payload(args = {})
+      current_state = state
+      account_link = account_link_status_payload(current_state)[:account_link]
+      token = cloud_auth_token(args)
+      functions_origin = configured_functions_origin(args, current_state["cloud_sync_metadata"] || {})
+
+      unless account_link[:status] == "linked"
+        return {
+          ok: true,
+          status: account_link[:status] == "off" ? "local_only" : account_link[:status],
+          eligible: false,
+          backup: nil,
+          message: "Cloud backup is a Pro benefit after account linking. Local-only play is unchanged.",
+          account_link: account_link,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      unless token
+        return {
+          ok: false,
+          status: "auth_required",
+          eligible: nil,
+          backup: nil,
+          message: "A linked device token or Firebase ID token is required to check cloud backup status.",
+          account_link: account_link,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      result = call_cloud_function(functions_origin, "getCloudBackupStatus", token, {})
+      payload = result["result"].is_a?(Hash) ? result["result"] : result
+      {
+        ok: true,
+        status: payload["eligible"] ? "eligible" : "pro_required",
+        eligible: payload["eligible"] == true,
+        backup: payload["backup"],
+        entitlement: payload["entitlement"],
+        account_link: account_link,
+        privacy: PRIVACY_NOTICE
+      }
+    rescue StandardError => e
+      cloud_backup_error_payload(e)
+    end
+
+    def create_cloud_backup_payload(args = {})
+      current_state = state
+      account_link = account_link_status_payload(current_state)[:account_link]
+      token = cloud_auth_token(args)
+      functions_origin = configured_functions_origin(args, current_state["cloud_sync_metadata"] || {})
+
+      unless account_link[:status] == "linked"
+        return {
+          ok: false,
+          status: "not_linked",
+          message: "Link this Codex device to an MCP Miner web account before creating a Pro cloud backup.",
+          account_link: account_link,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+      unless token
+        return {
+          ok: false,
+          status: "auth_required",
+          message: "A linked device token or Firebase ID token is required to create a cloud backup.",
+          account_link: account_link,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      backup = build_cloud_backup_payload(current_state)
+      result = call_cloud_function(functions_origin, "createCloudBackup", token, {
+        backup: backup,
+        localUpdatedAt: cloud_backup_local_updated_at(current_state),
+        deviceId: optional_string(account_link[:device_id])
+      })
+      payload = result["result"].is_a?(Hash) ? result["result"] : result
+      {
+        ok: true,
+        status: "backed_up",
+        backup: payload["backup"],
+        sections: backup.keys,
+        account_link: account_link,
+        privacy: PRIVACY_NOTICE
+      }
+    rescue StandardError => e
+      cloud_backup_error_payload(e)
+    end
+
+    def restore_cloud_backup_payload(args = {})
+      unless truthy_arg?(args, "confirm")
+        return {
+          ok: false,
+          status: "confirmation_required",
+          message: "Restore requires confirm: true and will not overwrite local progress silently.",
+          required_arguments: {
+            confirm: true
+          },
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      current_state = state
+      account_link = account_link_status_payload(current_state)[:account_link]
+      token = cloud_auth_token(args)
+      functions_origin = configured_functions_origin(args, current_state["cloud_sync_metadata"] || {})
+
+      unless account_link[:status] == "linked"
+        return {
+          ok: false,
+          status: "not_linked",
+          message: "Link this Codex device to the MCP Miner web account before restoring a Pro cloud backup.",
+          account_link: account_link,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+      unless token
+        return {
+          ok: false,
+          status: "auth_required",
+          message: "A linked device token or Firebase ID token is required to restore a cloud backup.",
+          account_link: account_link,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      result = call_cloud_function(functions_origin, "restoreCloudBackup", token, {
+        confirm: true,
+        localUpdatedAt: cloud_backup_local_updated_at(current_state),
+        deviceId: optional_string(account_link[:device_id])
+      })
+      payload = result["result"].is_a?(Hash) ? result["result"] : result
+      conflict = payload["conflict"].is_a?(Hash) ? payload["conflict"] : {}
+      if conflict["freshness"] == "local_newer" && !truthy_arg?(args, "allow_overwrite")
+        return {
+          ok: false,
+          status: "local_newer_conflict",
+          message: "Local progress appears newer than the cloud backup. Re-run with confirm: true and allow_overwrite: true to restore anyway.",
+          backup: payload["backup"],
+          conflict: conflict,
+          privacy: PRIVACY_NOTICE
+        }
+      end
+
+      cloud_payload = payload["payload"].is_a?(Hash) ? payload["payload"] : {}
+      rollback_path = nil
+      restored = with_state do |state|
+        rollback_path = backup_state_before_cloud_restore
+        apply_cloud_backup_sections!(state, cloud_payload["sections"] || {})
+        state["last_recovery"] = {
+          "type" => "cloud_backup_restore",
+          "backup_file" => rollback_path && File.basename(rollback_path),
+          "backup_id" => payload.dig("backup", "backupId"),
+          "source_device_id" => payload.dig("backup", "sourceDeviceId"),
+          "conflict" => conflict,
+          "created_at" => Time.now.utc.iso8601
+        }
+        {
+          ok: true,
+          status: "restored",
+          backup: payload["backup"],
+          conflict: conflict,
+          rollback_file: rollback_path && File.basename(rollback_path),
+          restored_player: {
+            space_bucks: state["space_bucks"].to_i,
+            current_asteroid_class_id: state["current_asteroid_class_id"],
+            suit_condition: state["suit_condition"].to_i
+          },
+          sync: sync_progress_payload(state)[:sync],
+          privacy: PRIVACY_NOTICE
+        }
+      end
+      restored
+    rescue StandardError => e
+      cloud_backup_error_payload(e)
     end
 
     def account_link_status_payload(current_state = state)
@@ -2229,18 +2418,30 @@ module McpMiner
         rejected_events: Array(metadata["rejected_events"]).last(25),
         last_error: optional_string(metadata["last_error"]),
         functions_origin: optional_string(metadata["functions_origin"]),
+        sync_cadence_seconds: metadata["sync_cadence_seconds"].to_i.positive? ? metadata["sync_cadence_seconds"].to_i : DEFAULT_SYNC_CADENCE_SECONDS,
+        sync_mode: optional_string(metadata["sync_mode"]) || "batch",
+        next_eligible_sync_at: optional_string(metadata["next_eligible_sync_at"]),
+        entitlement_plan: optional_string(metadata["entitlement_plan"]) || "free",
         link_session_id: optional_string(metadata["link_session_id"]),
         link_code: optional_string(metadata["link_code"]),
         link_url: optional_string(metadata["link_url"]),
         link_expires_at: optional_string(metadata["link_expires_at"]),
         device_id: optional_string(metadata["device_id"]),
-        device_token_present: !!stored_device_token,
-        plan: optional_string(metadata["plan"]) || "free",
-        billing_status: optional_string(metadata["billing_status"]) || "free",
-        sync_cadence_seconds: metadata["sync_cadence_seconds"].to_i,
-        max_devices: metadata["max_devices"].to_i,
-        history_retention_days: metadata["history_retention_days"].to_i,
-        next_eligible_sync_at: optional_string(metadata["next_eligible_sync_at"])
+        device_token_present: !!stored_device_token
+      }
+    end
+
+    def cloud_sync_cadence_payload(current_state = state, now: Time.now.utc)
+      metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
+      next_eligible = optional_string(metadata["next_eligible_sync_at"])
+      retry_after = seconds_until(next_eligible, now)
+      {
+        entitlement_plan: optional_string(metadata["entitlement_plan"]) || "free",
+        sync_mode: optional_string(metadata["sync_mode"]) || "batch",
+        sync_cadence_seconds: metadata["sync_cadence_seconds"].to_i.positive? ? metadata["sync_cadence_seconds"].to_i : DEFAULT_SYNC_CADENCE_SECONDS,
+        next_eligible_sync_at: next_eligible,
+        retry_after_seconds: retry_after,
+        can_sync_now: retry_after <= 0
       }
     end
 
@@ -2255,13 +2456,40 @@ module McpMiner
       end
     end
 
+    def force_cloud_sync?(args)
+      args["force"] == true || safe_string(args["force"]).downcase == "true"
+    end
+
+    def record_cadence_wait(events, functions_origin, cadence)
+      with_state do |state|
+        state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+        state["cloud_sync_metadata"]["status"] = "waiting_for_cadence"
+        state["cloud_sync_metadata"]["pending_event_ids"] = events.map { |event| event["eventId"] }.last(200)
+        state["cloud_sync_metadata"]["functions_origin"] = functions_origin
+        state["cloud_sync_metadata"]["sync_cadence_seconds"] = cadence[:sync_cadence_seconds]
+        state["cloud_sync_metadata"]["sync_mode"] = cadence[:sync_mode]
+        state["cloud_sync_metadata"]["next_eligible_sync_at"] = cadence[:next_eligible_sync_at]
+        state["cloud_sync_metadata"]["entitlement_plan"] = cadence[:entitlement_plan]
+        state["cloud_sync_metadata"]["last_error"] = nil
+      end
+
+      {
+        ok: true,
+        status: "waiting_for_cadence",
+        queued_event_count: events.length,
+        next_eligible_sync_at: cadence[:next_eligible_sync_at],
+        retry_after_seconds: cadence[:retry_after_seconds],
+        message: "Queued locally; cloud sync is next eligible at #{cadence[:next_eligible_sync_at]}.",
+        sync: sync_progress_payload[:sync],
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
     def apply_cloud_sync_result(result, events, functions_origin)
       payload = result["result"].is_a?(Hash) ? result["result"] : result
       accepted_ids = Array(payload["accepted"])
       duplicates = Array(payload["duplicates"])
       rejected = Array(payload["rejected"])
-      entitlement = payload["entitlement"].is_a?(Hash) ? payload["entitlement"] : {}
-      throttle = payload["throttle"].is_a?(Hash) ? payload["throttle"] : {}
       sequence_by_id = events.to_h { |event| [event["eventId"], event["sequence"].to_i] }
       duplicate_ids = duplicates.map { |item| safe_string(item["eventId"]) }.reject(&:empty?)
       synced_ids = accepted_ids + duplicate_ids
@@ -2269,37 +2497,10 @@ module McpMiner
       duplicate_sequences = duplicates.map { |item| item["sequence"].to_i }
       max_synced_sequence = (synced_sequences + duplicate_sequences + [0]).max
       now = Time.now.utc.iso8601
-
-      if payload["status"] == "throttled"
-        with_state do |state|
-          state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
-          apply_cloud_entitlement_metadata!(state["cloud_sync_metadata"], entitlement)
-          state["cloud_sync_metadata"]["status"] = "throttled"
-          state["cloud_sync_metadata"]["last_attempt_at"] = now
-          state["cloud_sync_metadata"]["next_retry_at"] = optional_string(throttle["nextEligibleSyncAt"])
-          state["cloud_sync_metadata"]["next_eligible_sync_at"] = optional_string(throttle["nextEligibleSyncAt"])
-          state["cloud_sync_metadata"]["pending_event_ids"] = events.map { |event| event["eventId"] }.last(200)
-          state["cloud_sync_metadata"]["last_error"] = "Cloud sync is waiting for the #{state["cloud_sync_metadata"]["plan"]} cadence window."
-          state["cloud_sync_metadata"]["functions_origin"] = functions_origin
-          state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
-          state["cloud_auth"]["status"] = "linked"
-          state["cloud_auth"]["last_error"] = nil
-        end
-
-        return {
-          ok: false,
-          status: "throttled",
-          queued_event_count: events.length,
-          throttle: throttle,
-          entitlement: entitlement,
-          sync: sync_progress_payload[:sync],
-          privacy: PRIVACY_NOTICE
-        }
-      end
+      cadence = sync_cadence_from_payload(payload)
 
       with_state do |state|
         state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
-        apply_cloud_entitlement_metadata!(state["cloud_sync_metadata"], entitlement)
         previous_sequence = state["cloud_sync_metadata"]["last_pushed_sequence"].to_i
         next_sequence = [previous_sequence, max_synced_sequence].max
         state["cloud_sync_metadata"]["status"] = rejected.empty? ? "synced" : "conflict"
@@ -2307,13 +2508,13 @@ module McpMiner
         state["cloud_sync_metadata"]["last_attempt_at"] = now
         state["cloud_sync_metadata"]["last_success_at"] = now if rejected.empty?
         state["cloud_sync_metadata"]["next_retry_at"] = nil if rejected.empty?
-        state["cloud_sync_metadata"]["next_eligible_sync_at"] = optional_string(throttle["nextEligibleSyncAt"])
         state["cloud_sync_metadata"]["retry_count"] = rejected.empty? ? 0 : state["cloud_sync_metadata"]["retry_count"].to_i
         state["cloud_sync_metadata"]["duplicate_event_ids"] = (Array(state["cloud_sync_metadata"]["duplicate_event_ids"]) + duplicate_ids).last(100)
         state["cloud_sync_metadata"]["rejected_events"] = rejected.last(100)
         state["cloud_sync_metadata"]["pending_event_ids"] = events.select { |event| event["sequence"].to_i > next_sequence }.map { |event| event["eventId"] }.last(200)
         state["cloud_sync_metadata"]["last_error"] = rejected.empty? ? nil : "Cloud rejected #{rejected.length} event(s); inspect rejected_events."
         state["cloud_sync_metadata"]["functions_origin"] = functions_origin
+        write_sync_cadence_metadata(state["cloud_sync_metadata"], cadence)
         state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
         state["cloud_auth"]["status"] = rejected.empty? ? "linked" : "sync_error"
         state["cloud_auth"]["last_error"] = rejected.empty? ? nil : state["cloud_sync_metadata"]["last_error"]
@@ -2326,47 +2527,362 @@ module McpMiner
         duplicate_event_ids: duplicate_ids,
         rejected_events: rejected,
         synced_sequence: max_synced_sequence,
+        sync_cadence: cadence,
         sync: sync_progress_payload[:sync],
         privacy: PRIVACY_NOTICE
       }
     end
 
-    def apply_cloud_entitlement_metadata!(metadata, entitlement)
-      return unless entitlement.is_a?(Hash) && !entitlement.empty?
+    def sync_cadence_from_payload(payload)
+      entitlement = payload["entitlement"].is_a?(Hash) ? payload["entitlement"] : {}
+      cadence = payload["syncCadence"].is_a?(Hash) ? payload["syncCadence"] : {}
+      features = entitlement["features"].is_a?(Hash) ? entitlement["features"] : {}
+      cadence_seconds = cadence["cadenceSeconds"].to_i
+      cadence_seconds = entitlement["syncCadenceSeconds"].to_i unless cadence_seconds.positive?
+      cadence_seconds = DEFAULT_SYNC_CADENCE_SECONDS unless cadence_seconds.positive?
+      {
+        "entitlement_plan" => optional_string(entitlement["plan"]) || "free",
+        "sync_mode" => optional_string(cadence["mode"]) || (features["nearRealTimeSync"] ? "near_real_time" : "batch"),
+        "sync_cadence_seconds" => cadence_seconds,
+        "next_eligible_sync_at" => optional_string(cadence["nextEligibleSyncAt"]),
+        "retry_after_seconds" => cadence["retryAfterSeconds"].to_i
+      }
+    end
 
-      metadata["plan"] = optional_string(entitlement["plan"]) || metadata["plan"] || "free"
-      metadata["billing_status"] = optional_string(entitlement["billingStatus"]) || metadata["billing_status"] || "free"
-      metadata["sync_cadence_seconds"] = entitlement["syncCadenceSeconds"].to_i if entitlement.key?("syncCadenceSeconds")
-      metadata["max_devices"] = entitlement["maxDevices"].to_i if entitlement.key?("maxDevices")
-      metadata["history_retention_days"] = entitlement["historyRetentionDays"].to_i if entitlement.key?("historyRetentionDays")
+    def write_sync_cadence_metadata(metadata, cadence)
+      metadata["entitlement_plan"] = cadence["entitlement_plan"]
+      metadata["sync_mode"] = cadence["sync_mode"]
+      metadata["sync_cadence_seconds"] = cadence["sync_cadence_seconds"].to_i.positive? ? cadence["sync_cadence_seconds"].to_i : DEFAULT_SYNC_CADENCE_SECONDS
+      metadata["next_eligible_sync_at"] = optional_string(cadence["next_eligible_sync_at"])
     end
 
     def record_cloud_sync_error(error, events, functions_origin)
       now = Time.now.utc.iso8601
+      plan_limited = cloud_plan_limit_error?(error)
+      status = plan_limited ? "plan_limited" : "sync_error"
+      details = error.respond_to?(:details) ? error.details : {}
+      retry_after = details["retryAfterSeconds"].to_i
+      cadence = cadence_from_error_details(details, retry_after)
       with_state do |state|
         state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
         retry_count = state["cloud_sync_metadata"]["retry_count"].to_i + 1
-        state["cloud_sync_metadata"]["status"] = "sync_error"
+        state["cloud_sync_metadata"]["status"] = status
         state["cloud_sync_metadata"]["last_attempt_at"] = now
         state["cloud_sync_metadata"]["retry_count"] = retry_count
-        state["cloud_sync_metadata"]["next_retry_at"] = (Time.now.utc + [[60 * (2**[retry_count - 1, 0].max), 3600].min, 60].max).iso8601
+        state["cloud_sync_metadata"]["next_retry_at"] = plan_limited && retry_after.positive? ? cadence["next_eligible_sync_at"] : (Time.now.utc + [[60 * (2**[retry_count - 1, 0].max), 3600].min, 60].max).iso8601
         state["cloud_sync_metadata"]["pending_event_ids"] = events.map { |event| event["eventId"] }.last(200)
         state["cloud_sync_metadata"]["last_error"] = safe_string(error.message)[0, 240]
         state["cloud_sync_metadata"]["functions_origin"] = functions_origin
+        write_sync_cadence_metadata(state["cloud_sync_metadata"], cadence) if plan_limited
         state["cloud_auth"] = default_cloud_auth.merge(state["cloud_auth"].is_a?(Hash) ? state["cloud_auth"] : {})
-        state["cloud_auth"]["status"] = "sync_error"
+        state["cloud_auth"]["status"] = plan_limited ? "linked" : "sync_error"
         state["cloud_auth"]["last_error"] = state["cloud_sync_metadata"]["last_error"]
         state["cloud_auth"]["updated_at"] = now
       end
 
       {
         ok: false,
-        status: "sync_error",
+        status: status,
         queued_event_count: events.length,
         error: safe_string(error.message)[0, 240],
+        next_eligible_sync_at: plan_limited ? cadence["next_eligible_sync_at"] : nil,
+        retry_after_seconds: plan_limited ? retry_after : 0,
+        message: plan_limited ? safe_string(error.message)[0, 240] : "Cloud sync failed; local progress remains queued for retry.",
         sync: sync_progress_payload[:sync],
         privacy: PRIVACY_NOTICE
       }
+    end
+
+    def cadence_from_error_details(details, retry_after)
+      entitlement = details["entitlement"].is_a?(Hash) ? details["entitlement"] : {}
+      features = entitlement["features"].is_a?(Hash) ? entitlement["features"] : {}
+      cadence_seconds = details["cadenceSeconds"].to_i
+      cadence_seconds = entitlement["syncCadenceSeconds"].to_i unless cadence_seconds.positive?
+      cadence_seconds = DEFAULT_SYNC_CADENCE_SECONDS unless cadence_seconds.positive?
+      {
+        "entitlement_plan" => optional_string(entitlement["plan"]) || "free",
+        "sync_mode" => optional_string(details["syncMode"]) || (features["nearRealTimeSync"] ? "near_real_time" : "batch"),
+        "sync_cadence_seconds" => cadence_seconds,
+        "next_eligible_sync_at" => optional_string(details["nextEligibleSyncAt"]) || (Time.now.utc + retry_after).iso8601,
+        "retry_after_seconds" => retry_after
+      }
+    end
+
+    def cloud_error_details(body)
+      details = body.dig("error", "details")
+      details.is_a?(Hash) ? details : {}
+    end
+
+    def friendly_cloud_error_message(body, response)
+      details = cloud_error_details(body)
+      reason = safe_string(details["reason"])
+      message = safe_string(body.dig("error", "message") || response.message)
+      friendly =
+        case reason
+        when "plan_limit_device_count"
+          "This MCP Miner account has reached its active Codex device limit. Free supports 1 device; Pro supports up to 5. Disconnect another device or upgrade to Pro."
+        when "plan_limit_sync_cadence"
+          retry_after = details["retryAfterSeconds"].to_i
+          retry_text = retry_after.positive? ? " Retry in about #{retry_after} seconds." : ""
+          "Free cloud sync accepts one batch per minute; local progress remains queued.#{retry_text} Pro enables near-real-time sync."
+        when "plan_limit_backup_restore"
+          "Cloud backup and restore is a Pro benefit. Local play continues on Free."
+        else
+          message.empty? ? response.message : message
+        end
+      reason.empty? ? friendly : "#{reason}: #{friendly}"
+    end
+
+    def cloud_plan_limit_error?(error)
+      if error.respond_to?(:details)
+        reason = safe_string(error.details["reason"])
+        return true if %w[plan_limit_device_count plan_limit_sync_cadence plan_limit_backup_restore].include?(reason)
+      end
+      message = safe_string(error.message)
+      message.include?("plan_limit_device_count") || message.include?("plan_limit_sync_cadence") || message.include?("plan_limit_backup_restore")
+    end
+
+    def cloud_backup_error_payload(error)
+      details = error.respond_to?(:details) ? error.details : {}
+      reason = safe_string(details["reason"])
+      {
+        ok: false,
+        status: reason == "plan_limit_backup_restore" ? "pro_required" : "backup_error",
+        error: safe_string(error.message)[0, 240],
+        reason: reason.empty? ? nil : reason,
+        message: reason == "plan_limit_backup_restore" ? "Cloud backup and restore is a Pro benefit. Local progress remains playable on this machine." : "Cloud backup request failed; local progress was not changed.",
+        privacy: PRIVACY_NOTICE
+      }
+    end
+
+    def cloud_auth_token(args = {})
+      optional_string(args["device_token"]) ||
+        optional_string(args["id_token"]) ||
+        stored_device_token ||
+        optional_string(ENV["MCP_MINER_DEVICE_TOKEN"]) ||
+        optional_string(ENV["MCP_MINER_FIREBASE_ID_TOKEN"])
+    end
+
+    def redacted_sync_headers(token)
+      headers = {
+        "Content-Type" => "application/json"
+      }
+      token = optional_string(token)
+      return headers unless token
+
+      if token.start_with?("mcpd_")
+        headers["X-MCP-Miner-Device-Token"] = "<redacted:device-token>"
+      else
+        headers["Authorization"] = "Bearer <redacted:firebase-id-token>"
+      end
+      headers
+    end
+
+    def build_cloud_backup_payload(current_state)
+      profile = default_profile.merge(current_state["profile"].is_a?(Hash) ? current_state["profile"] : {})
+      metadata = default_cloud_sync_metadata.merge(current_state["cloud_sync_metadata"].is_a?(Hash) ? current_state["cloud_sync_metadata"] : {})
+      {
+        "profile" => {
+          "display_name" => optional_string(profile["display_name"]),
+          "miner_name" => optional_string(profile["miner_name"]),
+          "pronouns" => optional_string(profile["pronouns"]),
+          "suit_style" => optional_string(profile["suit_style"]),
+          "cloud_sync" => profile["cloud_sync"] == true,
+          "customization_unlocks" => safe_string_array(profile["customization_unlocks"]),
+          "generated_assets" => safe_generated_assets(profile["generated_assets"])
+        },
+        "progress" => {
+          "space_bucks" => current_state["space_bucks"].to_i,
+          "suit_condition" => current_state["suit_condition"].to_i,
+          "current_asteroid_class_id" => optional_string(current_state["current_asteroid_class_id"]),
+          "unlocked_asteroid_class_ids" => safe_string_array(current_state["unlocked_asteroid_class_ids"]),
+          "unlocked_machine_ids" => safe_string_array(current_state["unlocked_machine_ids"]),
+          "asteroid_progress" => deep_copy(current_state["asteroid_progress"] || {}),
+          "asteroid_progress_by_id" => deep_copy(current_state["asteroid_progress_by_id"] || {}),
+          "rare_find_pity_score" => current_state["rare_find_pity_score"].to_f,
+          "asteroid_depletions" => deep_copy(Array(current_state["asteroid_depletions"]).last(25)),
+          "hazard_log" => deep_copy(Array(current_state["hazard_log"]).last(25)),
+          "stats" => backup_stats(current_state["stats"] || {})
+        },
+        "inventory" => deep_copy(current_state["inventory"] || {}),
+        "orders" => {
+          "orders" => deep_copy(current_state["orders"] || []),
+          "completed_orders" => deep_copy(current_state["completed_orders"] || []),
+          "orders_generated_at" => optional_string(current_state["orders_generated_at"]),
+          "orders_refresh_due_at" => optional_string(current_state["orders_refresh_due_at"]),
+          "order_generation_index" => current_state["order_generation_index"].to_i,
+          "weekly_contracts" => deep_copy(current_state["weekly_contracts"] || []),
+          "completed_weekly_contracts" => deep_copy(current_state["completed_weekly_contracts"] || []),
+          "weekly_contract_generation_index" => current_state["weekly_contract_generation_index"].to_i,
+          "fabrication_queue" => deep_copy(current_state["fabrication_queue"] || []),
+          "completed_products" => deep_copy(current_state["completed_products"] || []),
+          "fabrication_sequence" => current_state["fabrication_sequence"].to_i
+        },
+        "upgrades" => {
+          "upgrades" => deep_copy(current_state["upgrades"] || {}),
+          "unlocked_machine_ids" => safe_string_array(current_state["unlocked_machine_ids"])
+        },
+        "base" => {
+          "base_modules" => deep_copy(current_state["base_modules"] || {})
+        },
+        "cosmetics" => {
+          "customization_unlocks" => safe_string_array(profile["customization_unlocks"]),
+          "generated_assets" => safe_generated_assets(profile["generated_assets"]),
+          "store_transactions" => safe_store_transactions(current_state["store_transactions"])
+        },
+        "settings" => {
+          "report_mode" => current_state["report_mode"],
+          "cloud_sync" => current_state["cloud_sync"] == true
+        },
+        "syncMetadata" => {
+          "state_schema_version" => current_state["state_schema_version"].to_i,
+          "status" => optional_string(metadata["status"]),
+          "last_pushed_sequence" => metadata["last_pushed_sequence"].to_i,
+          "last_pulled_version" => optional_string(metadata["last_pulled_version"]),
+          "sync_cadence_seconds" => metadata["sync_cadence_seconds"].to_i,
+          "sync_mode" => optional_string(metadata["sync_mode"]),
+          "next_eligible_sync_at" => optional_string(metadata["next_eligible_sync_at"]),
+          "entitlement_plan" => optional_string(metadata["entitlement_plan"]),
+          "device_id" => optional_string(metadata["device_id"])
+        }
+      }
+    end
+
+    def apply_cloud_backup_sections!(state, sections)
+      profile = sections["profile"].is_a?(Hash) ? sections["profile"] : {}
+      restored_profile = default_profile.merge(state["profile"].is_a?(Hash) ? state["profile"] : {})
+      %w[display_name miner_name pronouns suit_style cloud_sync].each do |field|
+        restored_profile[field] = profile[field] if profile.key?(field)
+      end
+      restored_profile["customization_unlocks"] = safe_string_array(profile["customization_unlocks"]) if profile.key?("customization_unlocks")
+      restored_profile["generated_assets"] = safe_generated_assets(profile["generated_assets"]) if profile.key?("generated_assets")
+      state["profile"] = restored_profile
+
+      progress = sections["progress"].is_a?(Hash) ? sections["progress"] : {}
+      %w[
+        space_bucks
+        suit_condition
+        current_asteroid_class_id
+        unlocked_asteroid_class_ids
+        unlocked_machine_ids
+        asteroid_progress
+        asteroid_progress_by_id
+        rare_find_pity_score
+        asteroid_depletions
+        hazard_log
+        stats
+      ].each do |key|
+        state[key] = deep_copy(progress[key]) if progress.key?(key)
+      end
+
+      state["inventory"] = deep_copy(sections["inventory"]) if sections["inventory"].is_a?(Hash)
+
+      orders = sections["orders"].is_a?(Hash) ? sections["orders"] : {}
+      %w[
+        orders
+        completed_orders
+        orders_generated_at
+        orders_refresh_due_at
+        order_generation_index
+        weekly_contracts
+        completed_weekly_contracts
+        weekly_contract_generation_index
+        fabrication_queue
+        completed_products
+        fabrication_sequence
+      ].each do |key|
+        state[key] = deep_copy(orders[key]) if orders.key?(key)
+      end
+
+      upgrades = sections["upgrades"].is_a?(Hash) ? sections["upgrades"] : {}
+      state["upgrades"] = deep_copy(upgrades["upgrades"]) if upgrades["upgrades"].is_a?(Hash)
+      state["unlocked_machine_ids"] = safe_string_array(upgrades["unlocked_machine_ids"]) if upgrades.key?("unlocked_machine_ids")
+
+      base = sections["base"].is_a?(Hash) ? sections["base"] : {}
+      state["base_modules"] = deep_copy(base["base_modules"]) if base["base_modules"].is_a?(Hash)
+
+      cosmetics = sections["cosmetics"].is_a?(Hash) ? sections["cosmetics"] : {}
+      state["profile"]["customization_unlocks"] = safe_string_array(cosmetics["customization_unlocks"]) if cosmetics.key?("customization_unlocks")
+      state["profile"]["generated_assets"] = safe_generated_assets(cosmetics["generated_assets"]) if cosmetics.key?("generated_assets")
+      state["store_transactions"] = safe_store_transactions(cosmetics["store_transactions"]) if cosmetics.key?("store_transactions")
+
+      settings = sections["settings"].is_a?(Hash) ? sections["settings"] : {}
+      state["report_mode"] = settings["report_mode"] if VALID_REPORT_MODES.include?(settings["report_mode"])
+      state["cloud_sync"] = settings["cloud_sync"] == true if settings.key?("cloud_sync")
+
+      sync_metadata = sections["syncMetadata"].is_a?(Hash) ? sections["syncMetadata"] : {}
+      state["cloud_sync_metadata"] = default_cloud_sync_metadata.merge(state["cloud_sync_metadata"].is_a?(Hash) ? state["cloud_sync_metadata"] : {})
+      %w[last_pushed_sequence last_pulled_version sync_cadence_seconds sync_mode next_eligible_sync_at entitlement_plan].each do |field|
+        state["cloud_sync_metadata"][field] = sync_metadata[field] if sync_metadata.key?(field)
+      end
+      normalize_state(state)
+    end
+
+    def backup_state_before_cloud_restore
+      return nil unless File.exist?(state_path)
+
+      backup_path = "#{state_path}.backup-before-cloud-restore-#{Time.now.utc.strftime('%Y%m%d%H%M%S')}-#{Process.pid}"
+      FileUtils.cp(state_path, backup_path)
+      backup_path
+    end
+
+    def cloud_backup_local_updated_at(current_state)
+      candidates = [
+        current_state.dig("latest_report", "created_at"),
+        read_journal_entries.last&.dig("timestamp"),
+        File.exist?(state_path) ? File.mtime(state_path).utc.iso8601 : nil,
+        current_state["created_at"]
+      ].compact
+      candidates.max_by { |value| Time.parse(safe_string(value)) rescue Time.at(0) } || Time.now.utc.iso8601
+    end
+
+    def backup_stats(stats)
+      stats = stats.is_a?(Hash) ? stats : {}
+      {
+        "turns_seen" => stats["turns_seen"].to_i,
+        "tool_events_seen" => stats["tool_events_seen"].to_i,
+        "work_score_total" => stats["work_score_total"].to_f,
+        "chonks_mined_total" => stats["chonks_mined_total"].to_i,
+        "materials_found_total" => stats["materials_found_total"].to_i,
+        "reports_emitted" => stats["reports_emitted"].to_i,
+        "work_events" => deep_copy(stats["work_events"] || {})
+      }
+    end
+
+    def safe_string_array(values)
+      Array(values).map { |value| safe_string(value) }.reject(&:empty?).uniq
+    end
+
+    def safe_generated_assets(values)
+      Array(values).map do |asset|
+        next unless asset.is_a?(Hash)
+
+        asset_ref = safe_string(asset["asset_ref"])
+        next if asset_ref.empty? || asset_ref.include?("/") || asset_ref.include?("\\")
+
+        {
+          "asset_ref" => asset_ref[0, 120],
+          "created_at" => optional_string(asset["created_at"])
+        }.compact
+      end.compact.last(20)
+    end
+
+    def safe_store_transactions(values)
+      Array(values).map do |transaction|
+        next unless transaction.is_a?(Hash)
+
+        {
+          "store_item_id" => optional_string(transaction["store_item_id"]),
+          "kind" => optional_string(transaction["kind"]),
+          "item_id" => optional_string(transaction["item_id"]),
+          "spent" => transaction["spent"].to_i,
+          "created_at" => optional_string(transaction["created_at"])
+        }.compact
+      end.compact.last(50)
+    end
+
+    def truthy_arg?(args, key)
+      args[key] == true || safe_string(args[key]).downcase == "true"
     end
 
     def call_cloud_function(functions_origin, function_name, id_token, payload)
@@ -2386,24 +2902,24 @@ module McpMiner
         http.request(request)
       end
       body = response.body.to_s.empty? ? {} : JSON.parse(response.body)
-      raise "Cloud sync HTTP #{response.code}: #{body.dig('error', 'message') || response.message}" unless response.is_a?(Net::HTTPSuccess)
-      raise "Cloud sync rejected: #{body.dig('error', 'message')}" if body["error"]
+      unless response.is_a?(Net::HTTPSuccess)
+        error = body["error"].is_a?(Hash) ? body["error"] : {}
+        raise CloudFunctionError.new(
+          "Cloud sync HTTP #{response.code}: #{friendly_cloud_error_message(body, response)}",
+          details: cloud_error_details(body),
+          status: error["status"] || response.code
+        )
+      end
+      if body["error"]
+        error = body["error"].is_a?(Hash) ? body["error"] : {}
+        raise CloudFunctionError.new(
+          "Cloud sync rejected: #{friendly_cloud_error_message(body, response)}",
+          details: cloud_error_details(body),
+          status: error["status"]
+        )
+      end
 
       body
-    end
-
-    def redacted_sync_headers(token)
-      headers = {
-        "Content-Type" => "application/json"
-      }
-      return headers unless token && !token.empty?
-
-      if token.start_with?("mcpd_")
-        headers["X-MCP-Miner-Device-Token"] = "<redacted:device-token>"
-      else
-        headers["Authorization"] = "Bearer <redacted:firebase-id-token>"
-      end
-      headers
     end
 
     def configured_functions_origin(args = {}, metadata = {})
@@ -4052,6 +4568,13 @@ module McpMiner
     def optional_string(value)
       text = safe_string(value)
       text.empty? ? nil : text
+    end
+
+    def seconds_until(iso_time, now = Time.now.utc)
+      target = Time.parse(safe_string(iso_time))
+      [(target - now).ceil, 0].max
+    rescue ArgumentError
+      0
     end
 
     def deep_copy(value)

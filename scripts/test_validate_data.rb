@@ -99,4 +99,58 @@ expect_failure(
   end
 end
 
-puts "Validator fixture checks passed: 7"
+expect_failure(
+  "invalid annual subscription math",
+  "data/subscription_plans.yaml pro_annual annual_price_cents must equal pro_monthly monthly_price_cents * annual_months_charged"
+) do |data_dir|
+  mutate_yaml(data_dir, "subscription_plans.yaml") do |data|
+    data.fetch("plans").find { |plan| plan.fetch("id") == "pro_annual" }["annual_price_cents"] = 5000
+  end
+end
+
+expect_failure(
+  "unsupported subscription currency",
+  "data/subscription_plans.yaml subscription_pricing.currency must be supported"
+) do |data_dir|
+  mutate_yaml(data_dir, "subscription_plans.yaml") do |data|
+    data.fetch("subscription_pricing")["currency"] = "cad"
+  end
+end
+
+expect_failure(
+  "invalid pro annual entitlement drift",
+  "data/subscription_plans.yaml pro_annual entitlements must match pro_monthly entitlements"
+) do |data_dir|
+  mutate_yaml(data_dir, "subscription_plans.yaml") do |data|
+    data.fetch("plans").find { |plan| plan.fetch("id") == "pro_annual" }.fetch("entitlements")["exports"] = false
+  end
+end
+
+expect_failure(
+  "missing provider price id",
+  "data/subscription_plans.yaml subscription_pricing.provider_price_ids.stripe.live.pro_monthly must be configured"
+) do |data_dir|
+  mutate_yaml(data_dir, "subscription_plans.yaml") do |data|
+    data.fetch("subscription_pricing").fetch("provider_price_ids").fetch("stripe").fetch("live")["pro_monthly"] = ""
+  end
+end
+
+expect_failure(
+  "cosmetic progression effect",
+  "data/cosmetics.yaml cosmetic suit_trim_basic.effects must stay empty; cosmetics cannot affect progression"
+) do |data_dir|
+  mutate_yaml(data_dir, "cosmetics.yaml") do |data|
+    data.fetch("cosmetic_catalog").fetch("items").first["effects"] = [{ "target" => "chonk_output", "formula" => "x2" }]
+  end
+end
+
+expect_failure(
+  "invalid premium cosmetic retention",
+  "data/cosmetics.yaml cosmetic suit_trim_aurora.retention must be inactive_after_downgrade"
+) do |data_dir|
+  mutate_yaml(data_dir, "cosmetics.yaml") do |data|
+    data.fetch("cosmetic_catalog").fetch("items").find { |item| item.fetch("id") == "suit_trim_aurora" }["retention"] = "retain_after_downgrade"
+  end
+end
+
+puts "Validator fixture checks passed: 13"

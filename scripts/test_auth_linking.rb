@@ -84,6 +84,52 @@ def start_link_server(requests)
   [server, thread, "http://127.0.0.1:#{server.config[:Port]}"]
 end
 
+def start_device_limit_link_server(requests)
+  server = WEBrick::HTTPServer.new(
+    BindAddress: "127.0.0.1",
+    Port: 0,
+    Logger: WEBrick::Log.new(File::NULL),
+    AccessLog: []
+  )
+  server.mount_proc "/createLinkSession" do |request, response|
+    requests << ["createLinkSession", JSON.parse(request.body)]
+    response["Content-Type"] = "application/json"
+    response.body = JSON.generate({
+      result: {
+        ok: true,
+        privacyClass: "abstract",
+        session: {
+          sessionId: "link_limit_session",
+          code: "LIMT-1234",
+          status: "pending",
+          expiresAt: "2026-05-25T12:10:00Z"
+        },
+        linkUrl: "https://mcp-miner.web.app/?linkCode=LIMT-1234&sessionId=link_limit_session",
+        deviceSecret: "limit-device-secret",
+        message: "Approve this device."
+      }
+    })
+  end
+  server.mount_proc "/exchangeLinkSession" do |request, response|
+    requests << ["exchangeLinkSession", JSON.parse(request.body)]
+    response.status = 429
+    response["Content-Type"] = "application/json"
+    response.body = JSON.generate({
+      error: {
+        status: "RESOURCE_EXHAUSTED",
+        message: "Free accounts can link one active Codex device.",
+        details: {
+          reason: "plan_limit_device_count",
+          maxDevices: 1,
+          activeDevices: 1
+        }
+      }
+    })
+  end
+  thread = Thread.new { server.start }
+  [server, thread, "http://127.0.0.1:#{server.config[:Port]}"]
+end
+
 Dir.mktmpdir("mcp-miner-auth-linking") do |dir|
   state_path = File.join(dir, "state.json")
   McpMiner::GameEngine.new(root: ROOT, state_path: state_path).write_state(
@@ -200,6 +246,27 @@ Dir.mktmpdir("mcp-miner-auth-linking") do |dir|
   ensure
     server.shutdown
     thread.join
+  end
+
+  limit_requests = []
+  limit_server, limit_thread, limit_origin = start_device_limit_link_server(limit_requests)
+  begin
+    limit_responses = run_mcp(state_path, [
+      { jsonrpc: "2.0", id: 13, method: "tools/call", params: { name: "start_account_link", arguments: { functions_origin: limit_origin, dashboard_url: "https://mcp-miner.web.app", device_name: "Second Codex" } } },
+      { jsonrpc: "2.0", id: 14, method: "tools/call", params: { name: "complete_account_link", arguments: { functions_origin: limit_origin } } }
+    ])
+    limit_pending = tool_payload(limit_responses[0])
+    limit_error = limit_responses[1].dig("error", "message").to_s
+
+    assert("account-link plan limits should surface device-count guidance") do
+      limit_pending["status"] == "link_pending" &&
+        limit_error.include?("plan_limit_device_count") &&
+        limit_error.include?("Free supports 1 device") &&
+        !File.read(state_path).include?("mcpd_")
+    end
+  ensure
+    limit_server.shutdown
+    limit_thread.join
   end
 
   auth_js = File.read(File.join(ROOT, "firebase", "hosting", "auth.js"))

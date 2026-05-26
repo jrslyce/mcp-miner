@@ -57,6 +57,8 @@ assert("package scripts should cover V1 readiness verification") do
     firebase:rules:smoke
     firebase:auth:smoke
     firebase:sync:smoke
+    firebase:backup:smoke
+    firebase:analytics:smoke
     firebase:dashboard:smoke
     firebase:integration:smoke
   ].all? { |name| scripts.key?(name) } &&

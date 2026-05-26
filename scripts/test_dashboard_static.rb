@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "yaml"
 
 ROOT = File.expand_path("..", __dir__)
 $checks = 0
@@ -18,6 +19,8 @@ end
 
 index = read("firebase/hosting/index.html")
 auth_js = read("firebase/hosting/auth.js")
+subscription_catalog = JSON.parse(read("firebase/hosting/subscription-plans.json"))
+subscription_config = YAML.load_file(File.join(ROOT, "data/subscription_plans.yaml"))
 styles = read("firebase/hosting/styles.css")
 asset = read("firebase/hosting/assets/asteroid-scan.svg")
 smoke = read("scripts/firebase_dashboard_smoke.js")
@@ -32,7 +35,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth device-link sync-privacy status asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
+required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&
@@ -54,6 +57,28 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     raw-sync-list
     raw-sync-count
     sync-status
+    sync-cadence
+    sync-next-refresh
+    billing-status
+    plan-cards
+    checkout-monthly
+    checkout-annual
+    manage-billing
+    linked-devices-usage
+    linked-devices-list
+    analytics-summary
+    analytics-list
+    export-json
+    export-csv
+    weekly-digest-status
+    weekly-digest-summary
+    weekly-digest-list
+    weekly-digest-enabled
+    beta-features-enabled
+    beta-access-status
+    cosmetics-summary
+    cosmetics-list
+    cosmetics-status
     privacy-list
     base-detail
   ].all? { |id| index.include?(%(id="#{id}")) }
@@ -77,11 +102,125 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     renderDeviceLink
     approveLinkSession
     rejectLinkSession
+    revokeSyncDevice
+    renameSyncDevice
+    renderLinkedDevices
+    schedulePortalRefresh
+    syncCadenceModel
+    getDashboardAnalytics
+    exportDashboardHistory
+    getWeeklyDigest
+    renderWeeklyDigest
+    updatePortalPreference
+    renderAnalytics
+    requestHistoryExport
+    getCosmeticCatalog
+    applyCosmeticSelection
+    renderCosmetics
+    requestCosmeticApply
+    cosmetic-preview
+    cosmetic-apply
     renderStore
+    createCheckoutSession
+    createCustomerPortalSession
+    loadPlanCatalog
+    renderPlanCards
+    annualDiscountCopy
+    normalizeRawSyncRows
+    renderRawSyncEvents
     getSyncState
     ensureLinkedProfile
     requiresEmailVerification
   ].all? { |needle| auth_js.include?(needle) }
+end
+
+assert("dashboard should render Pro weekly digest and beta preference controls") do
+  index.include?(%(data-panel="weekly-digest")) &&
+    index.include?(%(id="weekly-digest-enabled")) &&
+    index.include?(%(id="beta-features-enabled")) &&
+    auth_js.include?("function renderWeeklyDigest(digest, rawEntitlement, settings = {})") &&
+    auth_js.include?("httpsCallable(functions, \"getWeeklyDigest\")") &&
+    auth_js.include?("weeklyDigestEnabled") &&
+    auth_js.include?("betaFeaturesEnabled") &&
+    styles.include?(".digest-summary") &&
+    styles.include?(".preference-grid") &&
+    styles.include?(".toggle-row")
+end
+
+assert("dashboard should render cosmetic preview, apply, locked, and mobile-safe states") do
+  index.include?(%(data-panel="cosmetics")) &&
+    auth_js.include?("Cosmetics are visual only and do not affect mining rewards, Space Bucks, or orders.") &&
+    auth_js.include?("data-state=\"${escapeHtml(activeCosmeticPreview === item.id ? \"preview\"") &&
+    auth_js.include?("data-locked=\"${item.locked ? \"true\" : \"false\"}") &&
+    styles.include?(".cosmetics-list") &&
+    styles.include?(".cosmetic-row") &&
+    styles.include?(":root[data-cosmetic-theme=\"nebula\"]") &&
+    styles.include?("@media (max-width: 700px)") &&
+    styles.include?(".cosmetics-list,")
+end
+
+assert("dashboard brand copy should match the game instead of Firebase internals") do
+  index.include?("Space Mining Idle Game") &&
+    !index.include?("Firebase dashboard")
+end
+
+assert("dashboard pricing catalog should match subscription pricing config") do
+  plans_by_id = subscription_config.fetch("plans").to_h { |plan| [plan.fetch("id"), plan] }
+  catalog_by_id = subscription_catalog.fetch("plans").to_h { |plan| [plan.fetch("id"), plan] }
+  subscription_catalog.fetch("annualMonthsCharged") == subscription_config.dig("subscription_pricing", "annual_months_charged") &&
+    catalog_by_id.keys.sort == plans_by_id.keys.sort &&
+    catalog_by_id.all? do |id, plan|
+      source = plans_by_id.fetch(id)
+      plan.fetch("monthlyPriceCents") == source.fetch("monthly_price_cents") &&
+        plan["annualPriceCents"] == source["annual_price_cents"] &&
+        plan.fetch("shortCopy") == source.fetch("short_copy") &&
+        plan.fetch("privacyCopy") == source.fetch("privacy_copy") &&
+        plan.dig("entitlements", "maxCodexDevices") == source.dig("entitlements", "max_codex_devices") &&
+        plan.dig("entitlements", "syncCadenceSeconds") == source.dig("entitlements", "sync_cadence_seconds")
+    end
+end
+
+assert("dashboard subscription UX should expose plan cards without Stripe internals") do
+  index.include?(%(id="plan-cards")) &&
+    auth_js.include?("planActionState") &&
+    auth_js.include?("Opening secure billing.") &&
+    auth_js.include?("Cancellation scheduled.") &&
+    auth_js.include?("Payment needs attention.") &&
+    auth_js.include?("without collecting private work data") &&
+    !subscription_catalog.to_s.include?("price_") &&
+    !subscription_catalog.to_s.include?("cus_")
+end
+
+assert("dashboard should render linked device management without token secrets") do
+  index.include?(%(data-panel="linked-devices")) &&
+    index.include?(%(id="linked-devices-list")) &&
+    auth_js.include?("function renderLinkedDevices(devices = [], rawEntitlement = FREE_ENTITLEMENT)") &&
+    auth_js.include?("function updateLinkedDevice(action, deviceId, name = \"\")") &&
+    auth_js.include?("httpsCallable(functions, action === \"rename\" ? \"renameSyncDevice\" : \"revokeSyncDevice\")") &&
+    auth_js.include?("device-revoke") &&
+    auth_js.include?("device-rename") &&
+    !auth_js.include?("tokenHash") &&
+    !index.include?("token hash")
+end
+
+assert("dashboard should use cadence polling instead of realtime listeners") do
+  auth_js.include?("const PORTAL_POLLING") &&
+    auth_js.include?("window.setTimeout") &&
+    auth_js.include?("portalPollingSeconds") &&
+    !auth_js.include?("onSnapshot")
+end
+
+assert("dashboard should render Pro analytics and export controls") do
+  index.include?(%(data-panel="analytics")) &&
+    index.include?(%(id="analytics-list")) &&
+    index.include?(%(id="export-json")) &&
+    index.include?(%(id="export-csv")) &&
+    auth_js.include?("const getDashboardAnalytics = httpsCallable(functions, \"getDashboardAnalytics\")") &&
+    auth_js.include?("function renderAnalytics(analytics, rawEntitlement)") &&
+    auth_js.include?("function requestHistoryExport(format)") &&
+    auth_js.include?("httpsCallable(functions, \"exportDashboardHistory\")") &&
+    auth_js.include?("Exports contain abstract gameplay history only.") &&
+    auth_js.include?("Pro unlocks history export.")
 end
 
 assert("refresh control should not expose placeholder icon text") do
@@ -207,22 +346,6 @@ assert("password auth should require email verification before cloud sync and de
     auth_js.include?("await currentUser.getIdToken(true)")
 end
 
-assert("link URLs should promote device linking above the demo dashboard") do
-  index.index(%(data-panel="device-link")) < index.index(%(data-panel="auth")) &&
-    auth_js.include?("const pendingLink = {") &&
-    auth_js.include?("function setLinkMode()") &&
-    auth_js.include?("document.body.dataset.linkMode = hasPendingLink() ? \"pending\" : \"dashboard\"") &&
-    auth_js.include?("function linkModeLabel(user)") &&
-    auth_js.include?("pill: \"Device link\"") &&
-    auth_js.include?("mode: \"Sign in to connect\"") &&
-    auth_js.include?("mode: \"Approve Codex device\"") &&
-    auth_js.include?("updated: \"Awaiting account\"") &&
-    auth_js.include?("lastUpdated.textContent = linkLabel ? linkLabel.updated") &&
-    auth_js.include?("const linkLabel = linkModeLabel(currentUser);") &&
-    styles.include?("body[data-link-mode=\"pending\"] .workspace-grid") &&
-    styles.include?("body[data-link-mode=\"pending\"] .link-panel")
-end
-
 assert("signed-in account panel should not render the raw Firebase UID") do
   index.include?("<dt>Account</dt>") &&
     index.include?(%(id="auth-identity">Not signed in</dd>)) &&
@@ -303,18 +426,6 @@ assert("signed-in dashboard refresh should warn when cloud reads are partial") d
     auth_js.include?("setMessage(DASHBOARD_REFRESH_SUCCESS)")
 end
 
-assert("dashboard should expose a raw abstract sync payload inspector without auth headers") do
-  index.include?(%(data-panel="raw-sync")) &&
-    auth_js.include?("function rawSyncEventPayload(event)") &&
-    auth_js.include?("function renderRawSyncEvents(events)") &&
-    auth_js.include?('collection(db, "players", user.uid, "rewardEvents")') &&
-    auth_js.include?('orderBy("receivedAt", "desc")') &&
-    auth_js.include?("scoreSource") &&
-    auth_js.include?("serverCalculated") &&
-    !auth_js.include?("Authorization: Bearer") &&
-    !auth_js.include?("X-MCP-Miner-Device-Token")
-end
-
 assert("signed-in reports panel should show an empty state when no reports are synced") do
   auth_js.include?("No cloud reports have been synced yet.") &&
     auth_js.include?("function renderReports(reports)") &&
@@ -324,8 +435,17 @@ end
 assert("dashboard reads should stay owner-scoped under players/{uid}") do
   auth_js.scan(/doc\(db, "players", user\.uid/).length >= 7 &&
     auth_js.include?('collection(db, "players", user.uid, "inventory")') &&
-    auth_js.include?('collection(db, "players", user.uid, "orders")') &&
-    auth_js.include?('collection(db, "players", user.uid, "rewardEvents")')
+    auth_js.include?('collection(db, "players", user.uid, "orders")')
+end
+
+assert("billing panel should show annual copy and webhook-safe checkout state") do
+  index.include?("12 months for 11") &&
+    auth_js.include?("Pro unlocks only after Stripe confirms the subscription webhook.") &&
+    auth_js.include?("openBillingSession(\"createCheckoutSession\", { plan: \"pro_monthly\" })") &&
+    auth_js.include?("openBillingSession(\"createCheckoutSession\", { plan: \"pro_annual\" })") &&
+    auth_js.include?("openBillingSession(\"createCustomerPortalSession\")") &&
+    auth_js.include?("checkoutMonthly.disabled = !signedIn || verificationRequired || pro") &&
+    auth_js.include?("manageBilling.disabled = !signedIn || verificationRequired || !entitlement.providerCustomerId")
 end
 
 private_needles = %w[
@@ -353,8 +473,7 @@ end
 
 assert("privacy rows should stack on narrow mobile screens") do
   styles.include?("@media (max-width: 700px)") &&
-    styles.include?(".privacy-list li {\n    grid-template-columns: 1fr;\n    gap: 4px;\n  }") &&
-    styles.include?(".raw-sync-meta {\n    grid-template-columns: 1fr;\n    gap: 4px;\n  }")
+    styles.include?(".privacy-list li {\n    grid-template-columns: 1fr;\n    gap: 4px;\n  }")
 end
 
 assert("panel headings should stack on very narrow mobile screens") do
@@ -380,6 +499,7 @@ end
 assert("emulator dashboard smoke should exercise hosting and callable sync state") do
   smoke.include?("syncRewardEvents") &&
     smoke.include?("getSyncState") &&
+    smoke.include?("getDashboardAnalytics") &&
     smoke.include?("HOSTING_HOST") &&
     smoke.include?("eventChecksum")
 end

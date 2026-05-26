@@ -22,7 +22,7 @@
         <div class="brand-lockup">
           <img class="brand-mark" src="/assets/logo.png" alt="" aria-hidden="true">
           <div>
-            <p class="eyebrow">Firebase dashboard</p>
+            <p class="eyebrow">Space Mining Idle Game</p>
             <h1>MCP Miner</h1>
           </div>
         </div>
@@ -40,31 +40,6 @@
 
       <section class="workspace-grid">
         <aside class="side-rail" aria-label="Account and sync">
-          <section class="panel link-panel" data-panel="device-link" aria-labelledby="device-link-title" hidden>
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Codex link</p>
-                <h2 id="device-link-title">Connect Device</h2>
-              </div>
-              <span id="device-link-status" class="pill">Waiting</span>
-            </div>
-            <p id="device-link-summary" class="message">Sign in to approve this Codex device.</p>
-            <dl class="compact-list">
-              <div>
-                <dt>Code</dt>
-                <dd id="device-link-code">-</dd>
-              </div>
-              <div>
-                <dt>Data</dt>
-                <dd>Abstract game progress only</dd>
-              </div>
-            </dl>
-            <div class="actions">
-              <button id="approve-device-link" type="button" disabled>Approve</button>
-              <button id="reject-device-link" type="button" class="button-secondary" disabled>Reject</button>
-            </div>
-          </section>
-
           <section class="panel auth-panel" data-panel="auth" aria-labelledby="auth-title">
             <div class="panel-heading">
               <div>
@@ -115,6 +90,78 @@
             <p id="auth-message" class="message" role="status" aria-live="polite"></p>
           </section>
 
+          <section class="panel billing-panel" data-panel="billing" aria-labelledby="billing-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Pro sync</p>
+                <h2 id="billing-title">Subscription</h2>
+              </div>
+              <span id="billing-status" class="pill">Free</span>
+            </div>
+            <p id="billing-summary" class="message">Free sync batches every minute for one Codex device.</p>
+            <div id="plan-cards" class="plan-cards" role="list" aria-label="Subscription plans"></div>
+            <dl class="compact-list">
+              <div>
+                <dt>Plan</dt>
+                <dd id="billing-plan">Free</dd>
+              </div>
+              <div>
+                <dt>Devices</dt>
+                <dd id="billing-devices">1 Codex</dd>
+              </div>
+              <div>
+                <dt>Sync</dt>
+                <dd id="billing-sync">60 sec</dd>
+              </div>
+              <div>
+                <dt>Annual</dt>
+                <dd>12 months for 11</dd>
+              </div>
+            </dl>
+            <div class="actions billing-actions">
+              <button id="checkout-monthly" type="button">Monthly</button>
+              <button id="checkout-annual" type="button" class="button-secondary">Annual</button>
+              <button id="manage-billing" type="button" class="button-secondary">Manage</button>
+            </div>
+          </section>
+
+          <section class="panel link-panel" data-panel="device-link" aria-labelledby="device-link-title" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Codex link</p>
+                <h2 id="device-link-title">Connect Device</h2>
+              </div>
+              <span id="device-link-status" class="pill">Waiting</span>
+            </div>
+            <p id="device-link-summary" class="message">Sign in to approve this Codex device.</p>
+            <dl class="compact-list">
+              <div>
+                <dt>Code</dt>
+                <dd id="device-link-code">-</dd>
+              </div>
+              <div>
+                <dt>Data</dt>
+                <dd>Abstract game progress only</dd>
+              </div>
+            </dl>
+            <div class="actions">
+              <button id="approve-device-link" type="button" disabled>Approve</button>
+              <button id="reject-device-link" type="button" class="button-secondary" disabled>Reject</button>
+            </div>
+          </section>
+
+          <section class="panel devices-panel" data-panel="linked-devices" aria-labelledby="linked-devices-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Codex devices</p>
+                <h2 id="linked-devices-title">Linked Devices</h2>
+              </div>
+              <span id="linked-devices-usage" class="pill">0 / 1</span>
+            </div>
+            <p id="linked-devices-summary" class="message">Sign in to manage connected Codex computers.</p>
+            <div id="linked-devices-list" class="device-list"></div>
+          </section>
+
           <section class="panel" data-panel="sync-privacy" aria-labelledby="sync-title">
             <div class="panel-heading">
               <div>
@@ -135,6 +182,14 @@
               <div>
                 <dt>Conflicts</dt>
                 <dd id="sync-conflicts">None</dd>
+              </div>
+              <div>
+                <dt>Cadence</dt>
+                <dd id="sync-cadence">60 sec</dd>
+              </div>
+              <div>
+                <dt>Next sync</dt>
+                <dd id="sync-next-refresh">Manual</dd>
               </div>
             </dl>
             <ul id="privacy-list" class="privacy-list"></ul>
@@ -170,6 +225,57 @@
               <span>Cloud Events</span>
               <strong id="metric-events">0</strong>
             </article>
+          </section>
+
+          <section class="panel panel-wide analytics-panel" data-panel="analytics" aria-labelledby="analytics-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Portal analytics</p>
+                <h2 id="analytics-title">History Trends</h2>
+              </div>
+              <span id="analytics-summary" class="pill">7 day history</span>
+            </div>
+            <div id="analytics-list" class="analytics-list"></div>
+            <div class="actions export-actions">
+              <button id="export-json" type="button" class="button-secondary" disabled>JSON</button>
+              <button id="export-csv" type="button" class="button-secondary" disabled>CSV</button>
+            </div>
+            <p id="export-status" class="message" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="panel panel-wide digest-panel" data-panel="weekly-digest" aria-labelledby="weekly-digest-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Pro weekly digest</p>
+                <h2 id="weekly-digest-title">Week In The Belt</h2>
+              </div>
+              <span id="weekly-digest-status" class="pill">Pro</span>
+            </div>
+            <div id="weekly-digest-summary" class="digest-summary"></div>
+            <div id="weekly-digest-list" class="digest-list"></div>
+            <div class="preference-grid">
+              <label class="toggle-row">
+                <input id="weekly-digest-enabled" type="checkbox">
+                <span>Weekly digest</span>
+              </label>
+              <label class="toggle-row">
+                <input id="beta-features-enabled" type="checkbox">
+                <span>Beta features</span>
+              </label>
+              <span id="beta-access-status" class="pill">Beta off</span>
+            </div>
+          </section>
+
+          <section class="panel panel-wide cosmetics-panel" data-panel="cosmetics" aria-labelledby="cosmetics-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Profile cosmetics</p>
+                <h2 id="cosmetics-title">Suit And Portal Style</h2>
+              </div>
+              <span id="cosmetics-summary" class="pill">Free styles</span>
+            </div>
+            <div id="cosmetics-list" class="cosmetics-list"></div>
+            <p id="cosmetics-status" class="message" role="status" aria-live="polite"></p>
           </section>
 
           <section class="dashboard-grid">

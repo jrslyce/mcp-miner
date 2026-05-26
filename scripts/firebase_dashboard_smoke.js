@@ -116,16 +116,47 @@ async function main() {
   if (!stateResult.result || !stateResult.result.state || stateResult.result.state.eventCount < 1) {
     throw new Error(`dashboard sync state missing reduced event: ${JSON.stringify(stateResult)}`);
   }
+  const analyticsResult = await requestJson(callableUrl("getDashboardAnalytics"), {
+    method: "POST",
+    headers: authHeaders(auth.idToken),
+    body: JSON.stringify({ data: {} })
+  });
+  if (!analyticsResult.result || !analyticsResult.result.trends || analyticsResult.result.retention.days !== 7) {
+    throw new Error(`dashboard analytics missing limited Free history: ${JSON.stringify(analyticsResult)}`);
+  }
+  const digestResult = await requestJson(callableUrl("getWeeklyDigest"), {
+    method: "POST",
+    headers: authHeaders(auth.idToken),
+    body: JSON.stringify({ data: {} })
+  });
+  if (!digestResult.result || !digestResult.result.weeklyDigest || digestResult.result.weeklyDigest.status !== "locked") {
+    throw new Error(`dashboard digest should be locked for Free: ${JSON.stringify(digestResult)}`);
+  }
+  const cosmeticsResult = await requestJson(callableUrl("getCosmeticCatalog"), {
+    method: "POST",
+    headers: authHeaders(auth.idToken),
+    body: JSON.stringify({ data: {} })
+  });
+  if (!cosmeticsResult.result || !cosmeticsResult.result.cosmetics || !cosmeticsResult.result.cosmetics.noProgressionEffects) {
+    throw new Error(`dashboard cosmetics missing visual-only catalog: ${JSON.stringify(cosmeticsResult)}`);
+  }
 
   const indexHtml = await requestText(`http://${HOSTING_HOST}/`);
   const dashboardJs = await requestText(`http://${HOSTING_HOST}/auth.js`);
-  const requiredPanels = ["status", "inventory", "orders", "asteroid", "asteroid-atlas", "upgrades", "store", "reports", "sync-privacy"];
+  const planCatalog = JSON.parse(await requestText(`http://${HOSTING_HOST}/subscription-plans.json`));
+  const requiredPanels = ["status", "analytics", "weekly-digest", "cosmetics", "inventory", "orders", "asteroid", "asteroid-atlas", "upgrades", "store", "reports", "sync-privacy", "billing", "linked-devices"];
   const missingPanels = requiredPanels.filter((panel) => !indexHtml.includes(`data-panel="${panel}"`));
   if (missingPanels.length) {
     throw new Error(`dashboard hosting response missing panels: ${missingPanels.join(", ")}`);
   }
-  if (!dashboardJs.includes("getSyncState") || !dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("ASTEROID_CLASSES")) {
+  if (!dashboardJs.includes("getSyncState") || !dashboardJs.includes("getDashboardAnalytics") || !dashboardJs.includes("exportDashboardHistory") || !dashboardJs.includes("getWeeklyDigest") || !dashboardJs.includes("getCosmeticCatalog") || !dashboardJs.includes("applyCosmeticSelection") || !dashboardJs.includes("DEMO_DASHBOARD") || !dashboardJs.includes("ASTEROID_CLASSES") || !dashboardJs.includes("createCheckoutSession") || !dashboardJs.includes("revokeSyncDevice") || !dashboardJs.includes("schedulePortalRefresh")) {
     throw new Error("dashboard module missing Firebase sync or demo-mode support");
+  }
+  if (!indexHtml.includes("id=\"sync-cadence\"") || !indexHtml.includes("id=\"sync-next-refresh\"")) {
+    throw new Error("dashboard hosting response missing sync cadence status fields");
+  }
+  if (!indexHtml.includes("id=\"plan-cards\"") || planCatalog.annualMonthsCharged !== 11 || planCatalog.plans.length !== 3) {
+    throw new Error("dashboard hosting response missing subscription plan catalog");
   }
 
   console.log(JSON.stringify({
@@ -134,6 +165,9 @@ async function main() {
     uid: auth.localId,
     accepted: syncResult.result.accepted.length,
     eventCount: stateResult.result.state.eventCount,
+    analyticsHistory: analyticsResult.result.history.length,
+    digestStatus: digestResult.result.weeklyDigest.status,
+    cosmetics: cosmeticsResult.result.cosmetics.items.length,
     hostingPanels: requiredPanels
   }, null, 2));
 }

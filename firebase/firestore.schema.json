@@ -51,7 +51,7 @@
     "players/{uid}/settings/current": {
       "owner": "uid",
       "clientAccess": ["read", "create", "update"],
-      "fields": ["ownerUid", "schemaVersion", "updatedAt", "privacyClass", "reportMode", "cloudSyncEnabled", "dashboardTheme", "appCheckDebugEnabled"]
+      "fields": ["ownerUid", "schemaVersion", "updatedAt", "privacyClass", "reportMode", "cloudSyncEnabled", "dashboardTheme", "appCheckDebugEnabled", "weeklyDigestEnabled", "betaFeaturesEnabled"]
     },
     "players/{uid}/syncMetadata/{clientId}": {
       "owner": "uid",
@@ -64,11 +64,19 @@
       "serverOwned": true,
       "fields": ["ownerUid", "deviceId", "deviceName", "status", "privacyClass", "scopes", "createdAt", "updatedAt", "lastUsedAt", "revokedAt", "linkSessionId"]
     },
+    "players/{uid}/billing/current": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true,
+      "sourceOfTruth": "stripe",
+      "fields": ["ownerUid", "schemaVersion", "privacyClass", "plan", "billingStatus", "provider", "providerCustomerId", "providerSubscriptionId", "providerTransactionId", "providerRenewalState", "providerWalletReference", "providerEnvironment", "providerBetaOnly", "currentPeriodEnd", "cancelAtPeriodEnd", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "features", "updatedAt", "supportMarkedStaleAt", "supportReconciledAt"]
+    },
     "players/{uid}/entitlements/current": {
       "owner": "uid",
       "clientAccess": ["read"],
       "serverOwned": true,
-      "fields": ["plan", "billingStatus", "provider", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "updatedAt"]
+      "projectionOf": "players/{uid}/billing/current",
+      "fields": ["ownerUid", "schemaVersion", "privacyClass", "plan", "billingStatus", "provider", "providerCustomerId", "providerSubscriptionId", "currentPeriodEnd", "cancelAtPeriodEnd", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "features", "updatedAt"]
     },
     "players/{uid}/rewardEvents/{eventId}": {
       "owner": "uid",
@@ -102,6 +110,12 @@
       "clientAccess": ["read"],
       "serverOwned": true
     },
+    "players/{uid}/cosmetics/current": {
+      "owner": "uid",
+      "clientAccess": ["read"],
+      "serverOwned": true,
+      "fields": ["ownerUid", "schemaVersion", "privacyClass", "applied", "ownedCosmeticIds", "retainedCosmeticIds", "updatedAt", "noProgressionEffects"]
+    },
     "linkSessions/{sessionId}": {
       "owner": "server",
       "clientAccess": [],
@@ -119,6 +133,18 @@
       "clientAccess": [],
       "serverOwned": true,
       "fields": ["uid", "deviceId", "deviceName", "status", "privacyClass", "scopes", "createdAt", "updatedAt", "lastUsedAt", "revokedAt", "linkSessionId"]
+    },
+    "billingWebhookEvents/{eventId}": {
+      "owner": "server",
+      "clientAccess": [],
+      "serverOwned": true,
+      "fields": ["provider", "providerEventId", "eventType", "receivedAt", "processedAt", "status", "reason", "uid", "plan", "providerTransactionId", "providerRenewalState", "betaOnly", "rawPayloadStorageRef"]
+    },
+    "supportAuditLogs/{auditId}": {
+      "owner": "server",
+      "clientAccess": [],
+      "serverOwned": true,
+      "fields": ["actor", "targetUid", "action", "result", "reason", "privacyClass", "details", "createdAt"]
     }
   }
 }
