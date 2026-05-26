@@ -22,6 +22,7 @@ Validated contents:
 - `base_modules.yaml`: starting base modules and unlockable base systems.
 - `player_start.yaml`: starting inventory, unlocked machine, starting asteroid, upgrades, and report mode.
 - `report_templates.yaml`: compact, full, no-progress, order-progress, and milestone report text.
+- `subscription_plans.yaml`: Free, Pro Monthly, and Pro Annual pricing, provider price references, entitlements, copy, and downgrade behavior.
 
 Implementation rule:
 

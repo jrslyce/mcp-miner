@@ -26,6 +26,7 @@ REQUIRED_FILES = %w[
   player_start.yaml
   report_templates.yaml
   balance_constants.yaml
+  subscription_plans.yaml
 ].freeze
 
 WORK_CATEGORIES = %w[
@@ -144,6 +145,7 @@ class Validator
     validate_hazards
     validate_player_start
     validate_reports
+    validate_subscription_plans
     finish
   end
 
@@ -585,6 +587,28 @@ class Validator
     end
   end
 
+  def validate_subscription_plans
+    pricing = subscription_pricing
+    context = file_context("subscription_plans.yaml", "subscription_pricing")
+    require_keys(pricing, context, %w[currency supported_currencies trial_eligibility grace_period_days annual_months_charged provider_price_ids])
+    supported = Array(pricing["supported_currencies"])
+    error("#{context}.currency must be supported") unless supported.include?(pricing["currency"])
+    error("#{context}.currency must be usd") unless pricing["currency"] == "usd"
+    positive_integer(pricing["grace_period_days"], "#{context}.grace_period_days", allow_zero: true)
+    positive_integer(pricing["annual_months_charged"], "#{context}.annual_months_charged")
+    error("#{context}.annual_months_charged must be 11") unless pricing["annual_months_charged"] == 11
+
+    trial = pricing["trial_eligibility"] || {}
+    require_keys(trial, "#{context}.trial_eligibility", %w[enabled days one_trial_per_account])
+    error("#{context}.trial_eligibility.enabled must be boolean") unless boolean?(trial["enabled"])
+    positive_integer(trial["days"], "#{context}.trial_eligibility.days", allow_zero: true)
+    error("#{context}.trial_eligibility.one_trial_per_account must be boolean") unless boolean?(trial["one_trial_per_account"])
+
+    validate_provider_price_ids(pricing["provider_price_ids"], context)
+    validate_subscription_plan_entries(pricing)
+    validate_downgrade_policy
+  end
+
   def finish
     if @errors.any?
       warn "Data validation failed:"
@@ -600,6 +624,144 @@ class Validator
     puts "  asteroid classes: #{asteroid_classes.length}"
     puts "  upgrades: #{upgrades.length}"
     puts "  hazards: #{hazards.length}"
+    puts "  subscription plans: #{subscription_plans.length}"
+  end
+
+  def validate_provider_price_ids(provider_price_ids, context)
+    unless provider_price_ids.is_a?(Hash)
+      error("#{context}.provider_price_ids must be a hash")
+      return
+    end
+
+    %w[stripe crypto_wallet].each do |provider|
+      %w[test live].each do |environment|
+        %w[pro_monthly pro_annual].each do |plan_id|
+          value = provider_price_ids.dig(provider, environment, plan_id)
+          unless value.is_a?(String) && !value.empty?
+            error("#{context}.provider_price_ids.#{provider}.#{environment}.#{plan_id} must be configured")
+          end
+        end
+      end
+    end
+  end
+
+  def validate_subscription_plan_entries(pricing)
+    ids = Set.new
+    subscription_plans.each do |plan|
+      context = file_context("subscription_plans.yaml", "plan #{plan['id'] || '(missing id)'}")
+      require_keys(plan, context, %w[id public_name internal_name billing_interval monthly_price_cents annual_price_cents short_copy privacy_copy progression_copy entitlements])
+      error("duplicate subscription plan id #{plan['id']}") unless ids.add?(plan["id"])
+      error("#{context}.public_name must be present") unless plan["public_name"].is_a?(String) && !plan["public_name"].empty?
+      error("#{context}.short_copy must be present") unless plan["short_copy"].is_a?(String) && !plan["short_copy"].empty?
+      error("#{context}.privacy_copy must mention privacy-safe sync boundaries") unless plan["privacy_copy"].to_s.match?(/not prompts, code, files, terminal output, or transcripts/)
+      error("#{context}.progression_copy must reject pay-to-win progression") unless plan["progression_copy"].to_s.match?(/Does not boost mining output/)
+      validate_subscription_entitlements(plan["entitlements"], context)
+    end
+
+    expected_ids = %w[free pro_monthly pro_annual]
+    error("data/subscription_plans.yaml must define exactly #{expected_ids.join(', ')} plans") unless ids == Set.new(expected_ids)
+
+    plan_map = subscription_plans.each_with_object({}) { |plan, acc| acc[plan["id"]] = plan }
+    free = plan_map["free"] || {}
+    pro_monthly = plan_map["pro_monthly"] || {}
+    pro_annual = plan_map["pro_annual"] || {}
+
+    validate_free_plan(free)
+    validate_pro_plan(pro_monthly, "pro_monthly")
+    validate_pro_plan(pro_annual, "pro_annual")
+
+    monthly_price = pro_monthly["monthly_price_cents"]
+    annual_price = pro_annual["annual_price_cents"]
+    months_charged = pricing["annual_months_charged"]
+    if [monthly_price, annual_price, months_charged].all? { |value| value.is_a?(Integer) }
+      unless annual_price == monthly_price * months_charged
+        error("data/subscription_plans.yaml pro_annual annual_price_cents must equal pro_monthly monthly_price_cents * annual_months_charged")
+      end
+    end
+    if pro_annual["monthly_price_cents"].is_a?(Integer) && monthly_price.is_a?(Integer)
+      error("data/subscription_plans.yaml pro_annual monthly_price_cents must match pro_monthly monthly_price_cents") unless pro_annual["monthly_price_cents"] == monthly_price
+    end
+    unless pro_monthly["entitlements"] == pro_annual["entitlements"]
+      error("data/subscription_plans.yaml pro_annual entitlements must match pro_monthly entitlements")
+    end
+  end
+
+  def validate_subscription_entitlements(entitlements, context)
+    require_keys(
+      entitlements,
+      "#{context}.entitlements",
+      %w[
+        max_codex_devices
+        sync_cadence_seconds
+        near_real_time_sync
+        manual_refresh
+        device_management
+        backup_restore
+        history_retention_days
+        advanced_dashboard
+        premium_cosmetics
+        weekly_digest
+        exports
+        priority_beta_access
+      ]
+    )
+    return unless entitlements.is_a?(Hash)
+
+    positive_integer(entitlements["max_codex_devices"], "#{context}.entitlements.max_codex_devices")
+    positive_integer(entitlements["sync_cadence_seconds"], "#{context}.entitlements.sync_cadence_seconds")
+    positive_integer(entitlements["history_retention_days"], "#{context}.entitlements.history_retention_days")
+    %w[
+      near_real_time_sync
+      manual_refresh
+      device_management
+      backup_restore
+      advanced_dashboard
+      premium_cosmetics
+      weekly_digest
+      exports
+      priority_beta_access
+    ].each do |key|
+      error("#{context}.entitlements.#{key} must be boolean") unless boolean?(entitlements[key])
+    end
+  end
+
+  def validate_free_plan(plan)
+    context = file_context("subscription_plans.yaml", "free")
+    error("#{context}.billing_interval must be none") unless plan["billing_interval"] == "none"
+    error("#{context}.monthly_price_cents must be 0") unless plan["monthly_price_cents"] == 0
+    error("#{context}.annual_price_cents must be 0") unless plan["annual_price_cents"] == 0
+    error("#{context} entitlements.max_codex_devices must be 1") unless plan.dig("entitlements", "max_codex_devices") == 1
+    error("#{context} entitlements.sync_cadence_seconds must be 60") unless plan.dig("entitlements", "sync_cadence_seconds") == 60
+    error("#{context} entitlements.near_real_time_sync must be false") unless plan.dig("entitlements", "near_real_time_sync") == false
+  end
+
+  def validate_pro_plan(plan, id)
+    context = file_context("subscription_plans.yaml", id)
+    expected_interval = id == "pro_annual" ? "annual" : "monthly"
+    error("#{context}.billing_interval must be #{expected_interval}") unless plan["billing_interval"] == expected_interval
+    positive_integer(plan["monthly_price_cents"], "#{context}.monthly_price_cents")
+    if id == "pro_monthly"
+      error("#{context}.annual_price_cents must be null") unless plan["annual_price_cents"].nil?
+    else
+      positive_integer(plan["annual_price_cents"], "#{context}.annual_price_cents")
+    end
+    error("#{context} entitlements.max_codex_devices must be 5") unless plan.dig("entitlements", "max_codex_devices") == 5
+    error("#{context} entitlements.sync_cadence_seconds must be less than 60") unless plan.dig("entitlements", "sync_cadence_seconds").is_a?(Integer) && plan.dig("entitlements", "sync_cadence_seconds") < 60
+    error("#{context} entitlements.near_real_time_sync must be true") unless plan.dig("entitlements", "near_real_time_sync") == true
+  end
+
+  def validate_downgrade_policy
+    policy = @data["subscription_plans.yaml"]["downgrade_policy"] || {}
+    context = file_context("subscription_plans.yaml", "downgrade_policy")
+    require_keys(policy, context, %w[effective_at entitlement_after_cancellation failed_payment_grace_period_days max_active_devices_after_downgrade extra_devices_after_downgrade history_after_downgrade backup_restore_after_downgrade support_summary])
+    error("#{context}.effective_at must be subscription_period_end") unless policy["effective_at"] == "subscription_period_end"
+    error("#{context}.entitlement_after_cancellation must be free") unless policy["entitlement_after_cancellation"] == "free"
+    positive_integer(policy["failed_payment_grace_period_days"], "#{context}.failed_payment_grace_period_days", allow_zero: true)
+    error("#{context}.failed_payment_grace_period_days must match subscription_pricing.grace_period_days") unless policy["failed_payment_grace_period_days"] == subscription_pricing["grace_period_days"]
+    error("#{context}.max_active_devices_after_downgrade must be 1") unless policy["max_active_devices_after_downgrade"] == 1
+    %w[extra_devices_after_downgrade history_after_downgrade backup_restore_after_downgrade support_summary].each do |key|
+      error("#{context}.#{key} must be clear user/support copy") unless policy[key].is_a?(String) && policy[key].length >= 24
+    end
   end
 
   def validate_upgrade_effect(effect, context)
@@ -885,6 +1047,14 @@ class Validator
 
   def work_events
     @data["work_scoring.yaml"]["work_events"] || []
+  end
+
+  def subscription_pricing
+    @data["subscription_plans.yaml"]["subscription_pricing"] || {}
+  end
+
+  def subscription_plans
+    @data["subscription_plans.yaml"]["plans"] || []
   end
 end
 
