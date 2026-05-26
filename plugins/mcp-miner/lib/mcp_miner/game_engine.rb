@@ -27,6 +27,11 @@ module McpMiner
     DEFAULT_FUNCTIONS_ORIGIN = "https://us-central1-mcp-miner.cloudfunctions.net"
     DEFAULT_DASHBOARD_URL = "https://mcp-miner.web.app"
     DEFAULT_SYNC_CADENCE_SECONDS = 60
+    REPORT_ICON_DATA_URI = "data:image/svg+xml;base64," \
+      "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+" \
+      "PHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiByeD0iMyIgZmlsbD0iIzJmN2Q2ZCIvPjxjaXJjbGUgY3g9Ijgi" \
+      "IGN5PSI4IiByPSI0IiBmaWxsPSIjZDVmNmRlIi8+PC9zdmc+"
+    REPORT_ICON_MARKDOWN = "![MCP Miner](#{REPORT_ICON_DATA_URI})"
     CURRENT_STATE_SCHEMA_VERSION = 1
     MAX_DEDUPE_KEYS = 300
     REPORT_PREFIX = "MCP Miner:"
@@ -553,6 +558,10 @@ module McpMiner
       turn = state["current_turn"] || {}
       template_key = report_template_key(state, mode)
       fill_report_template(report_template(template_key), report_values(state, turn))
+    end
+
+    def display_report(report)
+      decorate_report(report)
     end
 
     def record_report(state, report, turn_id:)
@@ -4568,6 +4577,13 @@ module McpMiner
       @data.dig(:reports, key)&.first ||
         @data.dig(:reports, "compact")&.first ||
         "#{REPORT_PREFIX} +{chonks} Chonks, {material_summary}, {order_summary}."
+    end
+
+    def decorate_report(report)
+      text = safe_string(report)
+      return text if text.start_with?("![MCP Miner](")
+
+      "#{REPORT_ICON_MARKDOWN} #{text}"
     end
 
     def report_values(state, turn)

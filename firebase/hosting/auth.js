@@ -481,6 +481,50 @@ const AUTH_ERROR_MESSAGES = {
   "auth/weak-password": "Use a password with at least 6 characters.",
   "auth/wrong-password": "Email or password did not match an MCP Miner account."
 };
+const LINK_STATE_MESSAGES = {
+  approved: {
+    label: "Approved",
+    summary: "Device approved. Return to Codex and run complete_account_link."
+  },
+  rejected: {
+    label: "Rejected",
+    summary: "Device link rejected. Start a new link from Codex if you want to connect later."
+  },
+  expired: {
+    label: "Expired",
+    summary: "This link code expired. Return to Codex and start a new account link."
+  },
+  invalid: {
+    label: "Invalid link",
+    summary: "This link code was not found. Return to Codex and start a new account link."
+  },
+  alreadyApproved: {
+    label: "Already approved",
+    summary: "This Codex device was already approved. Return to Codex and complete the account link."
+  },
+  alreadyExchanged: {
+    label: "Completed",
+    summary: "This link was already completed. Return to Codex or start a new link for another device."
+  },
+  approving: {
+    label: "Approving",
+    summary: "Approving this Codex device for abstract MCP Miner game progress sync."
+  },
+  rejecting: {
+    label: "Rejecting",
+    summary: "Rejecting this Codex device link."
+  }
+};
+const LINK_LOCKED_STATES = new Set(["approved", "rejected", "expired", "invalid", "alreadyApproved", "alreadyExchanged", "approving", "rejecting"]);
+const LINK_ERROR_MESSAGES = [
+  { status: "expired", patterns: ["expired"], message: LINK_STATE_MESSAGES.expired.summary },
+  { status: "invalid", patterns: ["not_found", "not-found", "not found"], message: LINK_STATE_MESSAGES.invalid.summary },
+  { status: "alreadyApproved", patterns: ["already_approved", "already approved"], message: LINK_STATE_MESSAGES.alreadyApproved.summary },
+  { status: "alreadyExchanged", patterns: ["already_exchanged", "already exchanged", "exchanged"], message: LINK_STATE_MESSAGES.alreadyExchanged.summary },
+  { status: "rejected", patterns: ["already_rejected", "link session rejected", " rejected"], message: LINK_STATE_MESSAGES.rejected.summary },
+  { status: "invalid", patterns: ["invalid-argument", "invalid argument", "permission-denied", "permission denied"], message: "This link could not be verified. Return to Codex and start a new account link." },
+  { status: "waiting", patterns: ["unauthenticated"], message: "Sign in before approving this Codex device." }
+];
 const FORM_VALIDATION_MESSAGE = "Check the highlighted email and password fields.";
 const DASHBOARD_REFRESH_SUCCESS = "Dashboard refreshed.";
 const DASHBOARD_REFRESH_PARTIAL = "Some cloud data could not be refreshed. Showing available owner data.";
@@ -666,6 +710,7 @@ let activeCosmeticPreview = null;
 let activeAsteroidVisual = ASTEROID_CLASSES[0];
 let activeAsteroidProgress = 0;
 let asteroidAnimationStarted = false;
+let deviceLinkState = "waiting";
 let verificationEmailSentAt = 0;
 let portalRefreshTimer = null;
 let portalRefreshInFlight = false;
@@ -1061,45 +1106,123 @@ function hasPendingLink() {
   return Boolean(pendingLink.sessionId || pendingLink.code);
 }
 
-function renderDeviceLink(user, status = "waiting") {
+function setLinkMode() {
+  document.body.dataset.linkMode = hasPendingLink() ? "pending" : "dashboard";
+}
+
+function linkModeLabel(user) {
+  if (!hasPendingLink()) {
+    return null;
+  }
+  if (deviceLinkState === "approved") {
+    return {
+      pill: "Approved",
+      mode: "Return to Codex",
+      source: "Codex link request",
+      updated: "Link approved"
+    };
+  }
+  if (deviceLinkState === "rejected") {
+    return {
+      pill: "Rejected",
+      mode: "Start a new link",
+      source: "Codex link request",
+      updated: "Link rejected"
+    };
+  }
+  if (LINK_STATE_MESSAGES[deviceLinkState] && LINK_LOCKED_STATES.has(deviceLinkState)) {
+    return {
+      pill: LINK_STATE_MESSAGES[deviceLinkState].label,
+      mode: "Start a new link",
+      source: "Codex link request",
+      updated: LINK_STATE_MESSAGES[deviceLinkState].label
+    };
+  }
+  if (!user) {
+    return {
+      pill: "Device link",
+      mode: "Sign in to connect",
+      source: "Codex link request",
+      updated: "Awaiting account"
+    };
+  }
+  if (requiresEmailVerification(user)) {
+    return {
+      pill: "Verify email",
+      mode: "Verify before approval",
+      source: "Codex link request",
+      updated: "Awaiting verification"
+    };
+  }
+  return {
+    pill: "Ready to approve",
+    mode: "Approve Codex device",
+    source: "Codex link request",
+    updated: "Awaiting approval"
+  };
+}
+
+function renderLinkModeHeader(user = currentUser) {
+  const linkLabel = linkModeLabel(user);
+  if (!linkLabel) {
+    return false;
+  }
+  connectionPill.textContent = linkLabel.pill;
+  dashboardMode.textContent = linkLabel.mode;
+  dashboardSource.textContent = linkLabel.source;
+  lastUpdated.textContent = linkLabel.updated;
+  return true;
+}
+
+function friendlyLinkMessage(error) {
+  const raw = `${(error && error.code) || ""} ${(error && error.message) || ""}`.toLowerCase();
+  return LINK_ERROR_MESSAGES.find((entry) => entry.patterns.some((pattern) => raw.includes(pattern))) || {
+    status: "invalid",
+    message: "This link could not be updated. Return to Codex and start a new account link."
+  };
+}
+
+function deviceLinkContent(user, status) {
+  if (LINK_STATE_MESSAGES[status]) {
+    return LINK_STATE_MESSAGES[status];
+  }
+  if (!user) {
+    return {
+      label: "Sign in",
+      summary: "Use Google, Sign In, or Create Account below to approve this Codex device. Approval syncs only abstract MCP Miner game progress."
+    };
+  }
+  if (requiresEmailVerification(user)) {
+    return {
+      label: "Verify email",
+      summary: "Verify your email, then refresh this dashboard before approving this Codex device. Codex sync uses only abstract game progress after approval."
+    };
+  }
+  return {
+    label: "Ready",
+    summary: "Approve this Codex device to sync Chonks, inventory, orders, upgrades, and abstract event counts. Prompts, code, commands, paths, repo names, terminal output, browser content, OpenAI account data, and transcripts are not synced."
+  };
+}
+
+function renderDeviceLink(user, status = deviceLinkState) {
   if (!hasPendingLink()) {
     deviceLinkPanel.hidden = true;
     return;
   }
 
+  setLinkMode();
+  deviceLinkState = status;
   const signedIn = Boolean(user);
   const verificationRequired = requiresEmailVerification(user);
+  const linkLocked = LINK_LOCKED_STATES.has(status);
+  const content = deviceLinkContent(user, status);
   deviceLinkPanel.hidden = false;
   deviceLinkCode.textContent = pendingLink.code || "From link";
-  approveDeviceLink.disabled = !signedIn || verificationRequired || status === "approved" || status === "rejected";
-  rejectDeviceLink.disabled = !signedIn || verificationRequired || status === "approved" || status === "rejected";
-
-  if (!signedIn) {
-    deviceLinkStatus.textContent = "Sign in";
-    deviceLinkSummary.textContent = "Sign in to approve this Codex device. Approval syncs only abstract MCP Miner game progress.";
-    return;
-  }
-
-  if (verificationRequired) {
-    deviceLinkStatus.textContent = "Verify email";
-    deviceLinkSummary.textContent = "Verify your email before approving this Codex device. Codex sync uses only abstract game progress after approval.";
-    return;
-  }
-
-  if (status === "approved") {
-    deviceLinkStatus.textContent = "Approved";
-    deviceLinkSummary.textContent = "Device approved. Return to Codex and run complete_account_link.";
-    return;
-  }
-
-  if (status === "rejected") {
-    deviceLinkStatus.textContent = "Rejected";
-    deviceLinkSummary.textContent = "Device link rejected. Codex will not receive a sync token.";
-    return;
-  }
-
-  deviceLinkStatus.textContent = "Ready";
-  deviceLinkSummary.textContent = "Approve this Codex device to sync Chonks, inventory, orders, upgrades, and abstract event counts. Prompts, code, commands, paths, repo names, terminal output, browser content, OpenAI account data, and transcripts are not synced.";
+  approveDeviceLink.disabled = !signedIn || verificationRequired || linkLocked;
+  rejectDeviceLink.disabled = !signedIn || verificationRequired || linkLocked;
+  deviceLinkStatus.textContent = content.label;
+  deviceLinkSummary.textContent = content.summary;
+  renderLinkModeHeader(user);
 }
 
 async function submitDeviceLink(action) {
@@ -1109,12 +1232,11 @@ async function submitDeviceLink(action) {
   }
 
   const callable = httpsCallable(functions, action === "approve" ? "approveLinkSession" : "rejectLinkSession");
-  approveDeviceLink.disabled = true;
-  rejectDeviceLink.disabled = true;
+  renderDeviceLink(currentUser, action === "approve" ? "approving" : "rejecting");
   try {
     await reloadCurrentUser();
     if (requiresEmailVerification(currentUser)) {
-      renderDeviceLink(currentUser);
+      renderDeviceLink(currentUser, "waiting");
       setMessage(EMAIL_VERIFICATION_REQUIRED, true);
       return;
     }
@@ -1125,8 +1247,9 @@ async function submitDeviceLink(action) {
     renderDeviceLink(currentUser, action === "approve" ? "approved" : "rejected");
     setMessage(action === "approve" ? "Codex device approved." : "Codex device rejected.");
   } catch (error) {
-    renderDeviceLink(currentUser);
-    setMessage(error.message || "Device link update failed.", true);
+    const friendly = friendlyLinkMessage(error);
+    renderDeviceLink(currentUser, friendly.status);
+    setMessage(friendly.message, true);
   }
 }
 
@@ -1733,10 +1856,11 @@ function renderDashboard(data) {
   const hasCloudState = Boolean(data.hasCloudState);
   const conflictState = syncMetadata.conflictState || syncMetadata.conflict_state || (numberValue(syncMetadata.rejectedCount || syncMetadata.rejected_count) > 0 ? "needs review" : "none");
 
-  connectionPill.textContent = currentUser ? "Signed in" : "Demo mode";
-  dashboardMode.textContent = data.mode || (currentUser ? "Cloud profile ready" : "Signed-out demo");
-  dashboardSource.textContent = data.source || "Local demo snapshot";
-  lastUpdated.textContent = timestampLabel(cloudState.updatedAt || syncMetadata.updatedAt || new Date());
+  const linkLabel = linkModeLabel(currentUser);
+  connectionPill.textContent = linkLabel ? linkLabel.pill : (currentUser ? "Signed in" : "Demo mode");
+  dashboardMode.textContent = linkLabel ? linkLabel.mode : (data.mode || (currentUser ? "Cloud profile ready" : "Signed-out demo"));
+  dashboardSource.textContent = linkLabel ? linkLabel.source : (data.source || "Local demo snapshot");
+  lastUpdated.textContent = linkLabel ? linkLabel.updated : timestampLabel(cloudState.updatedAt || syncMetadata.updatedAt || new Date());
   metricSpaceBucks.textContent = formatNumber(data.player && data.player.spaceBucks);
   metricChonks.textContent = formatNumber(materialQuantity(inventory, "mat_chonks"));
   metricSuit.textContent = formatPercent(data.player && data.player.suitCondition);
@@ -2607,6 +2731,7 @@ storeList.addEventListener("click", (event) => {
 onAuthStateChanged(auth, async (user) => {
   const previousUser = currentUser;
   currentUser = user;
+  setLinkMode();
   updateAuthControls(user);
   renderDeviceLink(user);
   if (!user) {
@@ -2661,5 +2786,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 applyTheme(preferredTheme());
+setLinkMode();
+renderDeviceLink(currentUser);
 renderDashboard(cloneDemo());
 loadPlanCatalog();

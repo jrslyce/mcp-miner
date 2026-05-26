@@ -82,6 +82,11 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
   ].all? { |id| index.include?(%(id="#{id}")) }
 end
 
+assert("dashboard brand copy should describe the game instead of Firebase infrastructure") do
+  index.include?(%(<p class="eyebrow">Space Mining Idle Game</p>)) &&
+    !index.include?(%(<p class="eyebrow">Firebase dashboard</p>))
+end
+
 assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo mode") do
   %w[
     getAuth
@@ -342,6 +347,43 @@ assert("password auth should require email verification before cloud sync and de
     auth_js.include?("await currentUser.getIdToken(true)")
 end
 
+assert("link URLs should promote device linking above the demo dashboard") do
+  index.index(%(data-panel="device-link")) < index.index(%(data-panel="auth")) &&
+    auth_js.include?("const pendingLink = {") &&
+    auth_js.include?("function setLinkMode()") &&
+    auth_js.include?("document.body.dataset.linkMode = hasPendingLink() ? \"pending\" : \"dashboard\"") &&
+    auth_js.include?("function linkModeLabel(user)") &&
+    auth_js.include?("pill: \"Device link\"") &&
+    auth_js.include?("mode: \"Sign in to connect\"") &&
+    auth_js.include?("mode: \"Approve Codex device\"") &&
+    auth_js.include?("updated: \"Awaiting account\"") &&
+    auth_js.include?("lastUpdated.textContent = linkLabel ? linkLabel.updated") &&
+    auth_js.include?("const linkLabel = linkModeLabel(currentUser);") &&
+    styles.include?("body[data-link-mode=\"pending\"] .workspace-grid") &&
+    styles.include?("body[data-link-mode=\"pending\"] .link-panel")
+end
+
+assert("device link flow should expose clear account, verification, terminal, and error states") do
+  index.include?(">Create Account</button>") &&
+    auth_js.include?("const LINK_STATE_MESSAGES = {") &&
+    auth_js.include?("const LINK_ERROR_MESSAGES = [") &&
+    auth_js.include?("let deviceLinkState = \"waiting\"") &&
+    auth_js.include?("function friendlyLinkMessage(error)") &&
+    auth_js.include?("function deviceLinkContent(user, status)") &&
+    auth_js.include?("Use Google, Sign In, or Create Account below") &&
+    auth_js.include?("Verify your email, then refresh this dashboard before approving") &&
+    auth_js.include?("Device approved. Return to Codex and run complete_account_link.") &&
+    auth_js.include?("Start a new link from Codex if you want to connect later.") &&
+    auth_js.include?("This link code expired. Return to Codex and start a new account link.") &&
+    auth_js.include?("This link code was not found. Return to Codex and start a new account link.") &&
+    auth_js.include?("This Codex device was already approved. Return to Codex and complete the account link.") &&
+    auth_js.include?("approveDeviceLink.disabled = !signedIn || verificationRequired || linkLocked") &&
+    auth_js.include?("rejectDeviceLink.disabled = !signedIn || verificationRequired || linkLocked") &&
+    auth_js.include?("const callable = httpsCallable(functions, action === \"approve\" ? \"approveLinkSession\" : \"rejectLinkSession\");") &&
+    auth_js.include?("renderDeviceLink(currentUser, action === \"approve\" ? \"approving\" : \"rejecting\")") &&
+    auth_js.include?("renderDeviceLink(currentUser, friendly.status)")
+end
+
 assert("signed-in account panel should not render the raw Firebase UID") do
   index.include?("<dt>Account</dt>") &&
     index.include?(%(id="auth-identity">Not signed in</dd>)) &&
@@ -464,7 +506,17 @@ assert("dashboard styles should be responsive and stable across mobile and deskt
     styles.include?("@media (max-width: 700px)") &&
     styles.include?("grid-template-columns: 340px minmax(0, 1fr)") &&
     styles.include?("grid-template-columns: repeat(4, minmax(0, 1fr))") &&
+    styles.include?("grid-template-columns: repeat(auto-fit, minmax(118px, 1fr))") &&
+    styles.include?(".topbar,\n.workspace-grid,\n.side-rail,\n.main-board") &&
+    styles.include?("grid-template-columns: repeat(auto-fit, minmax(76px, 1fr))") &&
+    styles.include?(".topbar-actions > * {\n    width: 100%;\n    min-width: 0;\n  }") &&
     !styles.include?("letter-spacing: -")
+end
+
+assert("mobile dashboard header should stay compact instead of stacking every control") do
+  styles.include?(".brand-lockup {\n    grid-auto-flow: column;\n    grid-template-columns: auto minmax(0, 1fr);\n    gap: 10px;\n  }") &&
+    styles.include?(".brand-mark {\n    width: 48px;\n    height: 48px;\n  }") &&
+    styles.include?(".topbar-actions {\n    width: 100%;\n    grid-auto-flow: row;\n    grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));\n    gap: 8px;\n    justify-content: stretch;\n  }")
 end
 
 assert("privacy rows should stack on narrow mobile screens") do
@@ -472,8 +524,8 @@ assert("privacy rows should stack on narrow mobile screens") do
     styles.include?(".privacy-list li {\n    grid-template-columns: 1fr;\n    gap: 4px;\n  }")
 end
 
-assert("panel headings should stack on very narrow mobile screens") do
-  styles.include?("@media (max-width: 360px)") &&
+assert("panel headings should stack on narrow mobile screens") do
+  styles.include?("@media (max-width: 430px)") &&
     styles.include?(".panel-heading {\n    grid-template-columns: 1fr;\n    gap: 8px;\n  }") &&
     styles.include?(".panel-heading .pill,\n  .panel-heading .status-dot {\n    justify-self: start;\n  }") &&
     styles.include?("overflow-wrap: anywhere;")

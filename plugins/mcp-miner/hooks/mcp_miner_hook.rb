@@ -26,7 +26,7 @@ class McpMinerHook
     when "post_tool_use"
       record_tool_use
     when "stop"
-      emit_stop_decision
+      emit_stop_report
     else
       warn "Unknown MCP Miner hook mode: #{@mode}"
       puts JSON.generate({ continue: true })
@@ -92,7 +92,7 @@ class McpMinerHook
     puts JSON.generate({
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
-        additionalContext: "MCP Miner is passively tracking this Codex turn. Do not mention the game unless the user asks or a Stop hook continuation explicitly asks you to append the generated MCP Miner footer."
+        additionalContext: "MCP Miner is passively tracking this Codex turn. Do not mention the game unless the user asks."
       }
     })
   end
@@ -142,7 +142,7 @@ class McpMinerHook
     end
   end
 
-  def emit_stop_decision
+  def emit_stop_report
     report = nil
 
     @engine.with_state do |state|
@@ -162,23 +162,78 @@ class McpMinerHook
     end
 
     puts JSON.generate({
-      decision: "block",
-      reason: "Append this exact MCP Miner report footer as the final paragraph of your response. Do not change any other answer content and do not add explanation about the footer.\n\n#{report}"
+      continue: true,
+      systemMessage: @engine.display_report(report)
     })
   end
 
   def classify_tool_use
     tool_name = safe_string(@input["tool_name"])
-    tool_input = @input["tool_input"].is_a?(Hash) ? @input["tool_input"] : {}
-    command = safe_string(tool_input["command"] || tool_input["cmd"] || @input.dig("tool_input", "description"))
+    tool_input = normalized_tool_input(@input["tool_input"])
 
-    case tool_name
-    when "Bash"
+    classify_named_tool(tool_name, tool_input)
+  end
+
+  def classify_named_tool(tool_name, tool_input)
+    tool_input = normalized_tool_input(tool_input)
+    command = safe_string(tool_input["command"] || tool_input["cmd"] || tool_input["patch"] || tool_input["input"] || tool_input["description"])
+
+    case canonical_tool_name(tool_name)
+    when "Bash", "exec_command"
       classify_bash(command)
     when "apply_patch"
       classify_patch(command)
+    when "parallel"
+      classify_parallel(tool_input)
+    when "tool_search_tool", "list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource"
+      { event_id: "work_search", line_count: 0 }
     else
       classify_mcp(tool_name)
+    end
+  end
+
+  def normalized_tool_input(tool_input)
+    case tool_input
+    when Hash
+      tool_input
+    when String
+      { "command" => tool_input }
+    else
+      {}
+    end
+  end
+
+  def canonical_tool_name(tool_name)
+    safe_string(tool_name).split(".").last
+  end
+
+  def classify_parallel(tool_input)
+    tool_uses = tool_input["tool_uses"]
+    return nil unless tool_uses.is_a?(Array)
+
+    classifications = tool_uses.map do |tool_use|
+      next unless tool_use.is_a?(Hash)
+
+      child_name = safe_string(tool_use["recipient_name"] || tool_use["tool_name"] || tool_use["name"])
+      classify_named_tool(child_name, tool_use["parameters"])
+    end.compact
+    classifications.max_by { |classification| event_priority(classification[:event_id]) }
+  end
+
+  def event_priority(event_id)
+    case event_id
+    when "work_test_pass", "work_test_fail"
+      6
+    when "work_apply_patch", "work_write_docs"
+      5
+    when "work_commit_or_pr"
+      4
+    when "work_review"
+      3
+    when "work_search", "work_file_read"
+      2
+    else
+      1
     end
   end
 

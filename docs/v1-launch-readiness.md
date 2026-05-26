@@ -97,6 +97,6 @@ These are intentionally out of scope for V1:
 When Codex desktop plugin UI testing is available, enable the local plugin at `plugins/mcp-miner`, start a fresh turn, and confirm:
 
 1. The SessionStart hook returns MCP Miner context.
-2. Normal work can generate a compact `MCP Miner:` footer through the Stop hook.
+2. Normal work can generate a compact non-blocking `MCP Miner:` report through the Stop hook.
 3. `get_player_status`, `get_active_orders`, `get_inventory`, `get_store_catalog`, `open_dashboard`, and `open_store` are available.
 4. Reports and dashboard/store panels contain only abstract gameplay data.
