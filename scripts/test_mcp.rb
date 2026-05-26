@@ -208,12 +208,13 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
       reward_controls_payload.dig("reward_controls", "policy", "events", "work_review", "cooldown_seconds") == 30 &&
       reward_controls_payload.dig("reward_controls", "recent_diagnostics").is_a?(Array)
   end
-  assert("open_dashboard should return the reserved dashboard URL") do
-    dashboard_payload["dashboard_url"] == "http://localhost:3317/dashboard" &&
-      dashboard_payload["available"] == false
+  assert("open_dashboard should return the hosted dashboard URL") do
+    dashboard_payload["dashboard_url"] == "https://mcp-miner.web.app" &&
+      dashboard_payload["status"] == "available" &&
+      dashboard_payload["available"] == true
   end
-  assert("open_store should return the store URL") do
-    store_payload["store_url"] == "http://localhost:3317/dashboard#store" &&
+  assert("open_store should return the hosted store URL") do
+    store_payload["store_url"] == "https://mcp-miner.web.app#store" &&
       store_payload["available"] == true
   end
 
