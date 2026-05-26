@@ -342,6 +342,43 @@ assert("password auth should require email verification before cloud sync and de
     auth_js.include?("await currentUser.getIdToken(true)")
 end
 
+assert("link URLs should promote device linking above the demo dashboard") do
+  index.index(%(data-panel="device-link")) < index.index(%(data-panel="auth")) &&
+    auth_js.include?("const pendingLink = {") &&
+    auth_js.include?("function setLinkMode()") &&
+    auth_js.include?("document.body.dataset.linkMode = hasPendingLink() ? \"pending\" : \"dashboard\"") &&
+    auth_js.include?("function linkModeLabel(user)") &&
+    auth_js.include?("pill: \"Device link\"") &&
+    auth_js.include?("mode: \"Sign in to connect\"") &&
+    auth_js.include?("mode: \"Approve Codex device\"") &&
+    auth_js.include?("updated: \"Awaiting account\"") &&
+    auth_js.include?("lastUpdated.textContent = linkLabel ? linkLabel.updated") &&
+    auth_js.include?("const linkLabel = linkModeLabel(currentUser);") &&
+    styles.include?("body[data-link-mode=\"pending\"] .workspace-grid") &&
+    styles.include?("body[data-link-mode=\"pending\"] .link-panel")
+end
+
+assert("device link flow should expose clear account, verification, terminal, and error states") do
+  index.include?(">Create Account</button>") &&
+    auth_js.include?("const LINK_STATE_MESSAGES = {") &&
+    auth_js.include?("const LINK_ERROR_MESSAGES = [") &&
+    auth_js.include?("let deviceLinkState = \"waiting\"") &&
+    auth_js.include?("function friendlyLinkMessage(error)") &&
+    auth_js.include?("function deviceLinkContent(user, status)") &&
+    auth_js.include?("Use Google, Sign In, or Create Account below") &&
+    auth_js.include?("Verify your email, then refresh this dashboard before approving") &&
+    auth_js.include?("Device approved. Return to Codex and run complete_account_link.") &&
+    auth_js.include?("Start a new link from Codex if you want to connect later.") &&
+    auth_js.include?("This link code expired. Return to Codex and start a new account link.") &&
+    auth_js.include?("This link code was not found. Return to Codex and start a new account link.") &&
+    auth_js.include?("This Codex device was already approved. Return to Codex and complete the account link.") &&
+    auth_js.include?("approveDeviceLink.disabled = !signedIn || verificationRequired || linkLocked") &&
+    auth_js.include?("rejectDeviceLink.disabled = !signedIn || verificationRequired || linkLocked") &&
+    auth_js.include?("const callable = httpsCallable(functions, action === \"approve\" ? \"approveLinkSession\" : \"rejectLinkSession\");") &&
+    auth_js.include?("renderDeviceLink(currentUser, action === \"approve\" ? \"approving\" : \"rejecting\")") &&
+    auth_js.include?("renderDeviceLink(currentUser, friendly.status)")
+end
+
 assert("signed-in account panel should not render the raw Firebase UID") do
   index.include?("<dt>Account</dt>") &&
     index.include?(%(id="auth-identity">Not signed in</dd>)) &&

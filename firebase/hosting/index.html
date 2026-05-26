@@ -40,6 +40,31 @@
 
       <section class="workspace-grid">
         <aside class="side-rail" aria-label="Account and sync">
+          <section class="panel link-panel" data-panel="device-link" aria-labelledby="device-link-title" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Codex link</p>
+                <h2 id="device-link-title">Connect Device</h2>
+              </div>
+              <span id="device-link-status" class="pill">Waiting</span>
+            </div>
+            <p id="device-link-summary" class="message">Sign in to approve this Codex device.</p>
+            <dl class="compact-list">
+              <div>
+                <dt>Code</dt>
+                <dd id="device-link-code">-</dd>
+              </div>
+              <div>
+                <dt>Data</dt>
+                <dd>Abstract game progress only</dd>
+              </div>
+            </dl>
+            <div class="actions">
+              <button id="approve-device-link" type="button" disabled>Approve</button>
+              <button id="reject-device-link" type="button" class="button-secondary" disabled>Reject</button>
+            </div>
+          </section>
+
           <section class="panel auth-panel" data-panel="auth" aria-labelledby="auth-title">
             <div class="panel-heading">
               <div>
@@ -62,7 +87,7 @@
               </label>
               <div class="actions">
                 <button id="sign-in" type="submit">Sign In</button>
-                <button id="create-account" type="button" class="button-secondary">Create</button>
+                <button id="create-account" type="button" class="button-secondary">Create Account</button>
                 <button id="sign-out" type="button" class="button-secondary" disabled>Sign Out</button>
               </div>
             </form>
@@ -122,31 +147,6 @@
               <button id="checkout-monthly" type="button">Monthly</button>
               <button id="checkout-annual" type="button" class="button-secondary">Annual</button>
               <button id="manage-billing" type="button" class="button-secondary">Manage</button>
-            </div>
-          </section>
-
-          <section class="panel link-panel" data-panel="device-link" aria-labelledby="device-link-title" hidden>
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Codex link</p>
-                <h2 id="device-link-title">Connect Device</h2>
-              </div>
-              <span id="device-link-status" class="pill">Waiting</span>
-            </div>
-            <p id="device-link-summary" class="message">Sign in to approve this Codex device.</p>
-            <dl class="compact-list">
-              <div>
-                <dt>Code</dt>
-                <dd id="device-link-code">-</dd>
-              </div>
-              <div>
-                <dt>Data</dt>
-                <dd>Abstract game progress only</dd>
-              </div>
-            </dl>
-            <div class="actions">
-              <button id="approve-device-link" type="button" disabled>Approve</button>
-              <button id="reject-device-link" type="button" class="button-secondary" disabled>Reject</button>
             </div>
           </section>
 
