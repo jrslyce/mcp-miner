@@ -23,7 +23,7 @@ MCP Miner cloud sync stores owner-scoped, privacy-safe game data under `/players
 | `/linkSessions/{sessionId}` | server | none | Short-lived device-link approval sessions created by callable Functions. |
 | `/linkCodes/{code}` | server | none | Atomic one-time code reservations that prevent active link-code collisions. |
 | `/deviceTokens/{tokenHash}` | server | none | Hash-only revocable device token records used by callable Functions. |
-| `/billingWebhookEvents/{eventId}` | server | none | Server-only billing event audit records; raw payloads stay outside owner-readable documents. |
+| `/billingWebhookEvents/{eventId}` | server | none | Server-only billing event audit records with abstract provider status and renewal references; raw payloads stay outside owner-readable documents. |
 | `/supportAuditLogs/{auditId}` | server | none | Server-only audit trail for support inspection, reconciliation, stale-marking, and device revocation actions. |
 
 ## Client-Write Boundaries
@@ -32,7 +32,7 @@ Clients may create profile/settings/sync metadata and append abstract reward eve
 
 Link sessions, link-code reservations, device-token hashes, billing webhook events, and support audit logs are top-level server-owned collections. They are written only by Cloud Functions or Admin SDK support tooling and remain blocked from direct dashboard/plugin Firestore access by the default deny rule.
 
-Billing and entitlement documents under `/players/{uid}` are owner-readable but server-owned. Stripe is the source of truth for paid subscription state; Firestore billing and entitlement documents are projections written by Cloud Functions with the Admin SDK. Clients may read the effective plan and feature limits, but clients cannot directly write `plan`, `billingStatus`, provider IDs, sync cadence, device limits, history retention, or feature flags.
+Billing and entitlement documents under `/players/{uid}` are owner-readable but server-owned. Stripe is the source of truth for paid subscription state; Firestore billing and entitlement documents are projections written by Cloud Functions with the Admin SDK. Clients may read the effective plan and feature limits, but clients cannot directly write `plan`, `billingStatus`, provider IDs, provider transaction/renewal fields, sync cadence, device limits, history retention, or feature flags.
 
 Support tooling may inspect billing projection fields, Stripe customer/subscription IDs, linked-device metadata, and sync cursors through Admin SDK scripts. Every support action writes `/supportAuditLogs/{auditId}` with actor, target UID, action, result, reason, and abstract details. Support summaries intentionally exclude token hashes, device secrets, raw Stripe payloads, prompts, commands, code, paths, and transcript-like content.
 
@@ -56,6 +56,8 @@ Normalized entitlement fields:
   "provider": "stripe",
   "providerCustomerId": "cus_...",
   "providerSubscriptionId": "sub_...",
+  "providerTransactionId": "tx_or_invoice_reference",
+  "providerRenewalState": "active",
   "currentPeriodEnd": "2026-06-24T00:00:00.000Z",
   "cancelAtPeriodEnd": false,
   "syncCadenceSeconds": 10,

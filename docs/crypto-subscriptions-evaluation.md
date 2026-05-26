@@ -6,6 +6,12 @@ Crypto wallet subscriptions are **not MVP** for MCP Miner. Stripe card subscript
 only launch billing path. Crypto can be reconsidered after Stripe subscriptions, entitlement
 enforcement, support tooling, tax exports, and refund workflows are proven in production.
 
+MUX-210 adds a disabled-by-default crypto billing adapter so future sandbox work normalizes through
+the same billing and entitlement contract, but the adapter is launch-blocked unless deployment
+configuration explicitly sets both `CRYPTO_BILLING_ENABLED=true` and
+`CRYPTO_PROVIDER_APPROVED=true`. Without that approval gate, crypto webhook events are audited as
+blocked and cannot grant Pro.
+
 The lowest-debt later path is **Stripe stablecoin subscriptions**, because Stripe now documents
 stablecoin payments for Billing subscriptions while preserving the same Stripe subscription and
 invoice lifecycle we already normalize. That path is still approval-gated/private-preview surfaced
@@ -87,11 +93,17 @@ Provider adapters may only write:
 - `/players/{uid}/entitlements/current`
 - provider audit events such as `billingWebhookEvents/{eventId}`
 
+The crypto adapter additionally records support/accounting-safe billing fields when provider
+evidence exists: `providerTransactionId`, `providerRenewalState`, `providerWalletReference`,
+`providerEnvironment`, and `providerBetaOnly`. These fields are abstract operational references,
+not wallet secrets or raw payloads.
+
 ## Launch Recommendation
 
 Do not implement crypto subscriptions in the launch milestone. Keep the config placeholders from
-`data/subscription_plans.yaml`, but leave crypto disabled until a provider passes sandbox lifecycle
-tests, account approval, and finance review.
+`data/subscription_plans.yaml`, and leave the MUX-210 adapter disabled until a provider passes
+sandbox lifecycle tests, account approval, and finance review. Stripe remains the primary and safest
+path even if a crypto provider later enters beta.
 
 Suggested later path:
 

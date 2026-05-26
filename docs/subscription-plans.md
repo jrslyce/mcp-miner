@@ -39,6 +39,11 @@ Required crypto live variables, if the crypto provider ships:
 - `CRYPTO_PRO_MONTHLY_PLAN_ID`
 - `CRYPTO_PRO_ANNUAL_PLAN_ID`
 
+The crypto adapter remains disabled unless `CRYPTO_BILLING_ENABLED=true` and
+`CRYPTO_PROVIDER_APPROVED=true` are both set. Use `CRYPTO_PROVIDER_LAUNCH_MODE=production` only
+after sandbox lifecycle, finance, and support checks approve launch; otherwise approved crypto
+events stay beta-only while Stripe remains the primary path.
+
 ## Downgrade And Cancellation
 
 Cancelled Pro subscriptions keep Pro benefits until `subscription_period_end`. Failed payments keep

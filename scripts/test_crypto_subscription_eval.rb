@@ -17,7 +17,8 @@ doc = File.read(File.join(ROOT, "docs/crypto-subscriptions-evaluation.md"))
 assert("crypto evaluation should make a clear MVP decision") do
   doc.include?("Crypto wallet subscriptions are **not MVP**") &&
     doc.include?("Stripe card subscriptions remain") &&
-    doc.include?("only launch billing path")
+    doc.include?("only launch billing path") &&
+    doc.include?("disabled-by-default crypto billing adapter")
 end
 
 assert("crypto evaluation should compare recurring providers") do
@@ -35,7 +36,9 @@ end
 assert("crypto evaluation should require normalized entitlement projection") do
   doc.include?("No crypto provider may write entitlements directly.") &&
     doc.include?("/players/{uid}/billing/current") &&
-    doc.include?("/players/{uid}/entitlements/current")
+    doc.include?("/players/{uid}/entitlements/current") &&
+    doc.include?("CRYPTO_BILLING_ENABLED=true") &&
+    doc.include?("CRYPTO_PROVIDER_APPROVED=true")
 end
 
 assert("crypto evaluation should cover cancellation failure and tax risks") do
@@ -46,6 +49,16 @@ assert("crypto evaluation should estimate implementation effort") do
   doc.include?("Implementation Estimate") &&
     doc.include?("Stripe stablecoin subscription pilot") &&
     doc.include?("Production launch hardening")
+end
+
+assert("crypto evaluation should document accounting-safe provider references") do
+  %w[
+    providerTransactionId
+    providerRenewalState
+    providerWalletReference
+    providerEnvironment
+    providerBetaOnly
+  ].all? { |needle| doc.include?(needle) }
 end
 
 puts({

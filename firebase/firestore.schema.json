@@ -57,7 +57,7 @@
       "clientAccess": ["read"],
       "serverOwned": true,
       "sourceOfTruth": "stripe",
-      "fields": ["ownerUid", "schemaVersion", "privacyClass", "plan", "billingStatus", "provider", "providerCustomerId", "providerSubscriptionId", "currentPeriodEnd", "cancelAtPeriodEnd", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "features", "updatedAt", "supportMarkedStaleAt", "supportReconciledAt"]
+      "fields": ["ownerUid", "schemaVersion", "privacyClass", "plan", "billingStatus", "provider", "providerCustomerId", "providerSubscriptionId", "providerTransactionId", "providerRenewalState", "providerWalletReference", "providerEnvironment", "providerBetaOnly", "currentPeriodEnd", "cancelAtPeriodEnd", "syncCadenceSeconds", "maxDevices", "historyRetentionDays", "features", "updatedAt", "supportMarkedStaleAt", "supportReconciledAt"]
     },
     "players/{uid}/entitlements/current": {
       "owner": "uid",
@@ -125,7 +125,7 @@
       "owner": "server",
       "clientAccess": [],
       "serverOwned": true,
-      "fields": ["provider", "providerEventId", "receivedAt", "processedAt", "status", "rawPayloadStorageRef"]
+      "fields": ["provider", "providerEventId", "eventType", "receivedAt", "processedAt", "status", "reason", "uid", "plan", "providerTransactionId", "providerRenewalState", "betaOnly", "rawPayloadStorageRef"]
     },
     "supportAuditLogs/{auditId}": {
       "owner": "server",

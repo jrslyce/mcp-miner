@@ -1,8 +1,7 @@
 "use strict";
 
 const {
-  buildEntitlementProjection,
-  evaluateEntitlement
+  buildEntitlementProjection
 } = require("./entitlements");
 const {
   CHECKOUT_PRICE_ENV
@@ -181,9 +180,8 @@ async function handleStripeWebhookEvent({ event, db, stripe, env = process.env, 
       billing: mapped.billing,
       now
     });
-    const evaluatedEntitlement = evaluateEntitlement(entitlement, { now });
     transaction.set(billingRef, mapped.billing, { merge: true });
-    transaction.set(entitlementRef, evaluatedEntitlement, { merge: true });
+    transaction.set(entitlementRef, entitlement, { merge: true });
     return {
       ok: true,
       duplicate: false,
@@ -194,8 +192,8 @@ async function handleStripeWebhookEvent({ event, db, stripe, env = process.env, 
       provider: mapped.billing.provider,
       providerSubscriptionId: mapped.billing.providerSubscriptionId,
       currentPeriodEnd: mapped.billing.currentPeriodEnd,
-      entitlementStatus: evaluatedEntitlement.entitlementStatus,
-      accessReason: evaluatedEntitlement.accessReason
+      entitlementStatus: entitlement.entitlementStatus,
+      accessReason: entitlement.accessReason
     };
   });
   return result;

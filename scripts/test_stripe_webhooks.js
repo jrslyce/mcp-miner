@@ -172,6 +172,27 @@ function fakeDb() {
       db.store.has("players/firebase_uid_123/entitlements/current");
   });
 
+  await check("webhook payment failures should persist grace-period Pro projection", async () => {
+    const db = fakeDb();
+    const stripeEvent = event("invoice.payment_failed", {
+      subscription: "sub_test_123"
+    }, "evt_payment_failed_grace");
+    const result = await handleStripeWebhookEvent({
+      event: stripeEvent,
+      db,
+      stripe: fakeStripe(subscription({ status: "active" })),
+      env,
+      now
+    });
+    const entitlement = db.store.get("players/firebase_uid_123/entitlements/current");
+    return result.action === "project" &&
+      result.billingStatus === "past_due" &&
+      result.entitlementStatus === "pro" &&
+      result.accessReason === "grace_period" &&
+      entitlement.entitlementStatus === "pro" &&
+      entitlement.accessReason === "grace_period";
+  });
+
   await check("signature verification should accept valid Stripe signatures", () => {
     const stripe = new Stripe("sk_test_fake");
     const payload = JSON.stringify(event("customer.subscription.updated", subscription(), "evt_signed"));
