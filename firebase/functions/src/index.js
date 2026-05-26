@@ -1,6 +1,6 @@
 "use strict";
 
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { FieldValue } = require("firebase-admin/firestore");
@@ -32,6 +32,10 @@ const {
   createStripeClient,
   stripeCustomerIdFromBilling
 } = require("./billing");
+const {
+  handleStripeWebhookEvent,
+  verifyStripeWebhookEvent
+} = require("./stripe_webhooks");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -427,6 +431,41 @@ exports.createCustomerPortalSession = onCall({ region: "us-central1" }, async (r
     };
   } catch (error) {
     rethrowBillingError(error);
+  }
+});
+
+exports.stripeWebhook = onRequest({ region: "us-central1" }, async (request, response) => {
+  if (request.method !== "POST") {
+    response.status(405).json({ ok: false, error: "method_not_allowed" });
+    return;
+  }
+
+  try {
+    const stripe = createStripeClient();
+    const signature = request.headers["stripe-signature"];
+    const rawBody = request.rawBody || Buffer.from(JSON.stringify(request.body || {}));
+    const event = verifyStripeWebhookEvent(stripe, rawBody, signature, process.env.STRIPE_WEBHOOK_SECRET);
+    const result = await handleStripeWebhookEvent({
+      event,
+      db,
+      stripe,
+      env: process.env,
+      now: new Date().toISOString()
+    });
+    logger.info("mcp_miner_stripe_webhook_processed", {
+      privacyClass: "abstract",
+      eventId: event.id,
+      eventType: event.type,
+      action: result.action,
+      duplicate: result.duplicate === true
+    });
+    response.json({ ok: true, received: true, eventId: event.id, action: result.action, duplicate: result.duplicate === true });
+  } catch (error) {
+    logger.warn("mcp_miner_stripe_webhook_rejected", {
+      privacyClass: "abstract",
+      message: error.message || "Stripe webhook failed"
+    });
+    response.status(400).json({ ok: false, error: error.message || "Stripe webhook failed" });
   }
 });
 

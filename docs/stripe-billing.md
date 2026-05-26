@@ -10,6 +10,7 @@ server-owned billing and entitlement projections.
 Firebase Functions need these secrets or environment variables:
 
 - `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_PRO_MONTHLY_PRICE_ID`
 - `STRIPE_PRO_ANNUAL_PRICE_ID`
 - `MCP_MINER_DASHBOARD_URL`
@@ -44,3 +45,18 @@ Run this only after test-mode Stripe secrets and Price IDs are configured:
 - Stripe Dashboard shows Customer metadata `firebaseUid`.
 - Stripe Dashboard shows Subscription metadata `firebaseUid`, `plan`, and `source`.
 - Existing active subscriber clicking upgrade/manage is sent to Customer Portal.
+
+## Webhooks
+
+Configure Stripe to send these events to the `stripeWebhook` HTTPS Function:
+
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.payment_succeeded`
+- `invoice.payment_failed`
+
+Webhook processing verifies the Stripe signature with `STRIPE_WEBHOOK_SECRET`, records each Stripe
+event ID in `billingWebhookEvents/{eventId}`, and ignores duplicate event IDs. Unknown Price IDs or
+missing `firebaseUid` metadata are audited but do not write Pro entitlements.
