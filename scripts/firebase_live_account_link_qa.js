@@ -174,16 +174,19 @@ async function runCycle(word, index) {
   }
 
   const acceptedEvent = syncEvent(word, auth.localId, 1);
-  const sync = await callFunction("syncRewardEvents", exchanged.result.deviceToken, { events: [acceptedEvent] });
   const privateEvent = syncEvent(word, auth.localId, 2, { prompt: "must be rejected" });
-  const rejected = await callFunction("syncRewardEvents", exchanged.result.deviceToken, { events: [privateEvent] });
+  const sync = await callFunction("syncRewardEvents", exchanged.result.deviceToken, { events: [acceptedEvent, privateEvent] });
+  const privateRejection = sync.result && Array.isArray(sync.result.rejected) ? sync.result.rejected[0] : null;
   const state = await callFunction("getSyncState", exchanged.result.deviceToken, {});
 
-  if (!sync.result.accepted || sync.result.accepted[0] !== acceptedEvent.eventId) {
+  if (!sync.result.accepted || !sync.result.accepted.includes(acceptedEvent.eventId)) {
     throw new Error(`${email} abstract event was not accepted`);
   }
-  if (!rejected.result.rejected || rejected.result.rejected[0].reason !== "private_fields") {
-    throw new Error(`${email} private prompt field was not rejected`);
+  if (!privateRejection || privateRejection.reason !== "private_fields") {
+    throw new Error(`${email} private prompt field was not rejected: ${JSON.stringify({
+      privateEventId: privateEvent.eventId,
+      privateResponse: sync
+    })}`);
   }
   if (!state.result.state || state.result.state.eventCount < 1 || state.result.state.lastSequence < 1) {
     throw new Error(`${email} cloud state was not reduced`);
@@ -200,7 +203,7 @@ async function runCycle(word, index) {
     tokenHash: deviceTokenHash(exchanged.result.deviceToken),
     sessionId: link.result.session.sessionId,
     acceptedEventId: acceptedEvent.eventId,
-    rejectedReason: rejected.result.rejected[0].reason,
+    rejectedReason: privateRejection.reason,
     eventCount: state.result.state.eventCount,
     lastSequence: state.result.state.lastSequence
   };
