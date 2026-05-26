@@ -9,6 +9,7 @@ The Firebase Hosting dashboard is a static web app in `firebase/hosting`. It ope
 - The dashboard reads `getSyncState` from Cloud Functions when available and falls back to direct owner reads for `gameState/current` and `syncMetadata/default`.
 - Linked device management reads owner-visible `/players/{uid}/syncDevices` metadata and uses `renameSyncDevice` / `revokeSyncDevice` callables for owner-only changes. Token hashes and secrets stay server-side.
 - Portal refreshes use entitlement cadence polling instead of Firestore realtime listeners: Free stays on low-frequency one-minute refresh while Pro uses the configured near-real-time cadence.
+- Subscription cards load from `firebase/hosting/subscription-plans.json`, which mirrors `data/subscription_plans.yaml` for public prices, annual discount copy, plan limits, and privacy-safe plan descriptions.
 - Inventory, orders, upgrades, and base panels read their Firestore collections/documents where reducers have produced data. If cloud economy reducers have not produced those documents yet, the dashboard shows that the cloud profile is ready and is waiting for Codex sync.
 
 ## Privacy Boundary

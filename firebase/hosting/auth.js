@@ -387,6 +387,7 @@ const billingSummary = document.querySelector("#billing-summary");
 const billingPlan = document.querySelector("#billing-plan");
 const billingDevices = document.querySelector("#billing-devices");
 const billingSync = document.querySelector("#billing-sync");
+const planCards = document.querySelector("#plan-cards");
 const checkoutMonthly = document.querySelector("#checkout-monthly");
 const checkoutAnnual = document.querySelector("#checkout-annual");
 const manageBilling = document.querySelector("#manage-billing");
@@ -413,11 +414,32 @@ let asteroidAnimationStarted = false;
 let verificationEmailSentAt = 0;
 let portalRefreshTimer = null;
 let portalRefreshInFlight = false;
+let planCatalog = {
+  currency: "usd",
+  annualMonthsCharged: 11,
+  plans: []
+};
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 function setMessage(text, isError = false) {
   message.textContent = text;
   message.dataset.tone = isError ? "error" : "success";
+}
+
+async function loadPlanCatalog() {
+  try {
+    const response = await fetch("/subscription-plans.json", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+    const catalog = await response.json();
+    if (Array.isArray(catalog.plans)) {
+      planCatalog = catalog;
+      renderBilling(activeDashboard.entitlement);
+    }
+  } catch (error) {
+    // The dashboard still renders the signed-out demo if the public catalog cannot be fetched.
+  }
 }
 
 function preferredTheme() {
@@ -515,6 +537,35 @@ function planLabel(plan) {
   return labels[plan] || displayNameFromId(plan || "free");
 }
 
+function moneyFromCents(cents, suffix = "") {
+  const value = numberValue(cents) / 100;
+  return value <= 0 ? "$0" : `$${value.toFixed(value % 1 === 0 ? 0 : 2)}${suffix}`;
+}
+
+function planPriceLabel(plan) {
+  if (plan.billingInterval === "annual") {
+    return `${moneyFromCents(plan.annualPriceCents)}/yr`;
+  }
+  if (plan.billingInterval === "monthly") {
+    return `${moneyFromCents(plan.monthlyPriceCents)}/mo`;
+  }
+  return "$0";
+}
+
+function annualDiscountCopy() {
+  const monthly = planCatalog.plans.find((plan) => plan.id === "pro_monthly");
+  const annual = planCatalog.plans.find((plan) => plan.id === "pro_annual");
+  const monthsCharged = numberValue(planCatalog.annualMonthsCharged, 11);
+  if (!monthly || !annual || !monthly.monthlyPriceCents || !annual.annualPriceCents) {
+    return "Annual billing gives 12 months for the price of 11.";
+  }
+  const expectedAnnual = monthly.monthlyPriceCents * monthsCharged;
+  const consistent = expectedAnnual === annual.annualPriceCents;
+  return consistent
+    ? `Annual: 12 months for the price of ${formatNumber(monthsCharged)}.`
+    : "Annual discount follows the configured yearly price.";
+}
+
 function normalizedEntitlement(entitlement) {
   return {
     ...FREE_ENTITLEMENT,
@@ -527,10 +578,30 @@ function normalizedEntitlement(entitlement) {
 }
 
 function billingSummaryText(entitlement) {
+  if (!currentUser) {
+    return "Free works locally; Pro adds faster cloud sync and portal convenience without collecting private work data.";
+  }
+  if (requiresEmailVerification(currentUser)) {
+    return "Verify your email before starting checkout or managing billing.";
+  }
+  if (entitlement.billingStatus === "past_due") {
+    const grace = entitlement.gracePeriodEnd ? ` through ${timestampLabel(entitlement.gracePeriodEnd)}` : "";
+    return `Payment needs attention. Pro access remains active${grace}, then Free limits apply until billing is fixed.`;
+  }
+  if (entitlement.billingStatus === "unpaid") {
+    return "Payment failed. This account is on Free limits until billing is updated.";
+  }
+  if (entitlement.cancelAtPeriodEnd) {
+    const end = entitlement.currentPeriodEnd ? ` on ${timestampLabel(entitlement.currentPeriodEnd)}` : " at period end";
+    return `Cancellation scheduled. Pro access ends${end}, then Free cadence and one-device limits apply.`;
+  }
   if (entitlement.entitlementStatus === "pro") {
     const renewal = entitlement.cancelAtPeriodEnd ? "ends" : "renews";
     const period = entitlement.currentPeriodEnd ? ` ${renewal} ${timestampLabel(entitlement.currentPeriodEnd)}` : "";
     return `${planLabel(entitlement.plan)}${period}. Up to ${formatNumber(entitlement.maxDevices)} Codex devices with near-real-time sync.`;
+  }
+  if (entitlement.accessReason === "canceled" || entitlement.billingStatus === "canceled") {
+    return "Pro access has ended. Free cloud sync remains available for one Codex device every minute.";
   }
   if (entitlement.billingStatus === "checkout_pending") {
     return "Checkout started. Pro unlocks only after Stripe confirms the subscription webhook.";
@@ -552,6 +623,60 @@ function renderBilling(rawEntitlement) {
   checkoutMonthly.disabled = !signedIn || verificationRequired || pro;
   checkoutAnnual.disabled = !signedIn || verificationRequired || pro;
   manageBilling.disabled = !signedIn || verificationRequired || !entitlement.providerCustomerId;
+  renderPlanCards(entitlement);
+}
+
+function planActionState(plan, entitlement, signedIn, verificationRequired) {
+  const current = entitlement.plan === plan.id || (entitlement.entitlementStatus !== "pro" && plan.id === "free");
+  if (current) {
+    return { label: "Current", disabled: true };
+  }
+  if (plan.id === "free") {
+    return { label: "Included", disabled: true };
+  }
+  if (!signedIn) {
+    return { label: "Sign in", disabled: true };
+  }
+  if (verificationRequired) {
+    return { label: "Verify email", disabled: true };
+  }
+  if (entitlement.entitlementStatus === "pro") {
+    return { label: "Manage", disabled: true };
+  }
+  return { label: plan.billingInterval === "annual" ? "Upgrade annual" : "Upgrade monthly", disabled: false };
+}
+
+function renderPlanCards(entitlement) {
+  const signedIn = Boolean(currentUser);
+  const verificationRequired = requiresEmailVerification(currentUser);
+  if (!planCatalog.plans.length) {
+    planCards.innerHTML = "<p class=\"empty-state\">Loading subscription plans.</p>";
+    return;
+  }
+
+  planCards.innerHTML = planCatalog.plans.map((plan) => {
+    const action = planActionState(plan, entitlement, signedIn, verificationRequired);
+    const entitlements = plan.entitlements || {};
+    const cadence = entitlements.nearRealTimeSync ? `${formatNumber(entitlements.syncCadenceSeconds)} sec sync` : `${formatNumber(entitlements.syncCadenceSeconds)} sec batches`;
+    const annual = plan.billingInterval === "annual" ? `<span>${escapeHtml(annualDiscountCopy())}</span>` : "";
+    return `
+      <article class="plan-card" role="listitem" data-current="${action.label === "Current" ? "true" : "false"}">
+        <div class="plan-card-top">
+          <strong>${escapeHtml(plan.publicName)}</strong>
+          <span>${escapeHtml(planPriceLabel(plan))}</span>
+        </div>
+        <p>${escapeHtml(plan.shortCopy)}</p>
+        <div class="plan-facts">
+          <span>${escapeHtml(formatNumber(entitlements.maxCodexDevices || 1))} Codex ${numberValue(entitlements.maxCodexDevices, 1) === 1 ? "device" : "devices"}</span>
+          <span>${escapeHtml(cadence)}</span>
+          <span>${escapeHtml(formatNumber(entitlements.historyRetentionDays || 7))} day history</span>
+          ${annual}
+        </div>
+        <p class="plan-privacy">${escapeHtml(plan.privacyCopy)}</p>
+        <button type="button" class="button-secondary plan-action" data-plan="${escapeHtml(plan.id)}" ${action.disabled ? "disabled" : ""}>${escapeHtml(action.label)}</button>
+      </article>
+    `;
+  }).join("");
 }
 
 function activeDeviceCount(devices) {
@@ -1699,6 +1824,11 @@ async function openBillingSession(callableName, payload = {}) {
   checkoutMonthly.disabled = true;
   checkoutAnnual.disabled = true;
   manageBilling.disabled = true;
+  planCards.setAttribute("aria-busy", "true");
+  planCards.querySelectorAll("button").forEach((button) => {
+    button.disabled = true;
+  });
+  setMessage("Opening secure billing.");
   try {
     const callable = httpsCallable(functions, callableName);
     const result = await callable({
@@ -1712,6 +1842,7 @@ async function openBillingSession(callableName, payload = {}) {
     }
     window.location.assign(url);
   } catch (error) {
+    planCards.removeAttribute("aria-busy");
     setMessage(error.message || "Stripe billing session failed.", true);
     renderBilling(activeDashboard && activeDashboard.entitlement);
   }
@@ -1796,6 +1927,14 @@ checkoutAnnual.addEventListener("click", () => {
 
 manageBilling.addEventListener("click", () => {
   openBillingSession("createCustomerPortalSession");
+});
+
+planCards.addEventListener("click", (event) => {
+  const button = event.target.closest(".plan-action");
+  if (!button || button.disabled) {
+    return;
+  }
+  openBillingSession("createCheckoutSession", { plan: button.dataset.plan });
 });
 
 linkedDevicesList.addEventListener("click", (event) => {
@@ -1892,3 +2031,4 @@ onAuthStateChanged(auth, async (user) => {
 
 applyTheme(preferredTheme());
 renderDashboard(cloneDemo());
+loadPlanCatalog();

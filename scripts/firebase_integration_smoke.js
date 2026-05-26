@@ -216,6 +216,7 @@ async function main() {
 
   const indexHtml = await requestText(`http://${HOSTING_HOST}/`);
   const dashboardJs = await requestText(`http://${HOSTING_HOST}/auth.js`);
+  const planCatalog = JSON.parse(await requestText(`http://${HOSTING_HOST}/subscription-plans.json`));
   const requiredPanels = ["status", "inventory", "orders", "asteroid", "upgrades", "store", "reports", "device-link", "linked-devices", "sync-privacy"];
   const missingPanels = requiredPanels.filter((panel) => !indexHtml.includes(`data-panel="${panel}"`));
   if (missingPanels.length) {
@@ -226,6 +227,9 @@ async function main() {
   }
   if (!indexHtml.includes("id=\"sync-cadence\"") || !indexHtml.includes("id=\"sync-next-refresh\"")) {
     throw new Error("dashboard hosting response missing cadence refresh fields");
+  }
+  if (!indexHtml.includes("id=\"plan-cards\"") || planCatalog.plans.length !== 3) {
+    throw new Error("dashboard hosting response missing subscription plan cards/catalog");
   }
 
   if (!sync.result || sync.result.accepted[0] !== acceptedEvent.eventId) {

@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "yaml"
 
 ROOT = File.expand_path("..", __dir__)
 $checks = 0
@@ -18,6 +19,8 @@ end
 
 index = read("firebase/hosting/index.html")
 auth_js = read("firebase/hosting/auth.js")
+subscription_catalog = JSON.parse(read("firebase/hosting/subscription-plans.json"))
+subscription_config = YAML.load_file(File.join(ROOT, "data/subscription_plans.yaml"))
 styles = read("firebase/hosting/styles.css")
 asset = read("firebase/hosting/assets/asteroid-scan.svg")
 smoke = read("scripts/firebase_dashboard_smoke.js")
@@ -55,6 +58,7 @@ assert("dashboard should expose concrete status, inventory, order, upgrade, repo
     sync-cadence
     sync-next-refresh
     billing-status
+    plan-cards
     checkout-monthly
     checkout-annual
     manage-billing
@@ -91,10 +95,40 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     renderStore
     createCheckoutSession
     createCustomerPortalSession
+    loadPlanCatalog
+    renderPlanCards
+    annualDiscountCopy
     getSyncState
     ensureLinkedProfile
     requiresEmailVerification
   ].all? { |needle| auth_js.include?(needle) }
+end
+
+assert("dashboard pricing catalog should match subscription pricing config") do
+  plans_by_id = subscription_config.fetch("plans").to_h { |plan| [plan.fetch("id"), plan] }
+  catalog_by_id = subscription_catalog.fetch("plans").to_h { |plan| [plan.fetch("id"), plan] }
+  subscription_catalog.fetch("annualMonthsCharged") == subscription_config.dig("subscription_pricing", "annual_months_charged") &&
+    catalog_by_id.keys.sort == plans_by_id.keys.sort &&
+    catalog_by_id.all? do |id, plan|
+      source = plans_by_id.fetch(id)
+      plan.fetch("monthlyPriceCents") == source.fetch("monthly_price_cents") &&
+        plan["annualPriceCents"] == source["annual_price_cents"] &&
+        plan.fetch("shortCopy") == source.fetch("short_copy") &&
+        plan.fetch("privacyCopy") == source.fetch("privacy_copy") &&
+        plan.dig("entitlements", "maxCodexDevices") == source.dig("entitlements", "max_codex_devices") &&
+        plan.dig("entitlements", "syncCadenceSeconds") == source.dig("entitlements", "sync_cadence_seconds")
+    end
+end
+
+assert("dashboard subscription UX should expose plan cards without Stripe internals") do
+  index.include?(%(id="plan-cards")) &&
+    auth_js.include?("planActionState") &&
+    auth_js.include?("Opening secure billing.") &&
+    auth_js.include?("Cancellation scheduled.") &&
+    auth_js.include?("Payment needs attention.") &&
+    auth_js.include?("without collecting private work data") &&
+    !subscription_catalog.to_s.include?("price_") &&
+    !subscription_catalog.to_s.include?("cus_")
 end
 
 assert("dashboard should render linked device management without token secrets") do
