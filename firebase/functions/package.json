@@ -4,7 +4,7 @@
   "private": true,
   "main": "src/index.js",
   "engines": {
-    "node": ">=20"
+    "node": "22"
   },
   "scripts": {
     "lint": "node --check src/index.js && node --check src/linking.js && node --check src/sync.js && node --check src/entitlements.js"

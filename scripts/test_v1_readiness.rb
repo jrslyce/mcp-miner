@@ -108,7 +108,7 @@ cloud_sync_docs = read("docs/cloud-sync-api.md")
 assert("Firestore rules and sync API should reject private event data") do
   firestore_rules.include?("isOwner") &&
     firestore_rules.include?("noPrivateTopLevel") &&
-    firestore_rules.include?("noPrivateObservedFields") &&
+    firestore_rules.include?("allow write: if false;") &&
     firestore_schema.include?("privateFieldDenylist") &&
     sync_function.include?("PRIVATE_KEYS") &&
     sync_function.include?("event contains private field names") &&

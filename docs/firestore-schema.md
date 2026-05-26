@@ -73,7 +73,7 @@ only the sanitized event.
 
 ## Rejected Private Fields
 
-Rules reject practical top-level private field names on client-writeable documents and inside reward-event `observedFields`:
+Rules reject practical top-level private field names on client-writeable documents:
 
 - prompts and assistant replies
 - code and source code

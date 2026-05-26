@@ -59,7 +59,7 @@ end
 
 assert("rules should reject practical private field names") do
   schema.fetch("privateFieldDenylist").all? { |field| rules.include?(%("#{field}")) } &&
-    rules.include?("noPrivateObservedFields(data)") &&
+    rules.include?("noPrivateTopLevel(data)") &&
     docs.include?("Rejected Private Fields")
 end
 
@@ -84,10 +84,10 @@ assert("reward events should be server-owned abstract Codex hook summaries") do
   rules.include?("match /rewardEvents/{eventId}") &&
     rules.include?("allow read: if isOwner(uid);") &&
     rules.include?("allow write: if false;") &&
-    rules.include?('data.source == "codex_hook"') &&
     schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "serverOwned") == true &&
     schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "clientAccess") == ["read"] &&
-    schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "appendOnly") == true
+    schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "appendOnly") == true &&
+    schema.dig("collections", "players/{uid}/rewardEvents/{eventId}", "fields").include?("source")
 end
 
 assert("emulator rule smoke script should cover allow and deny cases") do

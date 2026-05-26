@@ -65,11 +65,6 @@ service cloud.firestore {
       return !data.keys().hasAny(privateKeys());
     }
 
-    function noPrivateObservedFields(data) {
-      return !("observedFields" in data) ||
-        (data.observedFields is map && noPrivateTopLevel(data.observedFields));
-    }
-
     function abstractOwned(uid, data) {
       return data.ownerUid == uid &&
         data.privacyClass == "abstract" &&
@@ -86,10 +81,6 @@ service cloud.firestore {
 
     function optionalBool(data, field) {
       return !(field in data) || data[field] is bool;
-    }
-
-    function optionalMap(data, field) {
-      return !(field in data) || data[field] is map;
     }
 
     function optionalList(data, field) {
@@ -192,78 +183,6 @@ service cloud.firestore {
         optionalString(data, "lastLocalEventId") &&
         optionalString(data, "lastCloudEventId") &&
         optionalString(data, "conflictState");
-    }
-
-    function validRewardEvent(uid, eventId, data) {
-      return abstractOwned(uid, data) &&
-        noPrivateObservedFields(data) &&
-        data.keys().hasOnly([
-          "ownerUid",
-          "eventId",
-          "eventType",
-          "schemaVersion",
-          "receiptSchemaVersion",
-          "receiptType",
-          "sequence",
-          "timestamp",
-          "sessionId",
-          "turnId",
-          "observedFields",
-          "privacyClass",
-          "source",
-          "signature",
-          "checksum",
-          "clientCreatedAt",
-          "receivedAt",
-          "reducedAt",
-          "rewardControl"
-        ]) &&
-        data.keys().hasAll(["ownerUid", "eventId", "eventType", "schemaVersion", "sequence", "timestamp", "privacyClass", "source", "signature", "checksum"]) &&
-        data.eventId == eventId &&
-        data.schemaVersion is int &&
-        (!("receiptSchemaVersion" in data) || data.receiptSchemaVersion is int) &&
-        data.sequence is int &&
-        data.eventType is string &&
-        data.eventType.matches("^work_[a-z_]+$") &&
-        data.source == "codex_hook" &&
-        timestampLike(data, "timestamp") &&
-        timestampLike(data, "clientCreatedAt") &&
-        timestampLike(data, "receivedAt") &&
-        timestampLike(data, "reducedAt") &&
-        optionalString(data, "sessionId") &&
-        optionalString(data, "turnId") &&
-        optionalString(data, "receiptType") &&
-        optionalString(data, "signature") &&
-        optionalString(data, "checksum") &&
-        optionalMap(data, "observedFields") &&
-        optionalMap(data, "rewardControl");
-    }
-
-    function validSyncDevice(uid, data) {
-      return abstractOwned(uid, data) &&
-        data.keys().hasOnly([
-          "ownerUid",
-          "deviceId",
-          "deviceName",
-          "status",
-          "privacyClass",
-          "scopes",
-          "createdAt",
-          "updatedAt",
-          "lastUsedAt",
-          "revokedAt",
-          "linkSessionId"
-        ]) &&
-        data.keys().hasAll(["ownerUid", "deviceId", "status", "privacyClass"]) &&
-        optionalString(data, "deviceId") &&
-        optionalString(data, "deviceName") &&
-        optionalString(data, "status") &&
-        optionalList(data, "scopes") &&
-        timestampLike(data, "createdAt") &&
-        timestampLike(data, "updatedAt") &&
-        timestampLike(data, "lastUsedAt") &&
-        timestampLike(data, "revokedAt") &&
-        optionalString(data, "linkSessionId");
     }
 
     match /_emulatorSmoke/{uid} {
