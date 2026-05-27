@@ -2,6 +2,18 @@
 
 MCP Miner is a passive asteroid-mining game for Codex work.
 
+## Install In Codex
+
+There is not currently a public self-serve OpenAI plugin marketplace submission flow documented for Codex plugins, so the simplest user install path is a public GitHub repo plus the local marketplace file in this repository.
+
+```sh
+git clone https://github.com/jrslyce/mcp-miner.git
+cd mcp-miner
+ruby scripts/install_codex_plugin.rb
+```
+
+The installer backs up `~/.codex/config.toml`, registers this repo as the `diamond-mcp` marketplace, and enables `mcp-miner@diamond-mcp`. Restart Codex after running it.
+
 ## Codex Hook Trust
 
 After installing the Codex plugin, users must restart Codex and trust the 6 MCP Miner hooks in the Hooks UI (`/hooks` in Codex, or Hooks from settings):

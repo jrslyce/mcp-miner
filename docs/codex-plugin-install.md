@@ -2,6 +2,41 @@
 
 MCP Miner is packaged as the local Codex desktop plugin at `plugins/mcp-miner`.
 
+## Quick Install
+
+Clone the repo, then run the installer from the repository root:
+
+```sh
+git clone https://github.com/jrslyce/mcp-miner.git
+cd mcp-miner
+ruby scripts/install_codex_plugin.rb
+```
+
+The installer updates `~/.codex/config.toml` with:
+
+```toml
+[marketplaces.diamond-mcp]
+source_type = "local"
+source = "/absolute/path/to/mcp-miner"
+
+[plugins."mcp-miner@diamond-mcp"]
+enabled = true
+```
+
+It also creates a timestamped backup before changing an existing config. To preview the config change, run:
+
+```sh
+ruby scripts/install_codex_plugin.rb --dry-run
+```
+
+To remove the Codex entries later, run:
+
+```sh
+ruby scripts/install_codex_plugin.rb --uninstall
+```
+
+The repository includes `.agents/plugins/marketplace.json`, which points Codex at `./plugins/mcp-miner`.
+
 ## Local Install Smoke
 
 From the repository root:
@@ -9,6 +44,7 @@ From the repository root:
 ```sh
 npm run validate:plugin
 npm run test:plugin-install
+npm run test:codex-installer
 ```
 
 `test:plugin-install` verifies the plugin the same way Codex desktop should use it:
@@ -18,6 +54,7 @@ npm run test:plugin-install
 - `plugins/mcp-miner/.codex-plugin/plugin.json` points Codex at `./hooks/hooks.json`.
 - `plugins/mcp-miner/hooks/hooks.json` commands run through `ruby "$PLUGIN_ROOT/hooks/mcp_miner_hook.rb" ...`.
 - `plugins/mcp-miner/skills/mcp-miner/SKILL.md` documents the live MCP tool list and privacy behavior.
+- `scripts/install_codex_plugin.rb` safely registers the local marketplace and plugin entry in a Codex config.
 
 ## Local State
 

@@ -12,6 +12,7 @@ MCP_CONFIG = File.join(PLUGIN_ROOT, ".mcp.json")
 HOOKS_CONFIG = File.join(PLUGIN_ROOT, "hooks", "hooks.json")
 SKILL_FILE = File.join(PLUGIN_ROOT, "skills", "mcp-miner", "SKILL.md")
 INSTALL_DOC = File.join(ROOT, "docs", "codex-plugin-install.md")
+MARKETPLACE_FILE = File.join(ROOT, ".agents", "plugins", "marketplace.json")
 $checks = 0
 
 def assert(message)
@@ -70,6 +71,7 @@ def documented_tool_names(skill_source)
 end
 
 manifest = read_json(PLUGIN_MANIFEST)
+marketplace = read_json(MARKETPLACE_FILE)
 mcp_config = read_json(MCP_CONFIG)
 hooks_config = read_json(HOOKS_CONFIG)
 skill_source = File.read(SKILL_FILE)
@@ -88,6 +90,16 @@ assert("plugin-relative manifest paths should resolve from plugin root") do
     File.file?(File.expand_path(manifest.fetch("mcpServers"), PLUGIN_ROOT)) &&
     File.file?(File.expand_path(manifest.fetch("hooks"), PLUGIN_ROOT)) &&
     File.file?(SKILL_FILE)
+end
+
+marketplace_plugin = marketplace.fetch("plugins").find { |plugin| plugin.fetch("name") == "mcp-miner" }
+assert("repo marketplace should publish the local MCP Miner plugin") do
+  marketplace.fetch("name") == "diamond-mcp" &&
+    marketplace_plugin &&
+    marketplace_plugin.dig("source", "source") == "local" &&
+    marketplace_plugin.dig("source", "path") == "./plugins/mcp-miner" &&
+    marketplace_plugin.dig("policy", "installation") == "AVAILABLE" &&
+    marketplace_plugin.dig("policy", "authentication") == "ON_INSTALL"
 end
 
 server = mcp_config.fetch("mcpServers").fetch("mcp-miner")
@@ -161,7 +173,10 @@ assert("install docs should cover state path, hook trust, reset, backup, and smo
     install_doc.include?("subagentStop") &&
     install_doc.include?("stop") &&
     install_doc.include?("passive mining stays at zero") &&
+    install_doc.include?(".agents/plugins/marketplace.json") &&
+    install_doc.include?("ruby scripts/install_codex_plugin.rb") &&
     install_doc.include?("npm run test:plugin-install") &&
+    install_doc.include?("npm run test:codex-installer") &&
     install_doc.include?("npm run validate:plugin")
 end
 

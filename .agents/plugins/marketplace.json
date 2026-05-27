@@ -1,0 +1,20 @@
+{
+  "name": "diamond-mcp",
+  "interface": {
+    "displayName": "Diamond MCP"
+  },
+  "plugins": [
+    {
+      "name": "mcp-miner",
+      "source": {
+        "source": "local",
+        "path": "./plugins/mcp-miner"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Entertainment"
+    }
+  ]
+}
