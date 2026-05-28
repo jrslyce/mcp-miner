@@ -15,7 +15,9 @@ const {
   hasDeviceScope,
   newDeviceToken,
   newLinkSession,
+  normalizeDeviceSecret,
   normalizeLinkCode,
+  normalizeLinkSessionId,
   publicLinkSession,
   requirePendingSession,
   sanitizeDashboardUrl,
@@ -508,8 +510,12 @@ function legacyCursorFromDefault(cursorId, defaultSync) {
 }
 
 async function resolveLinkSessionRef(data) {
-  const sessionId = typeof data.sessionId === "string" ? data.sessionId.trim() : "";
-  if (sessionId) {
+  const rawSessionId = typeof data.sessionId === "string" ? data.sessionId.trim() : "";
+  if (rawSessionId) {
+    const sessionId = normalizeLinkSessionId(rawSessionId);
+    if (!sessionId) {
+      throw new HttpsError("invalid-argument", "A valid MCP Miner link session ID is required.");
+    }
     return db.doc(`linkSessions/${sessionId}`);
   }
 
@@ -1436,8 +1442,8 @@ exports.rejectLinkSession = onCall({ region: "us-central1" }, async (request) =>
 });
 
 exports.exchangeLinkSession = onCall({ region: "us-central1" }, async (request) => {
-  const sessionId = request.data && request.data.sessionId;
-  const deviceSecret = request.data && request.data.deviceSecret;
+  const sessionId = normalizeLinkSessionId(request.data && request.data.sessionId);
+  const deviceSecret = normalizeDeviceSecret(request.data && request.data.deviceSecret);
   if (!sessionId || !deviceSecret) {
     throw new HttpsError("invalid-argument", "sessionId and deviceSecret are required.");
   }
@@ -1446,7 +1452,7 @@ exports.exchangeLinkSession = onCall({ region: "us-central1" }, async (request) 
     subjectType: "link_session"
   }, new Date().toISOString());
 
-  const ref = db.doc(`linkSessions/${String(sessionId)}`);
+  const ref = db.doc(`linkSessions/${sessionId}`);
   const now = new Date().toISOString();
   const token = newDeviceToken();
   const hash = deviceTokenHash(token);
