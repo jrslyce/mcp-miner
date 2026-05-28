@@ -36,6 +36,40 @@ asteroid_ids = %w[
 ]
 
 required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
+assert("landing page should explain MCP Miner before the dashboard") do
+  index.include?(%(<main id="home" class="landing-shell">)) &&
+    index.include?("Turn Codex work into a tiny asteroid-mining game.") &&
+    index.include?("Install the plugin") &&
+    index.include?("Open dashboard") &&
+    index.include?(%(href="https://github.com/jrslyce/mcp-miner")) &&
+    index.include?(%(src="/assets/logo.png")) &&
+    index.include?(%(src="/assets/asteroids/asteroid_diamond_class_body.svg"))
+end
+
+assert("landing page should document gameplay, install, privacy, and account linking") do
+  index.include?(%(id="how-it-works")) &&
+    index.include?(%(id="privacy")) &&
+    index.include?(%(id="install")) &&
+    index.include?(%(id="portal")) &&
+    index.include?("git clone https://github.com/jrslyce/mcp-miner.git") &&
+    index.include?("ruby scripts/install_codex_plugin.rb") &&
+    index.include?("Prompts stored") &&
+    index.include?("Not collected for gameplay") &&
+    index.include?("short-lived approval code") &&
+    index.include?("revocable device token")
+end
+
+assert("landing page should use responsive production styles") do
+  styles.include?(".landing-hero") &&
+    styles.include?(".hero-console") &&
+    styles.include?(".play-grid") &&
+    styles.include?(".privacy-columns") &&
+    styles.include?(".install-terminal") &&
+    styles.include?("@media (max-width: 980px)") &&
+    styles.include?("@media (max-width: 700px)") &&
+    !styles.include?("radial-gradient")
+end
+
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
     index.include?(%(<script type="module" src="/auth.js"></script>)) &&

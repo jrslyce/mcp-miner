@@ -1,6 +1,6 @@
-# Firebase Dashboard MVP
+# Firebase Portal MVP
 
-The Firebase Hosting dashboard is a static web app in `firebase/hosting`. It opens on a working MCP Miner dashboard instead of a marketing page, with a signed-out demo snapshot and a signed-in cloud profile state.
+The Firebase Hosting portal is a static web app in `firebase/hosting`. It opens with a public landing page that explains the game, install flow, privacy boundary, and optional Codex account linking, then continues into the working MCP Miner dashboard with a signed-out demo snapshot and a signed-in cloud profile state.
 
 ## Data Sources
 

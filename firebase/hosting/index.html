@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MCP Miner Dashboard</title>
+    <title>MCP Miner - Codex Mining Game</title>
+    <meta name="description" content="MCP Miner is a privacy-safe Codex plugin that turns abstract work signals into a cozy asteroid-mining progression game.">
     <link rel="icon" type="image/png" href="/assets/logo.png">
     <link rel="apple-touch-icon" href="/assets/logo.png">
     <script>
@@ -17,7 +18,180 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <main class="dashboard-shell">
+    <main id="home" class="landing-shell">
+      <nav class="landing-nav" aria-label="MCP Miner site">
+        <a class="landing-brand" href="#home" aria-label="MCP Miner home">
+          <img class="landing-brand-mark" src="/assets/logo.png" alt="">
+          <span>MCP Miner</span>
+        </a>
+        <div class="landing-nav-links">
+          <a href="#how-it-works">How it works</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#install">Install</a>
+          <a href="#portal">Portal</a>
+        </div>
+        <div class="landing-nav-actions">
+          <button id="theme-toggle" type="button" class="theme-toggle" aria-pressed="false" aria-label="Use dark mode">
+            <span id="theme-toggle-label">Dark</span>
+          </button>
+          <a class="nav-button" href="https://github.com/jrslyce/mcp-miner">GitHub</a>
+        </div>
+      </nav>
+
+      <section class="landing-hero" aria-labelledby="landing-title">
+        <div class="hero-background" aria-hidden="true">
+          <img class="hero-logo-ghost" src="/assets/logo.png" alt="">
+          <img class="hero-rock hero-rock-a" src="/assets/asteroids/asteroid_quartz_belt.svg" alt="">
+          <img class="hero-rock hero-rock-b" src="/assets/asteroids/asteroid_diamond_class_body.svg" alt="">
+        </div>
+        <div class="hero-copy">
+          <p class="eyebrow">Local-first Codex plugin</p>
+          <h1 id="landing-title">Turn Codex work into a tiny asteroid-mining game.</h1>
+          <p class="hero-lede">MCP Miner watches privacy-safe work signals, mines Chonks, fills space orders, unlocks upgrades, and lets you sync an optional web portal account when you want cloud progress.</p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="hero-button" href="#install">Install the plugin</a>
+            <a class="hero-button secondary" href="#dashboard">Open dashboard</a>
+          </div>
+          <dl class="hero-proof" aria-label="Privacy summary">
+            <div>
+              <dt>Prompts stored</dt>
+              <dd>Never</dd>
+            </div>
+            <div>
+              <dt>Local mode</dt>
+              <dd>Free</dd>
+            </div>
+            <div>
+              <dt>Cloud sync</dt>
+              <dd>Optional</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="hero-console" aria-label="MCP Miner gameplay preview">
+          <div class="console-topline">
+            <span>Asteroid scan</span>
+            <strong>Diamond-Class Body</strong>
+          </div>
+          <div class="console-stage">
+            <img src="/assets/asteroids/asteroid_diamond_class_body.svg" alt="Diamond-Class Body asteroid preview">
+          </div>
+          <div class="console-metrics">
+            <div>
+              <span>Chonks</span>
+              <strong>15,683</strong>
+            </div>
+            <div>
+              <span>Order</span>
+              <strong>Ready</strong>
+            </div>
+            <div>
+              <span>Sync</span>
+              <strong>Optional</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-section trust-band" aria-label="Privacy-safe gameplay">
+        <div>
+          <p class="eyebrow">Safety first</p>
+          <h2>No private Codex content is needed to play.</h2>
+        </div>
+        <p>MCP Miner turns abstract work events into game math. The plugin does not need OpenAI credentials, prompts, source code, file paths, repo names, terminal output, browser content, or transcripts.</p>
+      </section>
+
+      <section id="how-it-works" class="landing-section" aria-labelledby="how-title">
+        <div class="section-heading">
+          <p class="eyebrow">How to play</p>
+          <h2 id="how-title">Mine while you work, then spend what you earn.</h2>
+        </div>
+        <div class="play-grid">
+          <article class="play-card">
+            <span class="step-number">01</span>
+            <h3>Install in Codex</h3>
+            <p>Clone the public repo, run the installer, restart Codex, and trust the MCP Miner hooks.</p>
+          </article>
+          <article class="play-card">
+            <span class="step-number">02</span>
+            <h3>Use Codex normally</h3>
+            <p>Supported work events become abstract score receipts. Those receipts mine Chonks and materials.</p>
+          </article>
+          <article class="play-card">
+            <span class="step-number">03</span>
+            <h3>Fulfill orders</h3>
+            <p>Use mined materials to complete buyer requests, earn Space Bucks, and unlock upgrades.</p>
+          </article>
+          <article class="play-card">
+            <span class="step-number">04</span>
+            <h3>Sync if you want</h3>
+            <p>Link a portal account to see your cloud profile, devices, history, cosmetics, and raw sync receipts.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="privacy" class="landing-section privacy-section" aria-labelledby="privacy-title">
+        <div class="section-heading">
+          <p class="eyebrow">What data is used</p>
+          <h2 id="privacy-title">Small receipts in, game progress out.</h2>
+        </div>
+        <div class="privacy-columns">
+          <article>
+            <h3>Used for gameplay</h3>
+            <ul>
+              <li>Abstract event type and category</li>
+              <li>Server-calculated score and checksum</li>
+              <li>Sequence numbers for conflict detection</li>
+              <li>Aggregated progress, inventory, orders, and upgrades</li>
+            </ul>
+          </article>
+          <article>
+            <h3>Not collected for gameplay</h3>
+            <ul>
+              <li>Prompts, chat transcripts, or source code</li>
+              <li>File paths, repo names, or terminal output</li>
+              <li>Browser contents or OpenAI account credentials</li>
+              <li>Raw private work artifacts</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="install" class="landing-section install-section" aria-labelledby="install-title">
+        <div class="install-copy">
+          <p class="eyebrow">Install</p>
+          <h2 id="install-title">Add MCP Miner to another Codex instance.</h2>
+          <p>Run the installer from a local clone. It backs up your Codex config, registers the Diamond MCP marketplace, and enables the plugin.</p>
+        </div>
+        <div class="install-terminal" aria-label="Install commands">
+          <code>git clone https://github.com/jrslyce/mcp-miner.git</code>
+          <code>cd mcp-miner</code>
+          <code>ruby scripts/install_codex_plugin.rb</code>
+        </div>
+      </section>
+
+      <section id="portal" class="landing-section portal-section" aria-labelledby="portal-title">
+        <div class="section-heading">
+          <p class="eyebrow">Portal account</p>
+          <h2 id="portal-title">Connect Codex with a short-lived approval code.</h2>
+        </div>
+        <div class="portal-steps">
+          <article>
+            <strong>1. Start link in Codex</strong>
+            <p>Ask MCP Miner to sync account. Codex creates a temporary link code.</p>
+          </article>
+          <article>
+            <strong>2. Sign in here</strong>
+            <p>Use Google or email/password, then approve the device shown in the portal.</p>
+          </article>
+          <article>
+            <strong>3. Complete in Codex</strong>
+            <p>Codex stores a revocable device token locally and can sync abstract game progress.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <section id="dashboard" class="dashboard-shell" aria-label="MCP Miner dashboard">
       <header class="topbar">
         <div class="brand-lockup">
           <img class="brand-mark" src="/assets/logo.png" alt="" aria-hidden="true">
@@ -28,9 +202,6 @@
         </div>
         <div class="topbar-actions">
           <span id="connection-pill" class="pill">Demo mode</span>
-          <button id="theme-toggle" type="button" class="theme-toggle" aria-pressed="false" aria-label="Use dark mode">
-            <span id="theme-toggle-label">Dark</span>
-          </button>
           <button id="refresh-dashboard" type="button" class="button-secondary">
             <span>Refresh</span>
           </button>
@@ -389,7 +560,7 @@
           </section>
         </section>
       </section>
-    </main>
+    </section>
 
     <script src="/firebase-config.js"></script>
     <script type="module" src="/auth.js"></script>
