@@ -8,6 +8,7 @@ require "tmpdir"
 
 ROOT = File.expand_path("..", __dir__)
 INSTALLER = File.join(ROOT, "scripts", "install_codex_plugin.rb")
+WINDOWS_INSTALLER = File.join(ROOT, "scripts", "install_codex_plugin.ps1")
 $checks = 0
 
 def assert(message)
@@ -31,6 +32,10 @@ Dir.mktmpdir("mcp-miner-codex-installer") do |dir|
 
     [projects."/tmp/example"]
     trust_level = "trusted"
+
+    [mcp_servers."mcp-miner"]
+    command = "ruby"
+    args = ["plugins/mcp-miner/scripts/mcp_server.rb"]
   TOML
 
   run_installer("--config", config_path, "--repo-root", ROOT)
@@ -47,6 +52,12 @@ Dir.mktmpdir("mcp-miner-codex-installer") do |dir|
   assert("installer should enable the MCP Miner plugin") do
     installed.include?('[plugins."mcp-miner@diamond-mcp"]') &&
       installed.include?("enabled = true")
+  end
+  assert("installer should remove standalone MCP server config that is not the plugin") do
+    !installed.include?('[mcp_servers."mcp-miner"]')
+  end
+  assert("installer should explain plugin vs standalone MCP server") do
+    run_installer("--config", File.join(dir, "fresh", "config.toml"), "--repo-root", ROOT).include?("not only the standalone MCP server")
   end
   assert("installer should back up an existing config before changing it") do
     Dir.glob("#{config_path}.backup-*").any?
@@ -75,8 +86,18 @@ Dir.mktmpdir("mcp-miner-codex-installer") do |dir|
   end
 end
 
+windows_installer = File.read(WINDOWS_INSTALLER)
+assert("Windows installer should install the Codex plugin and repair standalone MCP server config") do
+  windows_installer.include?('[plugins."$PluginRef"]') &&
+    windows_installer.include?("mcp_servers") &&
+    windows_installer.include?("not only the standalone MCP server") &&
+    windows_installer.include?("Ruby is required") &&
+    windows_installer.include?(".codex\\config.toml")
+end
+
 puts JSON.pretty_generate({
   ok: true,
   checks: $checks,
-  installer: File.basename(INSTALLER)
+  installer: File.basename(INSTALLER),
+  windows_installer: File.basename(WINDOWS_INSTALLER)
 })

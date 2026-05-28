@@ -4,13 +4,25 @@ MCP Miner is packaged as the local Codex desktop plugin at `plugins/mcp-miner`.
 
 ## Quick Install
 
-Clone the repo, then run the installer from the repository root:
+Clone the repo, then run the installer from the repository root.
+
+macOS/Linux:
 
 ```sh
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
 ruby scripts/install_codex_plugin.rb
 ```
+
+Windows PowerShell:
+
+```powershell
+git clone https://github.com/jrslyce/mcp-miner.git
+cd mcp-miner
+powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
+```
+
+The Windows installer checks that Ruby is available on `PATH`, because the plugin uses Ruby for its local hooks and MCP tools.
 
 The installer updates `~/.codex/config.toml` with:
 
@@ -29,13 +41,38 @@ It also creates a timestamped backup before changing an existing config. To prev
 ruby scripts/install_codex_plugin.rb --dry-run
 ```
 
+On Windows, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1 -DryRun
+```
+
 To remove the Codex entries later, run:
 
 ```sh
 ruby scripts/install_codex_plugin.rb --uninstall
 ```
 
+On Windows, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1 -Uninstall
+```
+
 The repository includes `.agents/plugins/marketplace.json`, which points Codex at `./plugins/mcp-miner`.
+
+## If You Only See The MCP Server
+
+If Codex shows an MCP server but does not show the MCP Miner plugin, the config probably has only a standalone MCP server entry such as `[mcp_servers."mcp-miner"]`. That starts tools, but it is not the Codex plugin and it will not install the plugin manifest or hook trust flow.
+
+Run the installer again from the repo root. It removes the stale standalone MCP Miner server entry and writes the plugin entry:
+
+```toml
+[plugins."mcp-miner@diamond-mcp"]
+enabled = true
+```
+
+After that, restart Codex. If the plugin still does not appear, open `~/.codex/config.toml` on macOS/Linux or `%USERPROFILE%\.codex\config.toml` on Windows and confirm both `[marketplaces.diamond-mcp]` and `[plugins."mcp-miner@diamond-mcp"]` are present.
 
 ## Local Install Smoke
 

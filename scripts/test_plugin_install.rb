@@ -175,6 +175,8 @@ assert("install docs should cover state path, hook trust, reset, backup, and smo
     install_doc.include?("passive mining stays at zero") &&
     install_doc.include?(".agents/plugins/marketplace.json") &&
     install_doc.include?("ruby scripts/install_codex_plugin.rb") &&
+    install_doc.include?(".\\scripts\\install_codex_plugin.ps1") &&
+    install_doc.include?("standalone MCP server") &&
     install_doc.include?("npm run test:plugin-install") &&
     install_doc.include?("npm run test:codex-installer") &&
     install_doc.include?("npm run validate:plugin")

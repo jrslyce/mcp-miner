@@ -153,12 +153,13 @@
         <div class="install-copy">
           <p class="eyebrow">Install</p>
           <h2 id="install-title">Add MCP Miner to another Codex instance.</h2>
-          <p>Run the installer from a local clone. It backs up your Codex config, registers the Diamond MCP marketplace, and enables the plugin.</p>
+          <p>Run the installer from a local clone. It backs up your Codex config, repairs standalone MCP-server-only installs, registers the Diamond MCP marketplace, and enables the plugin.</p>
         </div>
         <div class="install-terminal" aria-label="Install commands">
           <code>git clone https://github.com/jrslyce/mcp-miner.git</code>
           <code>cd mcp-miner</code>
           <code>ruby scripts/install_codex_plugin.rb</code>
+          <code>Windows: powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1</code>
         </div>
       </section>
 

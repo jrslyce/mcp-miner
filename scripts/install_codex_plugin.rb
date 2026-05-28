@@ -9,6 +9,10 @@ ROOT = File.expand_path("..", __dir__)
 MARKETPLACE_NAME = "diamond-mcp"
 PLUGIN_REF = "mcp-miner@diamond-mcp"
 PLUGIN_NAME = "MCP Miner"
+STANDALONE_MCP_HEADERS = [
+  "mcp_servers.mcp-miner",
+  %(mcp_servers."mcp-miner")
+].freeze
 
 options = {
   config: ENV.fetch("CODEX_CONFIG_PATH", File.join(Dir.home, ".codex", "config.toml")),
@@ -68,6 +72,9 @@ end
 def install_config(source, repo_root)
   config = remove_table(source, "marketplaces.#{MARKETPLACE_NAME}")
   config = remove_table(config, %(plugins."#{PLUGIN_REF}")).rstrip
+  STANDALONE_MCP_HEADERS.each do |header|
+    config = remove_table(config, header).rstrip
+  end
   config = "#{config}\n\n" unless config.empty?
 
   config + <<~TOML
@@ -126,6 +133,7 @@ if options[:uninstall]
   puts "#{PLUGIN_NAME} entries removed from #{config_path}."
 else
   puts "#{PLUGIN_NAME} installed in #{config_path}."
+  puts "This enables the Codex plugin entry, not only the standalone MCP server."
   puts "Restart Codex, then trust the 6 MCP Miner hooks in the Hooks UI."
   puts "Verify with: Show my MCP Miner status"
 end
