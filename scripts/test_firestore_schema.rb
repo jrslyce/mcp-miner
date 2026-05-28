@@ -67,6 +67,15 @@ assert("rules should reject practical private field names") do
     docs.include?("Rejected Private Fields")
 end
 
+assert("client-writeable profile and settings fields should be bounded") do
+  rules.include?("function optionalStringAtMost(data, field, maxSize)") &&
+    rules.include?("function optionalListAtMost(data, field, maxSize)") &&
+    rules.include?('optionalStringAtMost(data, "displayName", 80)') &&
+    rules.include?('optionalStringAtMost(data, "avatarConceptPrompt", 1000)') &&
+    rules.include?('optionalListAtMost(data, "customizationUnlocks", 50)') &&
+    rules.include?('optionalStringAtMost(data, "clientId", 120)')
+end
+
 assert("aggregate balances should be server-owned/read-only to clients") do
   %w[gameState inventory upgrades orders base cosmetics].all? do |collection|
     rules.include?("match /#{collection}/{docId}") && rules.include?("allow write: if false;")

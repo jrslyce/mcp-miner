@@ -5,12 +5,16 @@ const crypto = require("crypto");
 const LINK_SESSION_TTL_MS = 10 * 60 * 1000;
 const DEVICE_TOKEN_PREFIX = "mcpd_";
 const LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const LINK_SESSION_ID_PATTERN = /^link_[A-Za-z0-9_-]{20,80}$/;
+const DEVICE_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 const DEFAULT_DASHBOARD_URL = "https://mcp-miner.web.app";
 const ALLOWED_DASHBOARD_HOSTS = new Set([
   "mcp-miner.web.app",
   "mcp-miner.firebaseapp.com",
   "mcpminer.net",
-  "www.mcpminer.net",
+  "www.mcpminer.net"
+]);
+const LOCAL_DASHBOARD_HOSTS = new Set([
   "localhost",
   "127.0.0.1",
   "0.0.0.0"
@@ -39,6 +43,16 @@ function normalizeLinkCode(value) {
   return compact.length === 8 ? `${compact.slice(0, 4)}-${compact.slice(4)}` : "";
 }
 
+function normalizeLinkSessionId(value) {
+  const sessionId = String(value || "").trim();
+  return LINK_SESSION_ID_PATTERN.test(sessionId) ? sessionId : "";
+}
+
+function normalizeDeviceSecret(value) {
+  const secret = String(value || "").trim();
+  return DEVICE_SECRET_PATTERN.test(secret) ? secret : "";
+}
+
 function sha256(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
 }
@@ -49,6 +63,16 @@ function secretHash(secret) {
 
 function deviceTokenHash(token) {
   return sha256(`mcp-miner-device-token:${token}`);
+}
+
+function truthyEnv(name) {
+  return ["1", "true", "yes", "on"].includes(String(process.env[name] || "").toLowerCase());
+}
+
+function localDashboardUrlsAllowed() {
+  return truthyEnv("MCP_MINER_ALLOW_LOCAL_DASHBOARD_URLS") ||
+    truthyEnv("FUNCTIONS_EMULATOR") ||
+    Boolean(process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST);
 }
 
 function sanitizeDashboardUrl(value, configured = DEFAULT_DASHBOARD_URL) {
@@ -63,10 +87,11 @@ function sanitizeDashboardUrl(value, configured = DEFAULT_DASHBOARD_URL) {
   if (!["https:", "http:"].includes(parsed.protocol)) {
     throw new Error("dashboardUrl must use http or https.");
   }
-  if (!ALLOWED_DASHBOARD_HOSTS.has(parsed.hostname)) {
+  const localDashboardHost = LOCAL_DASHBOARD_HOSTS.has(parsed.hostname);
+  if (!ALLOWED_DASHBOARD_HOSTS.has(parsed.hostname) && !(localDashboardHost && localDashboardUrlsAllowed())) {
     throw new Error("dashboardUrl host is not allowed for MCP Miner links.");
   }
-  if (parsed.protocol !== "https:" && !["localhost", "127.0.0.1", "0.0.0.0"].includes(parsed.hostname)) {
+  if (parsed.protocol !== "https:" && !localDashboardHost) {
     throw new Error("dashboardUrl must use https outside localhost.");
   }
 
@@ -149,13 +174,18 @@ module.exports = {
   ALLOWED_DASHBOARD_HOSTS,
   DEFAULT_DASHBOARD_URL,
   DEVICE_TOKEN_PREFIX,
+  DEVICE_SECRET_PATTERN,
+  LOCAL_DASHBOARD_HOSTS,
   LINK_SESSION_TTL_MS,
+  LINK_SESSION_ID_PATTERN,
   deviceTokenHash,
   generateLinkCode,
   hasDeviceScope,
   newDeviceToken,
   newLinkSession,
+  normalizeDeviceSecret,
   normalizeLinkCode,
+  normalizeLinkSessionId,
   publicLinkSession,
   requirePendingSession,
   sanitizeDashboardUrl,

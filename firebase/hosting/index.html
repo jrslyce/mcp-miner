@@ -7,14 +7,7 @@
     <meta name="description" content="MCP Miner is a privacy-safe Codex plugin that turns abstract work signals into a cozy asteroid-mining progression game.">
     <link rel="icon" type="image/png" href="/assets/logo.png">
     <link rel="apple-touch-icon" href="/assets/logo.png">
-    <script>
-      (() => {
-        const saved = localStorage.getItem("mcp-miner-theme");
-        const systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = saved === "light" || saved === "dark" ? saved : (systemDark ? "dark" : "light");
-        document.documentElement.dataset.theme = theme;
-      })();
-    </script>
+    <script src="/theme.js"></script>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>

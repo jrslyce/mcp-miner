@@ -7,7 +7,9 @@ const {
   hasDeviceScope,
   newDeviceToken,
   newLinkSession,
+  normalizeDeviceSecret,
   normalizeLinkCode,
+  normalizeLinkSessionId,
   publicLinkSession,
   requirePendingSession,
   sanitizeDashboardUrl,
@@ -46,6 +48,15 @@ check("link code normalization should tolerate spacing and lower case", () => {
   return normalizeLinkCode(session.code.toLowerCase().replace("-", " ")) === session.code;
 });
 
+check("link session and device secret normalization should reject path-like or oversized values", () => {
+  return normalizeLinkSessionId(session.sessionId) === session.sessionId &&
+    normalizeLinkSessionId(`${session.sessionId}/nested`) === "" &&
+    normalizeLinkSessionId("link_short") === "" &&
+    normalizeDeviceSecret(deviceSecret) === deviceSecret &&
+    normalizeDeviceSecret(`${deviceSecret}/nested`) === "" &&
+    normalizeDeviceSecret("short") === "";
+});
+
 check("fresh pending sessions should validate", () => {
   return validateLinkSession(session, new Date("2026-05-25T12:01:00Z")).ok === true;
 });
@@ -65,10 +76,16 @@ check("device tokens should be prefixed and stored as hashes", () => {
     deviceTokenHash(token) !== token;
 });
 
-check("dashboard URLs should be restricted to MCP Miner and localhost origins", () => {
+check("dashboard URLs should reject local origins outside emulator or explicit opt-in", () => {
   assert.throws(() => sanitizeDashboardUrl("https://example.com/phish"), /not allowed/);
-  return sanitizeDashboardUrl("https://mcp-miner.web.app/path") === "https://mcp-miner.web.app" &&
-    sanitizeDashboardUrl("http://127.0.0.1:5000/path") === "http://127.0.0.1:5000";
+  assert.throws(() => sanitizeDashboardUrl("http://127.0.0.1:5000/path"), /not allowed/);
+  process.env.FUNCTIONS_EMULATOR = "true";
+  try {
+    return sanitizeDashboardUrl("https://mcp-miner.web.app/path") === "https://mcp-miner.web.app" &&
+      sanitizeDashboardUrl("http://127.0.0.1:5000/path") === "http://127.0.0.1:5000";
+  } finally {
+    delete process.env.FUNCTIONS_EMULATOR;
+  }
 });
 
 check("approval and rejection should require pending sessions", () => {

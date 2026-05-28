@@ -556,6 +556,8 @@ const EMAIL_VERIFICATION_SENT = "Verification email sent. Check your inbox, then
 const EMAIL_VERIFICATION_FAILED = "Account created, but the verification email could not be sent. Use Resend Verification.";
 const VERIFICATION_RESEND_COOLDOWN_MS = 60_000;
 const THEME_STORAGE_KEY = "mcp-miner-theme";
+const LINK_SESSION_ID_PATTERN = /^link_[A-Za-z0-9_-]{20,80}$/;
+const LINK_CODE_PATTERN = /^[A-Z0-9]{4}-?[A-Z0-9]{4}$/;
 const ASTEROID_CLASSES = [
   {
     id: "asteroid_starter_rubble",
@@ -724,8 +726,8 @@ const linkedDevicesSummary = document.querySelector("#linked-devices-summary");
 const linkedDevicesList = document.querySelector("#linked-devices-list");
 const linkParams = new URLSearchParams(window.location.search);
 const pendingLink = {
-  sessionId: linkParams.get("sessionId") || "",
-  code: linkParams.get("linkCode") || linkParams.get("code") || ""
+  sessionId: normalizeLinkSessionId(linkParams.get("sessionId")),
+  code: normalizeLinkCodeParam(linkParams.get("linkCode") || linkParams.get("code"))
 };
 
 let currentUser = null;
@@ -1446,6 +1448,21 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll("\"", "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function normalizeLinkSessionId(value) {
+  const sessionId = String(value || "").trim();
+  return LINK_SESSION_ID_PATTERN.test(sessionId) ? sessionId : "";
+}
+
+function normalizeLinkCodeParam(value) {
+  const code = String(value || "").trim().toUpperCase();
+  return LINK_CODE_PATTERN.test(code) ? code : "";
+}
+
+function sanitizeCssColor(value, fallback = "#66766d") {
+  const color = String(value || "").trim();
+  return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(color) ? color : fallback;
 }
 
 function numberValue(value, fallback = 0) {
@@ -2490,7 +2507,7 @@ function renderCosmetics(cosmetics) {
         const itemName = item.displayName || displayNameFromId(item.id);
         return `
           <article class="cosmetic-row" data-cosmetic-id="${escapeHtml(item.id)}" data-category="${escapeHtml(item.category)}" data-state="${escapeHtml(activeCosmeticPreview === item.id ? "preview" : item.state || "available")}" data-locked="${item.locked ? "true" : "false"}">
-            <span class="cosmetic-swatch" style="--cosmetic-swatch: ${escapeHtml(item.swatch || "#66766d")}"></span>
+            <span class="cosmetic-swatch" style="--cosmetic-swatch: ${sanitizeCssColor(item.swatch)}"></span>
             <div>
               <strong>${escapeHtml(item.displayName)}</strong>
               <span>${escapeHtml(item.description || displayNameFromId(item.availability))}</span>

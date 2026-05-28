@@ -47,7 +47,14 @@ assert("Firebase Hosting should include baseline browser security headers") do
   dashboard_headers = headers.find { |entry| entry["source"] == "**" }.fetch("headers")
   header_values = dashboard_headers.to_h { |header| [header["key"], header["value"]] }
   header_values["X-Content-Type-Options"] == "nosniff" &&
+    header_values["Content-Security-Policy"].include?("default-src 'self'") &&
+    header_values["Content-Security-Policy"].include?("script-src 'self' https://www.gstatic.com https://apis.google.com") &&
+    header_values["Content-Security-Policy"].include?("object-src 'none'") &&
+    header_values["Content-Security-Policy"].include?("frame-ancestors 'none'") &&
+    header_values["Cross-Origin-Opener-Policy"] == "same-origin-allow-popups" &&
+    header_values["Cross-Origin-Resource-Policy"] == "same-origin" &&
     header_values["Referrer-Policy"] == "strict-origin-when-cross-origin" &&
+    header_values["X-Permitted-Cross-Domain-Policies"] == "none" &&
     header_values["X-Frame-Options"] == "DENY" &&
     header_values["Permissions-Policy"].include?("camera=()") &&
     header_values["Permissions-Policy"].include?("microphone=()") &&

@@ -75,16 +75,16 @@ service cloud.firestore {
       return !(field in data) || data[field] is timestamp || data[field] is string;
     }
 
-    function optionalString(data, field) {
-      return !(field in data) || data[field] is string;
+    function optionalStringAtMost(data, field, maxSize) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxSize);
     }
 
     function optionalBool(data, field) {
       return !(field in data) || data[field] is bool;
     }
 
-    function optionalList(data, field) {
-      return !(field in data) || data[field] is list;
+    function optionalListAtMost(data, field, maxSize) {
+      return !(field in data) || (data[field] is list && data[field].size() <= maxSize);
     }
 
     function validPlayer(uid, data) {
@@ -105,8 +105,8 @@ service cloud.firestore {
         timestampLike(data, "createdAt") &&
         timestampLike(data, "updatedAt") &&
         timestampLike(data, "accountLinkedAt") &&
-        optionalString(data, "displayName") &&
-        optionalString(data, "minerName") &&
+        optionalStringAtMost(data, "displayName", 80) &&
+        optionalStringAtMost(data, "minerName", 80) &&
         optionalBool(data, "cloudSyncEnabled");
     }
 
@@ -128,13 +128,13 @@ service cloud.firestore {
         data.keys().hasAll(["ownerUid", "schemaVersion", "updatedAt", "privacyClass"]) &&
         data.schemaVersion is int &&
         timestampLike(data, "updatedAt") &&
-        optionalString(data, "displayName") &&
-        optionalString(data, "minerName") &&
-        optionalString(data, "pronouns") &&
-        optionalString(data, "suitStyle") &&
-        optionalString(data, "avatarConceptPrompt") &&
-        optionalList(data, "customizationUnlocks") &&
-        optionalList(data, "generatedAssetRefs");
+        optionalStringAtMost(data, "displayName", 80) &&
+        optionalStringAtMost(data, "minerName", 80) &&
+        optionalStringAtMost(data, "pronouns", 40) &&
+        optionalStringAtMost(data, "suitStyle", 160) &&
+        optionalStringAtMost(data, "avatarConceptPrompt", 1000) &&
+        optionalListAtMost(data, "customizationUnlocks", 50) &&
+        optionalListAtMost(data, "generatedAssetRefs", 20);
     }
 
     function validSettings(uid, data) {
@@ -154,8 +154,8 @@ service cloud.firestore {
         data.keys().hasAll(["ownerUid", "schemaVersion", "updatedAt", "privacyClass"]) &&
         data.schemaVersion is int &&
         timestampLike(data, "updatedAt") &&
-        optionalString(data, "reportMode") &&
-        optionalString(data, "dashboardTheme") &&
+        optionalStringAtMost(data, "reportMode", 40) &&
+        optionalStringAtMost(data, "dashboardTheme", 40) &&
         optionalBool(data, "cloudSyncEnabled") &&
         optionalBool(data, "appCheckDebugEnabled") &&
         optionalBool(data, "weeklyDigestEnabled") &&
@@ -182,11 +182,11 @@ service cloud.firestore {
         timestampLike(data, "updatedAt") &&
         timestampLike(data, "lastPulledAt") &&
         timestampLike(data, "lastPushedAt") &&
-        optionalString(data, "clientId") &&
-        optionalString(data, "clientVersion") &&
-        optionalString(data, "lastLocalEventId") &&
-        optionalString(data, "lastCloudEventId") &&
-        optionalString(data, "conflictState");
+        optionalStringAtMost(data, "clientId", 120) &&
+        optionalStringAtMost(data, "clientVersion", 80) &&
+        optionalStringAtMost(data, "lastLocalEventId", 120) &&
+        optionalStringAtMost(data, "lastCloudEventId", 120) &&
+        optionalStringAtMost(data, "conflictState", 80);
     }
 
     match /_emulatorSmoke/{uid} {

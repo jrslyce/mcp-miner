@@ -306,7 +306,8 @@ end
 
 assert("dashboard should support a persistent accessible theme toggle") do
   index.include?(%(id="theme-toggle")) &&
-    index.include?(%(localStorage.getItem("mcp-miner-theme"))) &&
+    index.include?(%(<script src="/theme.js"></script>)) &&
+    read("firebase/hosting/theme.js").include?(%(localStorage.getItem("mcp-miner-theme"))) &&
     auth_js.include?("const THEME_STORAGE_KEY = \"mcp-miner-theme\"") &&
     auth_js.include?("function applyTheme(theme)") &&
     auth_js.include?("themeToggle.setAttribute(\"aria-pressed\"") &&
@@ -399,6 +400,9 @@ end
 assert("link URLs should promote device linking above the demo dashboard") do
   index.index(%(data-panel="device-link")) < index.index(%(data-panel="auth")) &&
     auth_js.include?("const pendingLink = {") &&
+    auth_js.include?("const LINK_SESSION_ID_PATTERN = /^link_[A-Za-z0-9_-]{20,80}$/;") &&
+    auth_js.include?("function normalizeLinkSessionId(value)") &&
+    auth_js.include?("function normalizeLinkCodeParam(value)") &&
     auth_js.include?("function setLinkMode()") &&
     auth_js.include?("document.body.dataset.linkMode = hasPendingLink() ? \"pending\" : \"dashboard\"") &&
     auth_js.include?("function linkModeLabel(user)") &&
@@ -410,6 +414,12 @@ assert("link URLs should promote device linking above the demo dashboard") do
     auth_js.include?("const linkLabel = linkModeLabel(currentUser);") &&
     styles.include?("body[data-link-mode=\"pending\"] .workspace-grid") &&
     styles.include?("body[data-link-mode=\"pending\"] .link-panel")
+end
+
+assert("dashboard should sanitize CSS-injected cosmetic swatches") do
+  auth_js.include?("function sanitizeCssColor(value, fallback = \"#66766d\")") &&
+    auth_js.include?("style=\"--cosmetic-swatch: ${sanitizeCssColor(item.swatch)}\"") &&
+    !auth_js.include?("style=\"--cosmetic-swatch: ${escapeHtml(item.swatch")
 end
 
 assert("device link flow should expose clear account, verification, terminal, and error states") do
