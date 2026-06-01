@@ -118,7 +118,7 @@ assert("Windows installer should install the Codex plugin and repair standalone 
     windows_installer.include?("diamond-mcp") &&
     windows_installer.include?("mcp_servers") &&
     windows_installer.include?("not only the standalone MCP server") &&
-    windows_installer.include?("Ruby is required") &&
+    windows_installer.include?("MCP Miner Go binary") &&
     windows_installer.include?(".codex\\config.toml")
 end
 

@@ -8,6 +8,7 @@ ui-debug.log
 .env.*
 !.env.example
 dogfood-output/
+plugins/mcp-miner/bin/
 
 firebase/functions/node_modules/
 firebase/functions/lib/

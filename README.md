@@ -6,11 +6,14 @@ MCP Miner is a passive asteroid-mining game for Codex work.
 
 There is not currently a public self-serve OpenAI plugin marketplace submission flow documented for Codex plugins, so the simplest user install path is a public GitHub repo plus the local marketplace file in this repository.
 
+MCP Miner's Codex runtime is a compiled Go binary. Normal release installs do not require Go, Ruby, or Node on the user's machine; source checkouts need Go only when rebuilding `plugins/mcp-miner/bin/mcp-miner`.
+
 macOS/Linux:
 
 ```sh
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
+npm run build:plugin-go
 ruby scripts/install_codex_plugin.rb
 ```
 
@@ -19,6 +22,7 @@ Windows PowerShell:
 ```powershell
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
+npm run build:plugin-go
 powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
 ```
 
@@ -35,7 +39,7 @@ After installing the Codex plugin, users must restart Codex and trust the 6 MCP 
 - `subagentStop`
 - `stop`
 
-Without hook trust, MCP Miner status tools can still load, but passive mining stays at zero because Codex never runs the local Ruby hook commands. See [docs/codex-plugin-install.md](docs/codex-plugin-install.md) for the full install check.
+Without hook trust, MCP Miner status tools can still load, but passive mining stays at zero because Codex never runs the local Go hook commands. See [docs/codex-plugin-install.md](docs/codex-plugin-install.md) for the full install check.
 
 ## Account Linking
 

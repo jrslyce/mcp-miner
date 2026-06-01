@@ -6,11 +6,14 @@ MCP Miner is packaged as the local Codex desktop plugin at `plugins/mcp-miner`.
 
 Clone the repo, then run one installer from the repository root.
 
+Release bundles include the compiled Go runtime in `plugins/mcp-miner/bin`, so end users do not need Go installed. A source checkout needs Go only to rebuild that binary with `npm run build:plugin-go`.
+
 Windows PowerShell:
 
 ```powershell
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
+npm run build:plugin-go
 powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
 ```
 
@@ -19,10 +22,11 @@ macOS/Linux:
 ```sh
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
+npm run build:plugin-go
 ruby scripts/install_codex_plugin.rb
 ```
 
-Both installers register the same local Codex plugin. The Windows installer also checks that Ruby is available on `PATH`, because the plugin uses Ruby for its local hooks and MCP tools.
+Both installers register the same local Codex plugin. The Codex plugin runs the compiled Go binary for local hooks and MCP tools.
 
 The installer updates `~/.codex/config.toml` with:
 
@@ -87,9 +91,9 @@ npm run test:codex-installer
 `test:plugin-install` verifies the plugin the same way Codex desktop should use it:
 
 - `plugins/mcp-miner/.codex-plugin/plugin.json` keeps the validated manifest shape.
-- `plugins/mcp-miner/.mcp.json` launches `ruby ./scripts/mcp_server.rb` with `cwd` set to the plugin root.
+- `plugins/mcp-miner/.mcp.json` launches `./bin/mcp-miner mcp` with `cwd` set to the plugin root.
 - `plugins/mcp-miner/.codex-plugin/plugin.json` points Codex at `./hooks/hooks.json`.
-- `plugins/mcp-miner/hooks/hooks.json` commands run through `ruby "$PLUGIN_ROOT/hooks/mcp_miner_hook.rb" ...`.
+- `plugins/mcp-miner/hooks/hooks.json` commands run through `"$PLUGIN_ROOT/bin/mcp-miner" hook ...`.
 - `plugins/mcp-miner/skills/mcp-miner/SKILL.md` documents the live MCP tool list and privacy behavior.
 - `scripts/install_codex_plugin.rb` safely registers the local marketplace and plugin entry in a Codex config.
 
@@ -124,7 +128,7 @@ Codex should show 6 MCP Miner hooks to review:
 - `subagentStop`
 - `stop`
 
-Trust all 6. Codex requires this because hooks run local Ruby commands. If they are not trusted, MCP Miner status tools can still load, but passive mining stays at zero because Codex never runs the prompt, tool, subagent, or stop hooks.
+Trust all 6. Codex requires this because hooks run local Go commands. If they are not trusted, MCP Miner status tools can still load, but passive mining stays at zero because Codex never runs the prompt, tool, subagent, or stop hooks.
 
 To verify the install, start a fresh Codex turn, do a small tool action, then ask:
 

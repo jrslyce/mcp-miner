@@ -105,10 +105,11 @@ assert("repo marketplace should publish the local MCP Miner plugin") do
 end
 
 server = mcp_config.fetch("mcpServers").fetch("mcp-miner")
-assert(".mcp.json should launch the Ruby server from plugin root") do
-  server.fetch("command") == "ruby" &&
-    server.fetch("args") == ["./scripts/mcp_server.rb"] &&
+assert(".mcp.json should launch the Go server from plugin root") do
+  server.fetch("command") == "./bin/mcp-miner" &&
+    server.fetch("args") == ["mcp"] &&
     server.fetch("cwd") == "." &&
+    (File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner")) || File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner.exe"))) &&
     File.file?(File.join(PLUGIN_ROOT, "scripts", "mcp_server.rb"))
 end
 
@@ -118,7 +119,8 @@ end
 assert("hook commands should use PLUGIN_ROOT-relative scripts") do
   hook_commands.length >= 5 &&
     hook_commands.length == 6 &&
-    hook_commands.all? { |command| command.include?('$PLUGIN_ROOT/hooks/mcp_miner_hook.rb') } &&
+    hook_commands.all? { |command| command.include?('$PLUGIN_ROOT/bin/mcp-miner') } &&
+    (File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner")) || File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner.exe"))) &&
     File.file?(File.join(PLUGIN_ROOT, "hooks", "mcp_miner_hook.rb")) &&
     hooks_config.dig("hooks", "PostToolUse", 0, "matcher") == ".*"
 end

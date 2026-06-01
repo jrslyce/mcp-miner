@@ -1,6 +1,8 @@
 {
   "scripts": {
     "validate:data": "ruby scripts/validate_data.rb",
+    "build:plugin-go": "ruby scripts/build_plugin_go.rb",
+    "test:go": "go test ./...",
     "test:validator": "ruby scripts/test_validate_data.rb",
     "validate:plugin": "ruby scripts/validate_plugin_with_hooks.rb plugins/mcp-miner",
     "install:codex": "ruby scripts/install_codex_plugin.rb",
@@ -58,6 +60,6 @@
     "test:weekly": "ruby scripts/test_weekly_contracts.rb",
     "test:reward-controls": "ruby scripts/test_reward_controls.rb",
     "test:hooks": "ruby scripts/test_hooks.rb",
-    "check": "npm run validate:data && npm run test:validator && npm run validate:plugin && npm run test:plugin-install && npm run test:codex-installer && npm run test:v1-readiness && npm run test:firebase-config && npm run test:firebase-js && npm run test:firestore-schema && npm run test:auth-linking && npm run test:device-linking && npm run test:dashboard && npm run test:firebase-integration && npm run test:economy-simulation && npm run test:cloud-sync-api && npm run test:entitlements && npm run test:cloud-backups && npm run test:dashboard-analytics && npm run test:weekly-digest && npm run test:cosmetics-catalog && npm run test:cosmetics-entitlements && npm run test:billing && npm run test:stripe-webhooks && npm run test:crypto-billing && npm run test:crypto-evaluation && npm run test:subscription-qa && npm run test:observability && npm run test:subscription-ops && npm run test:support-tools && npm run test:sync-cadence-cost && npm run test:cloud-sync-client && npm run test:cloud-backup-client && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:store && npm run test:market && npm run test:upgrades && npm run test:asteroids && npm run test:fabrication && npm run test:base && npm run test:profile && npm run test:weekly && npm run test:reward-controls && npm run test:hooks"
+    "check": "npm run validate:data && npm run build:plugin-go && npm run test:go && npm run test:validator && npm run validate:plugin && npm run test:plugin-install && npm run test:codex-installer && npm run test:v1-readiness && npm run test:firebase-config && npm run test:firebase-js && npm run test:firestore-schema && npm run test:auth-linking && npm run test:device-linking && npm run test:dashboard && npm run test:firebase-integration && npm run test:economy-simulation && npm run test:cloud-sync-api && npm run test:entitlements && npm run test:cloud-backups && npm run test:dashboard-analytics && npm run test:weekly-digest && npm run test:cosmetics-catalog && npm run test:cosmetics-entitlements && npm run test:billing && npm run test:stripe-webhooks && npm run test:crypto-billing && npm run test:crypto-evaluation && npm run test:subscription-qa && npm run test:observability && npm run test:subscription-ops && npm run test:support-tools && npm run test:sync-cadence-cost && npm run test:cloud-sync-client && npm run test:cloud-backup-client && npm run test:mcp && npm run test:migrations && npm run test:orders && npm run test:store && npm run test:market && npm run test:upgrades && npm run test:asteroids && npm run test:fabrication && npm run test:base && npm run test:profile && npm run test:weekly && npm run test:reward-controls && npm run test:hooks"
   }
 }

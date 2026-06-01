@@ -4,6 +4,7 @@
 require "fileutils"
 require "json"
 require "optparse"
+require "rbconfig"
 
 ROOT = File.expand_path("..", __dir__)
 MARKETPLACE_NAME = "mcp-miner"
@@ -111,10 +112,16 @@ repo_root = File.expand_path(options[:repo_root])
 config_path = File.expand_path(options[:config])
 manifest_path = File.join(repo_root, "plugins", "mcp-miner", ".codex-plugin", "plugin.json")
 marketplace_path = File.join(repo_root, ".agents", "plugins", "marketplace.json")
+host_os = RbConfig::CONFIG.fetch("host_os")
+binary_name = host_os.match?(/mswin|mingw|cygwin/i) ? "mcp-miner.exe" : "mcp-miner"
+plugin_binary_path = File.join(repo_root, "plugins", "mcp-miner", "bin", binary_name)
 
 unless options[:uninstall]
   abort("Missing plugin manifest: #{manifest_path}") unless File.file?(manifest_path)
   abort("Missing marketplace file: #{marketplace_path}") unless File.file?(marketplace_path)
+  unless File.file?(plugin_binary_path)
+    abort("Missing MCP Miner Go binary: #{plugin_binary_path}. Install a release bundle that includes plugins/mcp-miner/bin, or run `npm run build:plugin-go` from a source checkout.")
+  end
 end
 
 current_config = File.file?(config_path) ? File.read(config_path) : ""

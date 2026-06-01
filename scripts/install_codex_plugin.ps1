@@ -108,16 +108,17 @@ $resolvedRepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
 $resolvedConfig = [System.IO.Path]::GetFullPath($Config)
 $manifestPath = Join-Path $resolvedRepoRoot "plugins\mcp-miner\.codex-plugin\plugin.json"
 $marketplacePath = Join-Path $resolvedRepoRoot ".agents\plugins\marketplace.json"
+$pluginBinaryPath = Join-Path $resolvedRepoRoot "plugins\mcp-miner\bin\mcp-miner.exe"
 
 if (-not $Uninstall) {
-  if (-not (Get-Command ruby -ErrorAction SilentlyContinue)) {
-    throw "Ruby is required because the MCP Miner plugin runs Ruby hooks and MCP tools. Install Ruby for Windows, reopen PowerShell, then rerun this script."
-  }
   if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "Missing plugin manifest: $manifestPath"
   }
   if (-not (Test-Path -LiteralPath $marketplacePath -PathType Leaf)) {
     throw "Missing marketplace file: $marketplacePath"
+  }
+  if (-not (Test-Path -LiteralPath $pluginBinaryPath -PathType Leaf)) {
+    throw "Missing MCP Miner Go binary: $pluginBinaryPath. Install a release bundle that includes plugins\mcp-miner\bin, or run `npm run build:plugin-go` from a source checkout."
   }
 }
 
