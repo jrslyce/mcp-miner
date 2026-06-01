@@ -43,6 +43,7 @@ def run_mcp_from_config(mcp_config, state_path)
 end
 
 def run_hook_command(command, mode_name, state_path)
+  resolved_command = command.gsub("$PLUGIN_ROOT", PLUGIN_ROOT)
   payload = {
     "session_id" => "plugin-install-smoke",
     "turn_id" => "plugin-install-turn",
@@ -53,7 +54,7 @@ def run_hook_command(command, mode_name, state_path)
   stdout, stderr, status = Open3.capture3({
     "PLUGIN_ROOT" => PLUGIN_ROOT,
     "MCP_MINER_STATE_PATH" => state_path
-  }, command, chdir: PLUGIN_ROOT, stdin_data: JSON.generate(payload))
+  }, resolved_command, chdir: PLUGIN_ROOT, stdin_data: JSON.generate(payload))
   raise "configured hook failed: #{stderr}" unless status.success?
 
   stdout.empty? ? {} : JSON.parse(stdout)
@@ -94,7 +95,8 @@ end
 
 marketplace_plugin = marketplace.fetch("plugins").find { |plugin| plugin.fetch("name") == "mcp-miner" }
 assert("repo marketplace should publish the local MCP Miner plugin") do
-  marketplace.fetch("name") == "diamond-mcp" &&
+  marketplace.fetch("name") == "mcp-miner" &&
+    marketplace.dig("interface", "displayName") == "MCP Miner" &&
     marketplace_plugin &&
     marketplace_plugin.dig("source", "source") == "local" &&
     marketplace_plugin.dig("source", "path") == "./plugins/mcp-miner" &&

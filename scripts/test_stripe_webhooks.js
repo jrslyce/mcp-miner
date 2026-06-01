@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("assert");
-const Stripe = require("../firebase/functions/node_modules/stripe");
+const crypto = require("crypto");
 const {
   billingFromSubscription,
   handleStripeWebhookEvent,
@@ -15,6 +15,38 @@ const env = {
   STRIPE_PRO_ANNUAL_PRICE_ID: "price_annual"
 };
 const now = "2026-05-24T00:00:00.000Z";
+
+function stripeTestClient() {
+  try {
+    const Stripe = require("../firebase/functions/node_modules/stripe");
+    return new Stripe("sk_test_fake");
+  } catch (_) {
+    return {
+      webhooks: {
+        generateTestHeaderString({ payload, secret }) {
+          const timestamp = Math.floor(Date.now() / 1000);
+          const signature = crypto
+            .createHmac("sha256", secret)
+            .update(`${timestamp}.${payload}`)
+            .digest("hex");
+          return `t=${timestamp},v1=${signature}`;
+        },
+        constructEvent(rawBody, header, secret) {
+          const payload = Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : String(rawBody);
+          const parts = Object.fromEntries(String(header).split(",").map((part) => part.split("=", 2)));
+          const expected = crypto
+            .createHmac("sha256", secret)
+            .update(`${parts.t}.${payload}`)
+            .digest("hex");
+          if (!parts.t || parts.v1 !== expected) {
+            throw new Error("Invalid signature");
+          }
+          return JSON.parse(payload);
+        }
+      }
+    };
+  }
+}
 
 let checks = 0;
 async function check(message, fn) {
@@ -194,7 +226,7 @@ function fakeDb() {
   });
 
   await check("signature verification should accept valid Stripe signatures", () => {
-    const stripe = new Stripe("sk_test_fake");
+    const stripe = stripeTestClient();
     const payload = JSON.stringify(event("customer.subscription.updated", subscription(), "evt_signed"));
     const secret = "whsec_test_secret";
     const header = stripe.webhooks.generateTestHeaderString({ payload, secret });
@@ -203,7 +235,7 @@ function fakeDb() {
   });
 
   await check("signature verification should reject invalid Stripe signatures", () => {
-    const stripe = new Stripe("sk_test_fake");
+    const stripe = stripeTestClient();
     const payload = JSON.stringify(event("customer.subscription.updated", subscription(), "evt_bad_sig"));
     try {
       verifyStripeWebhookEvent(stripe, Buffer.from(payload), "t=1,v1=bad", "whsec_test_secret");

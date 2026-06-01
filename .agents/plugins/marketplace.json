@@ -1,7 +1,7 @@
 {
-  "name": "diamond-mcp",
+  "name": "mcp-miner",
   "interface": {
-    "displayName": "Diamond MCP"
+    "displayName": "MCP Miner"
   },
   "plugins": [
     {

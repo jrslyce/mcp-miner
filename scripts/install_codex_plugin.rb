@@ -6,9 +6,11 @@ require "json"
 require "optparse"
 
 ROOT = File.expand_path("..", __dir__)
-MARKETPLACE_NAME = "diamond-mcp"
-PLUGIN_REF = "mcp-miner@diamond-mcp"
+MARKETPLACE_NAME = "mcp-miner"
+PLUGIN_REF = "mcp-miner@mcp-miner"
 PLUGIN_NAME = "MCP Miner"
+LEGACY_MARKETPLACE_NAMES = ["diamond-mcp"].freeze
+LEGACY_PLUGIN_REFS = ["mcp-miner@diamond-mcp"].freeze
 STANDALONE_MCP_HEADERS = [
   "mcp_servers.mcp-miner",
   %(mcp_servers."mcp-miner")
@@ -71,7 +73,13 @@ end
 
 def install_config(source, repo_root)
   config = remove_table(source, "marketplaces.#{MARKETPLACE_NAME}")
+  LEGACY_MARKETPLACE_NAMES.each do |marketplace_name|
+    config = remove_table(config, "marketplaces.#{marketplace_name}")
+  end
   config = remove_table(config, %(plugins."#{PLUGIN_REF}")).rstrip
+  LEGACY_PLUGIN_REFS.each do |plugin_ref|
+    config = remove_table(config, %(plugins."#{plugin_ref}")).rstrip
+  end
   STANDALONE_MCP_HEADERS.each do |header|
     config = remove_table(config, header).rstrip
   end
@@ -89,7 +97,14 @@ end
 
 def uninstall_config(source)
   config = remove_table(source, "marketplaces.#{MARKETPLACE_NAME}")
-  remove_table(config, %(plugins."#{PLUGIN_REF}")).rstrip + "\n"
+  LEGACY_MARKETPLACE_NAMES.each do |marketplace_name|
+    config = remove_table(config, "marketplaces.#{marketplace_name}")
+  end
+  config = remove_table(config, %(plugins."#{PLUGIN_REF}")).rstrip
+  LEGACY_PLUGIN_REFS.each do |plugin_ref|
+    config = remove_table(config, %(plugins."#{plugin_ref}")).rstrip
+  end
+  "#{config}\n"
 end
 
 repo_root = File.expand_path(options[:repo_root])

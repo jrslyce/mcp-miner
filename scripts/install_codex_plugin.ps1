@@ -8,9 +8,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$MarketplaceName = "diamond-mcp"
-$PluginRef = "mcp-miner@diamond-mcp"
+$MarketplaceName = "mcp-miner"
+$PluginRef = "mcp-miner@mcp-miner"
 $PluginName = "MCP Miner"
+$LegacyMarketplaceNames = @("diamond-mcp")
+$LegacyPluginRefs = @("mcp-miner@diamond-mcp")
 $StandaloneMcpHeaders = @(
   "mcp_servers.mcp-miner",
   'mcp_servers."mcp-miner"'
@@ -63,7 +65,13 @@ function Install-Config {
   )
 
   $configText = Remove-TomlTable $Source "marketplaces.$MarketplaceName"
+  foreach ($legacyMarketplaceName in $LegacyMarketplaceNames) {
+    $configText = Remove-TomlTable $configText "marketplaces.$legacyMarketplaceName"
+  }
   $configText = (Remove-TomlTable $configText "plugins.`"$PluginRef`"").TrimEnd()
+  foreach ($legacyPluginRef in $LegacyPluginRefs) {
+    $configText = (Remove-TomlTable $configText "plugins.`"$legacyPluginRef`"").TrimEnd()
+  }
   foreach ($header in $StandaloneMcpHeaders) {
     $configText = (Remove-TomlTable $configText $header).TrimEnd()
   }
@@ -86,7 +94,13 @@ function Uninstall-Config {
   param([string]$Source)
 
   $configText = Remove-TomlTable $Source "marketplaces.$MarketplaceName"
+  foreach ($legacyMarketplaceName in $LegacyMarketplaceNames) {
+    $configText = Remove-TomlTable $configText "marketplaces.$legacyMarketplaceName"
+  }
   $configText = (Remove-TomlTable $configText "plugins.`"$PluginRef`"").TrimEnd()
+  foreach ($legacyPluginRef in $LegacyPluginRefs) {
+    $configText = (Remove-TomlTable $configText "plugins.`"$legacyPluginRef`"").TrimEnd()
+  }
   return "$configText`n"
 }
 

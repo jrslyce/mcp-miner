@@ -9,11 +9,41 @@ require "tmpdir"
 ROOT = File.expand_path("..", __dir__)
 PLUGIN_ROOT = File.expand_path(ARGV[0] || "plugins/mcp-miner", ROOT)
 MANIFEST_PATH = File.join(PLUGIN_ROOT, ".codex-plugin", "plugin.json")
-UPSTREAM_VALIDATOR = "/Users/jared/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py"
+UPSTREAM_VALIDATOR_CANDIDATES = [
+  ENV["CODEX_PLUGIN_VALIDATOR"],
+  File.join(Dir.home, ".codex", "skills", ".system", "plugin-creator", "scripts", "validate_plugin.py"),
+  "/Users/jared/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py"
+].compact.freeze
+PYTHON_CANDIDATES = [
+  ENV["PYTHON"],
+  "python3",
+  "python",
+  "py"
+].compact.freeze
 
 def fail_with(message)
   warn message
   exit 1
+end
+
+def executable_available?(command)
+  _stdout, _stderr, status = Open3.capture3(command, "--version")
+  status.success?
+rescue Errno::ENOENT
+  false
+end
+
+def upstream_validator_path
+  UPSTREAM_VALIDATOR_CANDIDATES.find { |path| File.file?(path) }
+end
+
+def python_command
+  PYTHON_CANDIDATES.find { |command| executable_available?(command) }
+end
+
+def upstream_validator_dependencies_available?(command)
+  _stdout, _stderr, status = Open3.capture3(command, "-c", "import yaml")
+  status.success?
 end
 
 manifest = JSON.parse(File.read(MANIFEST_PATH))
@@ -35,11 +65,24 @@ Dir.mktmpdir("mcp-miner-plugin-validate") do |dir|
   temp_manifest.delete("hooks")
   File.write(temp_manifest_path, "#{JSON.pretty_generate(temp_manifest)}\n")
 
-  stdout, stderr, status = Open3.capture3("python3", UPSTREAM_VALIDATOR, temp_plugin)
-  unless status.success?
-    warn stdout unless stdout.empty?
-    warn stderr unless stderr.empty?
-    exit(status.exitstatus || 1)
+  validator = upstream_validator_path
+  python = python_command
+  if validator && python && upstream_validator_dependencies_available?(python)
+    stdout, stderr, status = Open3.capture3(python, validator, temp_plugin)
+    unless status.success?
+      warn stdout unless stdout.empty?
+      warn stderr unless stderr.empty?
+      exit(status.exitstatus || 1)
+    end
+  else
+    reason = if validator.nil?
+               "validator script was not found"
+             elsif python.nil?
+               "Python is not available"
+             else
+               "Python validator dependencies are not available"
+             end
+    warn "Skipping upstream plugin validator: #{reason}."
   end
 end
 

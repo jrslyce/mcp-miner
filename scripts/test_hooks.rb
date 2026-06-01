@@ -19,6 +19,13 @@ def assert(message)
   $checks += 1
 end
 
+def sibling_files_with_prefix(path, suffix_prefix)
+  prefix = "#{File.basename(path)}#{suffix_prefix}"
+  Dir.children(File.dirname(path)).select { |name| name.start_with?(prefix) }.map do |name|
+    File.join(File.dirname(path), name)
+  end
+end
+
 def run_hook(mode, payload, state_path)
   env = {
     "PLUGIN_ROOT" => PLUGIN_ROOT,
@@ -451,7 +458,7 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
   File.write(state_path, "{not-json")
   recovered_state = McpMiner::GameEngine.new(root: ROOT, state_path: state_path).state
   assert("corrupt state should be backed up") do
-    Dir.glob("#{state_path}.corrupt-*").any?
+    sibling_files_with_prefix(state_path, ".corrupt-").any?
   end
   assert("corrupt state should recover from journal replay") do
     recovered_state.dig("inventory", "mat_chonks") == replayed_state.dig("inventory", "mat_chonks") &&
@@ -525,7 +532,7 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     recovered_from_corrupt_journal = McpMiner::GameEngine.new(root: ROOT, state_path: corrupt_state_path).state
     new_journal_entries = journal_entries(corrupt_state_path)
     assert("corrupt journal should be backed up") do
-      Dir.glob("#{journal_path(corrupt_state_path)}.corrupt-*").any?
+      sibling_files_with_prefix(journal_path(corrupt_state_path), ".corrupt-").any?
     end
     assert("corrupt journal should preserve materialized state with an abstract migration snapshot") do
       recovered_from_corrupt_journal.dig("inventory", "mat_chonks") == state_before_corruption.dig("inventory", "mat_chonks") &&

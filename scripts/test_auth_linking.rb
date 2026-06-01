@@ -4,7 +4,7 @@
 require "json"
 require "open3"
 require "tmpdir"
-require "webrick"
+require_relative "test_support/webrick_compat"
 require_relative "../plugins/mcp-miner/lib/mcp_miner/game_engine"
 
 ROOT = File.expand_path("..", __dir__)

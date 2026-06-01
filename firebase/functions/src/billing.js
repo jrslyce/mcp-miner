@@ -1,6 +1,5 @@
 "use strict";
 
-const Stripe = require("stripe");
 const {
   PLAN_ENTITLEMENTS,
   evaluateEntitlement
@@ -59,6 +58,7 @@ function createStripeClient(env = process.env) {
   if (!secret || typeof secret !== "string" || !secret.trim()) {
     fail("failed-precondition", "STRIPE_SECRET_KEY must be configured before Stripe billing can start.");
   }
+  const Stripe = require("stripe");
   return new Stripe(secret.trim());
 }
 

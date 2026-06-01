@@ -7,6 +7,11 @@ require "yaml"
 
 ROOT = File.expand_path("..", __dir__)
 CATALOG_PATH = File.join(ROOT, "data", "cosmetics.yaml")
+NODE_CANDIDATES = [
+  ENV["NODE"],
+  "node",
+  File.join(Dir.home, ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies", "node", "bin", "node.exe")
+].compact.freeze
 $checks = 0
 
 def assert(message)
@@ -27,11 +32,24 @@ def contrast_ratio(background, foreground)
   (lighter + 0.05) / (darker + 0.05)
 end
 
+def executable_available?(command)
+  _stdout, _stderr, status = Open3.capture3(command, "--version")
+  status.success?
+rescue Errno::ENOENT, Errno::EACCES
+  false
+end
+
+def node_command
+  NODE_CANDIDATES.find { |command| executable_available?(command) }
+end
+
 data = YAML.load_file(CATALOG_PATH).fetch("cosmetic_catalog")
 items = data.fetch("items")
+node = node_command
+raise "Node.js is required for Functions catalog parity checks" unless node
 
 stdout, stderr, status = Open3.capture3(
-  "node",
+  node,
   "-e",
   "console.log(JSON.stringify(require('./firebase/functions/src/cosmetics').COSMETIC_CATALOG))",
   chdir: ROOT

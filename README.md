@@ -22,7 +22,7 @@ cd mcp-miner
 powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
 ```
 
-The installer backs up `~/.codex/config.toml` or `%USERPROFILE%\.codex\config.toml`, registers this repo as the `diamond-mcp` marketplace, removes stale standalone MCP Miner server config, and enables `mcp-miner@diamond-mcp`. Restart Codex after running it.
+The installer backs up `~/.codex/config.toml` or `%USERPROFILE%\.codex\config.toml`, registers this repo as the `mcp-miner` marketplace, removes stale standalone MCP Miner server config and legacy `diamond-mcp` entries, and enables `mcp-miner@mcp-miner`. Restart Codex after running it.
 
 ## Codex Hook Trust
 

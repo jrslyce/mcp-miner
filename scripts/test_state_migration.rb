@@ -16,6 +16,13 @@ def assert(message)
   $checks += 1
 end
 
+def sibling_files_with_prefix(path, suffix_prefix)
+  prefix = "#{File.basename(path)}#{suffix_prefix}"
+  Dir.children(File.dirname(path)).select { |name| name.start_with?(prefix) }.map do |name|
+    File.join(File.dirname(path), name)
+  end
+end
+
 def state(path)
   JSON.parse(File.read(path))
 end
@@ -53,7 +60,7 @@ Dir.mktmpdir("mcp-miner-migrations") do |dir|
   File.write(legacy_state_path, JSON.pretty_generate(legacy_state))
 
   migrated_state = McpMiner::GameEngine.new(root: ROOT, state_path: legacy_state_path).state
-  migration_backups = Dir.glob("#{legacy_state_path}.backup-v0-to-v#{McpMiner::GameEngine::CURRENT_STATE_SCHEMA_VERSION}-*")
+  migration_backups = sibling_files_with_prefix(legacy_state_path, ".backup-v0-to-v#{McpMiner::GameEngine::CURRENT_STATE_SCHEMA_VERSION}-")
   assert("legacy state should migrate to current state schema") do
     migrated_state["state_schema_version"] == McpMiner::GameEngine::CURRENT_STATE_SCHEMA_VERSION &&
       migrated_state.dig("inventory", "mat_chonks") == 77 &&
@@ -72,9 +79,9 @@ Dir.mktmpdir("mcp-miner-migrations") do |dir|
   current_state_path = File.join(dir, "current-state.json")
   current_engine = McpMiner::GameEngine.new(root: ROOT, state_path: current_state_path)
   current_engine.write_state(current_engine.initial_state)
-  current_backups_before = Dir.glob("#{current_state_path}.backup-*")
+  current_backups_before = sibling_files_with_prefix(current_state_path, ".backup-")
   current_state = McpMiner::GameEngine.new(root: ROOT, state_path: current_state_path).state
-  current_backups_after = Dir.glob("#{current_state_path}.backup-*")
+  current_backups_after = sibling_files_with_prefix(current_state_path, ".backup-")
   assert("current schema state should load without migration backup churn") do
     current_state["state_schema_version"] == McpMiner::GameEngine::CURRENT_STATE_SCHEMA_VERSION &&
       current_backups_before.empty? &&
@@ -84,7 +91,7 @@ Dir.mktmpdir("mcp-miner-migrations") do |dir|
   corrupt_state_path = File.join(dir, "corrupt-state.json")
   File.write(corrupt_state_path, "{not-json")
   recovered_state = McpMiner::GameEngine.new(root: ROOT, state_path: corrupt_state_path).state
-  corrupt_backups = Dir.glob("#{corrupt_state_path}.corrupt-*")
+  corrupt_backups = sibling_files_with_prefix(corrupt_state_path, ".corrupt-")
   assert("corrupt state should back up and reset to recoverable current schema") do
     corrupt_backups.length == 1 &&
       recovered_state["state_schema_version"] == McpMiner::GameEngine::CURRENT_STATE_SCHEMA_VERSION &&
@@ -108,7 +115,7 @@ Dir.mktmpdir("mcp-miner-migrations") do |dir|
   corrupt_journal_engine.write_state(corrupt_journal_engine.initial_state.merge("space_bucks" => 12))
   File.write(journal_path(corrupt_journal_state_path), "{not-json")
   recovered_journal_state = McpMiner::GameEngine.new(root: ROOT, state_path: corrupt_journal_state_path).state
-  journal_backups = Dir.glob("#{journal_path(corrupt_journal_state_path)}.corrupt-*")
+  journal_backups = sibling_files_with_prefix(journal_path(corrupt_journal_state_path), ".corrupt-")
   assert("corrupt journal should back up and preserve materialized state") do
     journal_backups.length == 1 &&
       recovered_journal_state["space_bucks"] == 12 &&

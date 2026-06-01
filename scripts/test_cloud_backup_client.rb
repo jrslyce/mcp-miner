@@ -4,7 +4,7 @@
 require "json"
 require "open3"
 require "tmpdir"
-require "webrick"
+require_relative "test_support/webrick_compat"
 require_relative "../plugins/mcp-miner/lib/mcp_miner/game_engine"
 
 ROOT = File.expand_path("..", __dir__)
@@ -15,6 +15,13 @@ def assert(message)
   raise message unless yield
 
   $checks += 1
+end
+
+def sibling_files_with_prefix(path, suffix_prefix)
+  prefix = "#{File.basename(path)}#{suffix_prefix}"
+  Dir.children(File.dirname(path)).select { |name| name.start_with?(prefix) }.map do |name|
+    File.join(File.dirname(path), name)
+  end
 end
 
 def run_mcp(state_path, calls)
@@ -287,10 +294,10 @@ Dir.mktmpdir("mcp-miner-cloud-backup-client") do |dir|
       { jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "restore_cloud_backup", arguments: { confirm: true, id_token: "fake-id-token", functions_origin: origin } } }
     ]).last)
     assert("local-newer cloud restore conflicts should not overwrite without allow_overwrite") do
-      conflict["ok"] == false &&
+        conflict["ok"] == false &&
         conflict["status"] == "local_newer_conflict" &&
         JSON.parse(File.read(state_path))["space_bucks"] == 42 &&
-        Dir.glob("#{state_path}.backup-before-cloud-restore-*").empty?
+        sibling_files_with_prefix(state_path, ".backup-before-cloud-restore-").empty?
     end
 
     restored = tool_payload(run_mcp(state_path, [
@@ -303,7 +310,7 @@ Dir.mktmpdir("mcp-miner-cloud-backup-client") do |dir|
         restored_state["space_bucks"] == 999 &&
         restored_state.dig("profile", "display_name") == "Restored Miner" &&
         restored_state["report_mode"] == "milestones_only" &&
-        Dir.glob("#{state_path}.backup-before-cloud-restore-*").length == 1
+        sibling_files_with_prefix(state_path, ".backup-before-cloud-restore-").length == 1
     end
   ensure
     server.shutdown
