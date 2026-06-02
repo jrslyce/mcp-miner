@@ -28,6 +28,26 @@ ruby scripts/install_codex_plugin.rb
 
 Both installers register the same local Codex plugin. The Codex plugin runs the compiled Go binary for local hooks and MCP tools.
 
+For macOS tester bundles, build the architecture-specific package instead of using the host checkout:
+
+```sh
+npm run package:plugin-macos-silicon
+npm run package:plugin-macos-intel
+```
+
+Those commands create:
+
+```text
+dist/mcp-miner-darwin-arm64
+dist/mcp-miner-darwin-amd64
+```
+
+Each bundle includes the correct `plugins/mcp-miner/bin/mcp-miner` binary and a macOS hook manifest that runs `"$PLUGIN_ROOT/bin/mcp-miner" hook ...`. Testers install from inside the matching bundle root with:
+
+```sh
+ruby scripts/install_codex_plugin.rb
+```
+
 The installer updates `~/.codex/config.toml` with:
 
 ```toml
@@ -85,6 +105,7 @@ From the repository root:
 ```sh
 npm run validate:plugin
 npm run test:plugin-install
+npm run test:macos-plugin-package
 npm run test:codex-installer
 ```
 
