@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook session_start",
+            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook session_start",
             "timeout": 10,
             "statusMessage": "Powering MCP Miner"
           }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook user_prompt_submit",
+            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook user_prompt_submit",
             "timeout": 10,
             "statusMessage": "Scanning asteroid work signal"
           }
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook subagent_start",
+            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook subagent_start",
             "timeout": 10,
             "statusMessage": "Tagging MCP Miner agent shift"
           }
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook subagent_stop",
+            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook subagent_stop",
             "timeout": 10,
             "statusMessage": "Closing MCP Miner agent shift"
           }
@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook post_tool_use",
+            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook post_tool_use",
             "timeout": 10,
             "statusMessage": "Mining Codex work"
           }
@@ -67,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook stop",
+            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook stop",
             "timeout": 10,
             "statusMessage": "Preparing MCP Miner report"
           }

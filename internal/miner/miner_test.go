@@ -3,6 +3,7 @@ package miner
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -104,6 +105,19 @@ func TestHookJournalStaysPrivacySafe(t *testing.T) {
 	for _, private := range []string{"private", "repo", "rg -n"} {
 		if strings.Contains(serialized, private) {
 			t.Fatalf("journal leaked private value %q: %s", private, serialized)
+		}
+	}
+	heartbeatRaw, err := os.ReadFile(filepath.Join(filepath.Dir(engine.StatePath), "hook-heartbeat.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	heartbeat := string(heartbeatRaw)
+	if !strings.Contains(heartbeat, `"mode":"post_tool_use"`) {
+		t.Fatalf("hook heartbeat did not record mode: %s", heartbeat)
+	}
+	for _, private := range []string{"private", "repo", "rg -n"} {
+		if strings.Contains(heartbeat, private) {
+			t.Fatalf("hook heartbeat leaked private value %q: %s", private, heartbeat)
 		}
 	}
 }

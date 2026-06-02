@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
 
 func RunHook(engine *Engine, mode string, in io.Reader, out io.Writer, errOut io.Writer) error {
 	raw, _ := io.ReadAll(in)
+	engine.recordHookHeartbeat(mode, len(strings.TrimSpace(string(raw))) > 0)
 	var payload any
 	if len(strings.TrimSpace(string(raw))) > 0 {
 		_ = json.Unmarshal(raw, &payload)
@@ -35,6 +38,29 @@ func RunHook(engine *Engine, mode string, in io.Reader, out io.Writer, errOut io
 	}
 	enc := json.NewEncoder(out)
 	return enc.Encode(response)
+}
+
+func (e *Engine) recordHookHeartbeat(mode string, payloadPresent bool) {
+	path := filepath.Join(filepath.Dir(e.StatePath), "hook-heartbeat.jsonl")
+	entry := M{
+		"timestamp":       nowISO(),
+		"mode":            mode,
+		"payload_present": payloadPresent,
+		"privacy_class":   "abstract",
+	}
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+	_, _ = file.Write(append(raw, '\n'))
 }
 
 func (e *Engine) hookSessionStart(input M) M {

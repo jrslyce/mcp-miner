@@ -3,6 +3,7 @@
 
 require "json"
 require "open3"
+require "rbconfig"
 require "tmpdir"
 
 ROOT = File.expand_path("..", __dir__)
@@ -43,7 +44,9 @@ def run_mcp_from_config(mcp_config, state_path)
 end
 
 def run_hook_command(command, mode_name, state_path)
-  resolved_command = command.gsub("$PLUGIN_ROOT", PLUGIN_ROOT)
+  resolved_command = command
+                     .gsub("$PLUGIN_ROOT", PLUGIN_ROOT)
+                     .gsub("%PLUGIN_ROOT%", PLUGIN_ROOT)
   payload = {
     "session_id" => "plugin-install-smoke",
     "turn_id" => "plugin-install-turn",
@@ -109,7 +112,7 @@ assert(".mcp.json should launch the Go server from plugin root") do
   server.fetch("command") == "./bin/mcp-miner" &&
     server.fetch("args") == ["mcp"] &&
     server.fetch("cwd") == "." &&
-    (File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner")) || File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner.exe"))) &&
+    File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner")) &&
     File.file?(File.join(PLUGIN_ROOT, "scripts", "mcp_server.rb"))
 end
 
@@ -117,10 +120,11 @@ hook_commands = hooks_config.fetch("hooks").values.flat_map do |entries|
   entries.flat_map { |entry| entry.fetch("hooks").map { |hook| hook.fetch("command") } }
 end
 assert("hook commands should use PLUGIN_ROOT-relative scripts") do
+  expected_hook_command = RbConfig::CONFIG.fetch("host_os").match?(/mswin|mingw|cygwin/i) ? "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\"" : "$PLUGIN_ROOT/bin/mcp-miner"
   hook_commands.length >= 5 &&
     hook_commands.length == 6 &&
-    hook_commands.all? { |command| command.include?('$PLUGIN_ROOT/bin/mcp-miner') } &&
-    (File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner")) || File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner.exe"))) &&
+    hook_commands.all? { |command| command.include?(expected_hook_command) } &&
+    File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner")) &&
     File.file?(File.join(PLUGIN_ROOT, "hooks", "mcp_miner_hook.rb")) &&
     hooks_config.dig("hooks", "PostToolUse", 0, "matcher") == ".*"
 end

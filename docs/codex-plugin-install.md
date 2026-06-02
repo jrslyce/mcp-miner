@@ -93,7 +93,8 @@ npm run test:codex-installer
 - `plugins/mcp-miner/.codex-plugin/plugin.json` keeps the validated manifest shape.
 - `plugins/mcp-miner/.mcp.json` launches `./bin/mcp-miner mcp` with `cwd` set to the plugin root.
 - `plugins/mcp-miner/.codex-plugin/plugin.json` points Codex at `./hooks/hooks.json`.
-- `plugins/mcp-miner/hooks/hooks.json` commands run through `"$PLUGIN_ROOT/bin/mcp-miner" hook ...`.
+- On Windows, `plugins/mcp-miner/hooks/hooks.json` commands run through `cmd /d /c call "%PLUGIN_ROOT%\bin\mcp-miner.exe" hook ...` so `%PLUGIN_ROOT%` expands even when Codex spawns the hook without an extra shell.
+- On Unix-like systems, the equivalent command target is `"$PLUGIN_ROOT/bin/mcp-miner" hook ...`.
 - `plugins/mcp-miner/skills/mcp-miner/SKILL.md` documents the live MCP tool list and privacy behavior.
 - `scripts/install_codex_plugin.rb` safely registers the local marketplace and plugin entry in a Codex config.
 
