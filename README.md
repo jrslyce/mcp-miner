@@ -13,8 +13,8 @@ macOS/Linux:
 ```sh
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
-npm run build:plugin-go
-ruby scripts/install_codex_plugin.rb
+go run ./cmd/mcp-miner build-plugin
+sh scripts/install_codex_plugin.sh
 ```
 
 Windows PowerShell:
@@ -22,11 +22,10 @@ Windows PowerShell:
 ```powershell
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
-npm run build:plugin-go
 powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
 ```
 
-The installer backs up `~/.codex/config.toml` or `%USERPROFILE%\.codex\config.toml`, registers this repo as the `mcp-miner` marketplace, removes stale standalone MCP Miner server config and legacy `diamond-mcp` entries, and enables `mcp-miner@mcp-miner`. Restart Codex after running it.
+The installer backs up `~/.codex/config.toml` or `%USERPROFILE%\.codex\config.toml`, rebuilds the Go plugin binary from source if needed, registers this repo as the `mcp-miner` marketplace, removes stale standalone MCP Miner server config and legacy `diamond-mcp` entries, and enables `mcp-miner@mcp-miner`. Restart Codex after running it.
 
 ## Codex Hook Trust
 

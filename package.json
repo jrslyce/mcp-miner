@@ -1,11 +1,11 @@
 {
   "scripts": {
     "validate:data": "ruby scripts/validate_data.rb",
-    "build:plugin-go": "ruby scripts/build_plugin_go.rb",
+    "build:plugin-go": "go run ./cmd/mcp-miner build-plugin",
     "test:go": "go test ./...",
     "test:validator": "ruby scripts/test_validate_data.rb",
     "validate:plugin": "ruby scripts/validate_plugin_with_hooks.rb plugins/mcp-miner",
-    "install:codex": "ruby scripts/install_codex_plugin.rb",
+    "install:codex": "go run ./cmd/mcp-miner install-codex-plugin",
     "firebase:emulators:start": "npx --yes firebase-tools@latest emulators:start --project demo-mcp-miner --import=.firebase/emulator-data --export-on-exit=.firebase/emulator-data",
     "firebase:emulators:smoke": "npx --yes firebase-tools@latest emulators:exec --project demo-mcp-miner --only auth,firestore,functions \"node scripts/firebase_emulator_smoke.js\"",
     "firebase:rules:smoke": "npx --yes firebase-tools@latest emulators:exec --project demo-mcp-miner --only auth,firestore \"node scripts/firebase_firestore_rules_smoke.js\"",

@@ -8,6 +8,24 @@ import (
 )
 
 func main() {
+	args := os.Args[1:]
+	if len(args) > 0 {
+		switch args[0] {
+		case "build-plugin":
+			if err := miner.RunBuildPlugin(args[1:], os.Stdout, os.Stderr); err != nil {
+				fmt.Fprintln(os.Stderr, "MCP Miner:", err)
+				os.Exit(1)
+			}
+			return
+		case "install-codex-plugin":
+			if err := miner.RunInstallCodexPlugin(args[1:], os.Stdout, os.Stderr); err != nil {
+				fmt.Fprintln(os.Stderr, "MCP Miner:", err)
+				os.Exit(1)
+			}
+			return
+		}
+	}
+
 	root, err := miner.LocateRoot()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "MCP Miner:", err)
@@ -19,7 +37,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	args := os.Args[1:]
 	if len(args) == 0 || args[0] == "mcp" {
 		if err := miner.RunMCP(engine, os.Stdin, os.Stdout, os.Stderr); err != nil {
 			fmt.Fprintln(os.Stderr, "MCP Miner:", err)

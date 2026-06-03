@@ -6,14 +6,13 @@ MCP Miner is packaged as the local Codex desktop plugin at `plugins/mcp-miner`.
 
 Clone the repo, then run one installer from the repository root.
 
-Release bundles include the compiled Go runtime in `plugins/mcp-miner/bin`, so end users do not need Go installed. A source checkout needs Go only to rebuild that binary with `npm run build:plugin-go`.
+Release bundles include the compiled Go runtime in `plugins/mcp-miner/bin`, so end users do not need Go installed. A source checkout needs Go only when the installer has to rebuild that binary.
 
 Windows PowerShell:
 
 ```powershell
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
-npm run build:plugin-go
 powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
 ```
 
@@ -22,11 +21,11 @@ macOS/Linux:
 ```sh
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
-npm run build:plugin-go
+go run ./cmd/mcp-miner build-plugin
 sh scripts/install_codex_plugin.sh
 ```
 
-Both installers register the same local Codex plugin. The Codex plugin runs the compiled Go binary for local hooks and MCP tools.
+Both installers register the same local Codex plugin. The Windows installer rebuilds the plugin binary with `go build` if it is missing. The Codex plugin runs the compiled Go binary for local hooks and MCP tools.
 
 The installer updates `~/.codex/config.toml` with:
 
@@ -96,7 +95,7 @@ npm run test:codex-installer
 - On Windows, `plugins/mcp-miner/hooks/hooks.json` commands run through `cmd /d /c call "%PLUGIN_ROOT%\bin\mcp-miner.exe" hook ...` so `%PLUGIN_ROOT%` expands even when Codex spawns the hook without an extra shell.
 - On Unix-like systems, the equivalent command target is `"$PLUGIN_ROOT/bin/mcp-miner" hook ...`.
 - `plugins/mcp-miner/skills/mcp-miner/SKILL.md` documents the live MCP tool list and privacy behavior.
-- `scripts/install_codex_plugin.sh` and `scripts/install_codex_plugin.ps1` safely register the local marketplace and plugin entry in a Codex config.
+- `scripts/install_codex_plugin.sh` and `scripts/install_codex_plugin.ps1` safely register the local marketplace and plugin entry in a Codex config without Ruby install helpers.
 
 ## Local State
 

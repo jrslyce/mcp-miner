@@ -109,6 +109,27 @@ $resolvedConfig = [System.IO.Path]::GetFullPath($Config)
 $manifestPath = Join-Path $resolvedRepoRoot "plugins\mcp-miner\.codex-plugin\plugin.json"
 $marketplacePath = Join-Path $resolvedRepoRoot ".agents\plugins\marketplace.json"
 $pluginBinaryPath = Join-Path $resolvedRepoRoot "plugins\mcp-miner\bin\mcp-miner.exe"
+$pluginHookBinaryPath = Join-Path $resolvedRepoRoot "plugins\mcp-miner\bin\mcp-miner"
+
+function Build-PluginBinary {
+  $goCommand = if ($env:GO) { $env:GO } else { "go" }
+  $binDir = Split-Path -Parent $pluginBinaryPath
+  if (-not (Test-Path -LiteralPath $binDir -PathType Container)) {
+    New-Item -ItemType Directory -Path $binDir | Out-Null
+  }
+
+  Write-Output "MCP Miner Go binary is missing; rebuilding with go build."
+  Push-Location $resolvedRepoRoot
+  try {
+    & $goCommand build -trimpath -o $pluginBinaryPath .\cmd\mcp-miner
+    if ($LASTEXITCODE -ne 0) {
+      throw "failed to build MCP Miner Go binary with $goCommand"
+    }
+  } finally {
+    Pop-Location
+  }
+  Copy-Item -LiteralPath $pluginBinaryPath -Destination $pluginHookBinaryPath -Force
+}
 
 if (-not $Uninstall) {
   if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
@@ -118,7 +139,7 @@ if (-not $Uninstall) {
     throw "Missing marketplace file: $marketplacePath"
   }
   if (-not (Test-Path -LiteralPath $pluginBinaryPath -PathType Leaf)) {
-    throw "Missing MCP Miner Go binary: $pluginBinaryPath. Install a release bundle that includes plugins\mcp-miner\bin, or run `npm run build:plugin-go` from a source checkout."
+    Build-PluginBinary
   }
 }
 

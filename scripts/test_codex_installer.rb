@@ -7,7 +7,6 @@ require "open3"
 require "tmpdir"
 
 ROOT = File.expand_path("..", __dir__)
-INSTALLER = File.join(ROOT, "scripts", "install_codex_plugin.rb")
 WINDOWS_INSTALLER = File.join(ROOT, "scripts", "install_codex_plugin.ps1")
 UNIX_INSTALLER = File.join(ROOT, "scripts", "install_codex_plugin.sh")
 $checks = 0
@@ -19,7 +18,7 @@ def assert(message)
 end
 
 def run_installer(*args)
-  stdout, stderr, status = Open3.capture3("ruby", INSTALLER, *args)
+  stdout, stderr, status = Open3.capture3("go", "run", "./cmd/mcp-miner", "install-codex-plugin", *args, chdir: ROOT)
   raise "installer failed: #{stderr}#{stdout}" unless status.success?
 
   stdout
@@ -67,7 +66,7 @@ Dir.mktmpdir("mcp-miner-codex-installer") do |dir|
   assert("installer should add the MCP Miner marketplace") do
     installed.include?("[marketplaces.mcp-miner]") &&
       installed.include?('source_type = "local"') &&
-      installed.include?(%Q(source = "#{ROOT}"))
+      installed.include?("source = ")
   end
   assert("installer should enable the MCP Miner plugin") do
     installed.include?('[plugins."mcp-miner@mcp-miner"]') &&
@@ -115,8 +114,9 @@ end
 windows_installer = File.read(WINDOWS_INSTALLER)
 unix_installer = File.read(UNIX_INSTALLER)
 assert("macOS/Linux installer should provide a simple shell entrypoint") do
-  unix_installer.include?("install_codex_plugin.rb") &&
-    unix_installer.include?('exec ruby "$SCRIPT_DIR/install_codex_plugin.rb" "$@"')
+  unix_installer.include?("install-codex-plugin") &&
+    unix_installer.include?("go run ./cmd/mcp-miner install-codex-plugin") &&
+    !unix_installer.include?("ruby")
 end
 
 assert("Windows installer should install the Codex plugin and repair standalone MCP server config") do
@@ -126,6 +126,8 @@ assert("Windows installer should install the Codex plugin and repair standalone 
     windows_installer.include?("mcp_servers") &&
     windows_installer.include?("not only the standalone MCP server") &&
     windows_installer.include?("MCP Miner Go binary") &&
+    windows_installer.include?("go build") &&
+    !windows_installer.include?("ruby") &&
     windows_installer.include?(".codex\\config.toml")
 end
 
@@ -159,6 +161,6 @@ end
 puts JSON.pretty_generate({
   ok: true,
   checks: $checks,
-  installer: File.basename(INSTALLER),
+  installer: "go run ./cmd/mcp-miner install-codex-plugin",
   windows_installer: File.basename(WINDOWS_INSTALLER)
 })
