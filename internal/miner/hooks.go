@@ -131,6 +131,8 @@ func (e *Engine) hookStop(input M) M {
 		return nil, nil
 	})
 	if should {
+		// Blocking hook decisions make reports visible but disruptive in Codex.
+		// Keep Stop output passive and expose the reliable report through MCP tools.
 		return M{"continue": true, "systemMessage": e.DisplayReport(report)}
 	}
 	return M{"continue": true}

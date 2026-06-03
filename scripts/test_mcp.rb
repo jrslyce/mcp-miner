@@ -4,10 +4,10 @@
 require "json"
 require "open3"
 require "tmpdir"
-require_relative "../plugins/mcp-miner/lib/mcp_miner/game_engine"
+require_relative "test_support/mcp_binary"
 
 ROOT = File.expand_path("..", __dir__)
-MCP_SERVER = File.join(ROOT, "plugins", "mcp-miner", "scripts", "mcp_server.rb")
+PLUGIN_ROOT = File.join(ROOT, "plugins", "mcp-miner")
 $checks = 0
 
 def assert(message)
@@ -19,8 +19,9 @@ end
 def run_mcp(state_path, calls)
   input = calls.map { |payload| JSON.generate(payload) }.join("\n")
   stdout, stderr, status = Open3.capture3({
+    "PLUGIN_ROOT" => PLUGIN_ROOT,
     "MCP_MINER_STATE_PATH" => state_path
-  }, "ruby", MCP_SERVER, stdin_data: "#{input}\n")
+  }, McpMinerBinary.path, "mcp", chdir: PLUGIN_ROOT, stdin_data: "#{input}\n")
   raise "MCP test failed: #{stderr}" unless status.success?
 
   stdout.lines.map { |line| JSON.parse(line) }
@@ -31,8 +32,11 @@ def tool_payload(response)
 end
 
 def seed_state(state_path)
-  engine = McpMiner::GameEngine.new(root: ROOT, state_path: state_path)
-  state = engine.initial_state
+  run_mcp(state_path, [
+    { jsonrpc: "2.0", id: 100, method: "initialize", params: {} },
+    { jsonrpc: "2.0", id: 101, method: "tools/call", params: { name: "update_settings", arguments: { report_mode: "meaningful_turns_only" } } }
+  ])
+  state = JSON.parse(File.read(state_path))
   state["space_bucks"] = 44
   state["inventory"] = state["inventory"].merge(
     "mat_chonks" => 125,
@@ -60,7 +64,7 @@ def seed_state(state_path)
     "turn_id" => "turn-safe",
     "created_at" => "2026-05-24T00:00:00Z"
   }
-  engine.write_state(state)
+  File.write(state_path, JSON.pretty_generate(state))
 end
 
 Dir.mktmpdir("mcp-miner-server") do |dir|
@@ -114,15 +118,22 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     purchase_base_module
     get_settings
     get_account_link_status
+    start_account_link
+    complete_account_link
     link_cloud_profile
     unlink_cloud_profile
+    disconnect_account
     get_reward_controls
     get_milestone_status
     get_catalog_summary
     update_settings
     sync_progress
-    preview_sync_payload
+    get_sync_status
     sync_cloud
+    preview_sync_payload
+    get_backup_status
+    create_cloud_backup
+    restore_cloud_backup
     claim_milestone
     open_dashboard
     open_store

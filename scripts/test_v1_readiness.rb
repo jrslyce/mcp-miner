@@ -4,9 +4,10 @@
 require "json"
 require "open3"
 require "tmpdir"
+require_relative "test_support/mcp_binary"
 
 ROOT = File.expand_path("..", __dir__)
-MCP_SERVER = File.join(ROOT, "plugins", "mcp-miner", "scripts", "mcp_server.rb")
+PLUGIN_ROOT = File.join(ROOT, "plugins", "mcp-miner")
 READINESS_DOC = File.join(ROOT, "docs", "v1-launch-readiness.md")
 PACKAGE_JSON = File.join(ROOT, "package.json")
 $checks = 0
@@ -20,8 +21,9 @@ end
 def run_mcp(state_path, calls)
   input = calls.map { |payload| JSON.generate(payload) }.join("\n")
   stdout, stderr, status = Open3.capture3({
+    "PLUGIN_ROOT" => PLUGIN_ROOT,
     "MCP_MINER_STATE_PATH" => state_path
-  }, "ruby", MCP_SERVER, stdin_data: "#{input}\n")
+  }, McpMinerBinary.path, "mcp", chdir: PLUGIN_ROOT, stdin_data: "#{input}\n")
   raise "V1 readiness MCP smoke failed: #{stderr}" unless status.success?
 
   stdout.lines.map { |line| JSON.parse(line) }

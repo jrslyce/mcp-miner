@@ -122,7 +122,7 @@ func TestHookJournalStaysPrivacySafe(t *testing.T) {
 	}
 }
 
-func TestEveryTurnFullStopRequestsVisibleFooter(t *testing.T) {
+func TestEveryTurnFullStopRecordsPassiveFooter(t *testing.T) {
 	engine := testEngine(t)
 	_, err := engine.WithState(func(state M) (any, error) {
 		state["report_mode"] = "every_turn_full"

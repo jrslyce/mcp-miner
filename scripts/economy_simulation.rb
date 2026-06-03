@@ -5,7 +5,8 @@ require "json"
 require "time"
 require "tmpdir"
 require "yaml"
-require_relative "../plugins/mcp-miner/lib/mcp_miner/game_engine"
+require_relative "test_support/ruby_game_engine"
+require_relative "test_support/mcp_binary"
 
 module McpMiner
   class EconomySimulation

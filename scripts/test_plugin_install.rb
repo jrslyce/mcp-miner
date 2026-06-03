@@ -5,6 +5,7 @@ require "json"
 require "open3"
 require "rbconfig"
 require "tmpdir"
+require_relative "test_support/mcp_binary"
 
 ROOT = File.expand_path("..", __dir__)
 PLUGIN_ROOT = File.join(ROOT, "plugins", "mcp-miner")
@@ -113,7 +114,7 @@ assert(".mcp.json should launch the Go server from plugin root") do
     server.fetch("args") == ["mcp"] &&
     server.fetch("cwd") == "." &&
     File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner")) &&
-    File.file?(File.join(PLUGIN_ROOT, "scripts", "mcp_server.rb"))
+    File.file?(McpMinerBinary.path)
 end
 
 hook_commands = hooks_config.fetch("hooks").values.flat_map do |entries|
@@ -121,11 +122,10 @@ hook_commands = hooks_config.fetch("hooks").values.flat_map do |entries|
 end
 assert("hook commands should use PLUGIN_ROOT-relative scripts") do
   expected_hook_command = RbConfig::CONFIG.fetch("host_os").match?(/mswin|mingw|cygwin/i) ? "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\"" : "$PLUGIN_ROOT/bin/mcp-miner"
-  hook_commands.length >= 5 &&
+    hook_commands.length >= 5 &&
     hook_commands.length == 6 &&
     hook_commands.all? { |command| command.include?(expected_hook_command) } &&
     File.file?(File.join(PLUGIN_ROOT, "bin", "mcp-miner")) &&
-    File.file?(File.join(PLUGIN_ROOT, "hooks", "mcp_miner_hook.rb")) &&
     hooks_config.dig("hooks", "PostToolUse", 0, "matcher") == ".*"
 end
 
@@ -182,9 +182,10 @@ assert("install docs should cover state path, hook trust, reset, backup, and smo
     install_doc.include?("stop") &&
     install_doc.include?("passive mining stays at zero") &&
     install_doc.include?(".agents/plugins/marketplace.json") &&
-    install_doc.include?("ruby scripts/install_codex_plugin.rb") &&
+    install_doc.include?("sh scripts/install_codex_plugin.sh") &&
     install_doc.include?(".\\scripts\\install_codex_plugin.ps1") &&
     install_doc.include?("standalone MCP server") &&
+    install_doc.include?("may not be shown by every Codex UI") &&
     install_doc.include?("npm run test:plugin-install") &&
     install_doc.include?("npm run test:codex-installer") &&
     install_doc.include?("npm run validate:plugin")

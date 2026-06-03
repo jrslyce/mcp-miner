@@ -9,6 +9,7 @@ require "tmpdir"
 ROOT = File.expand_path("..", __dir__)
 INSTALLER = File.join(ROOT, "scripts", "install_codex_plugin.rb")
 WINDOWS_INSTALLER = File.join(ROOT, "scripts", "install_codex_plugin.ps1")
+UNIX_INSTALLER = File.join(ROOT, "scripts", "install_codex_plugin.sh")
 $checks = 0
 
 def assert(message)
@@ -112,6 +113,12 @@ Dir.mktmpdir("mcp-miner-codex-installer") do |dir|
 end
 
 windows_installer = File.read(WINDOWS_INSTALLER)
+unix_installer = File.read(UNIX_INSTALLER)
+assert("macOS/Linux installer should provide a simple shell entrypoint") do
+  unix_installer.include?("install_codex_plugin.rb") &&
+    unix_installer.include?('exec ruby "$SCRIPT_DIR/install_codex_plugin.rb" "$@"')
+end
+
 assert("Windows installer should install the Codex plugin and repair standalone MCP server config") do
   windows_installer.include?('[plugins."$PluginRef"]') &&
     windows_installer.include?("mcp-miner@mcp-miner") &&

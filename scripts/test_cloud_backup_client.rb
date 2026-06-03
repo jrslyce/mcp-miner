@@ -5,10 +5,11 @@ require "json"
 require "open3"
 require "tmpdir"
 require_relative "test_support/webrick_compat"
-require_relative "../plugins/mcp-miner/lib/mcp_miner/game_engine"
+require_relative "test_support/ruby_game_engine"
+require_relative "test_support/mcp_binary"
 
 ROOT = File.expand_path("..", __dir__)
-MCP_SERVER = File.join(ROOT, "plugins", "mcp-miner", "scripts", "mcp_server.rb")
+PLUGIN_ROOT = File.join(ROOT, "plugins", "mcp-miner")
 $checks = 0
 
 def assert(message)
@@ -26,9 +27,7 @@ end
 
 def run_mcp(state_path, calls)
   input = calls.map { |payload| JSON.generate(payload) }.join("\n")
-  stdout, stderr, status = Open3.capture3({
-    "MCP_MINER_STATE_PATH" => state_path
-  }, "ruby", MCP_SERVER, stdin_data: "#{input}\n")
+  stdout, stderr, status = Open3.capture3({ "PLUGIN_ROOT" => PLUGIN_ROOT, "MCP_MINER_STATE_PATH" => state_path }, McpMinerBinary.path, "mcp", chdir: PLUGIN_ROOT, stdin_data: "#{input}\n")
   raise "MCP cloud backup client test failed: #{stderr}" unless status.success?
 
   stdout.lines.map { |line| JSON.parse(line) }

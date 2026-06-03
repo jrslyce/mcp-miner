@@ -52,7 +52,9 @@ assert("landing page should document gameplay, install, privacy, and account lin
     index.include?(%(id="install")) &&
     index.include?(%(id="portal")) &&
     index.include?("git clone https://github.com/jrslyce/mcp-miner.git") &&
-    index.include?("ruby scripts/install_codex_plugin.rb") &&
+    index.include?("sh scripts/install_codex_plugin.sh") &&
+    index.include?("MCP Miner marketplace") &&
+    !index.include?("Diamond MCP marketplace") &&
     index.include?("Prompts stored") &&
     index.include?("Not collected for gameplay") &&
     index.include?("short-lived approval code") &&

@@ -5,12 +5,11 @@ require "fileutils"
 require "json"
 require "open3"
 require "tmpdir"
-require_relative "../plugins/mcp-miner/lib/mcp_miner/game_engine"
+require_relative "test_support/ruby_game_engine"
+require_relative "test_support/mcp_binary"
 
 ROOT = File.expand_path("..", __dir__)
 PLUGIN_ROOT = File.join(ROOT, "plugins", "mcp-miner")
-HOOK = File.join(PLUGIN_ROOT, "hooks", "mcp_miner_hook.rb")
-MCP_SERVER = File.join(PLUGIN_ROOT, "scripts", "mcp_server.rb")
 $checks = 0
 
 def assert(message)
@@ -32,7 +31,7 @@ def run_hook(mode, payload, state_path)
     "MCP_MINER_REPO_ROOT" => ROOT,
     "MCP_MINER_STATE_PATH" => state_path
   }
-  stdout, stderr, status = Open3.capture3(env, "ruby", HOOK, mode, stdin_data: JSON.generate(payload))
+  stdout, stderr, status = Open3.capture3(env, McpMinerBinary.path, "hook", mode, chdir: PLUGIN_ROOT, stdin_data: JSON.generate(payload))
   raise "hook #{mode} failed: #{stderr}" unless status.success?
 
   stdout.empty? ? {} : JSON.parse(stdout)
@@ -41,8 +40,9 @@ end
 def run_mcp(state_path, calls)
   input = calls.map { |payload| JSON.generate(payload) }.join("\n")
   stdout, stderr, status = Open3.capture3({
+    "PLUGIN_ROOT" => PLUGIN_ROOT,
     "MCP_MINER_STATE_PATH" => state_path
-  }, "ruby", MCP_SERVER, stdin_data: "#{input}\n")
+  }, McpMinerBinary.path, "mcp", chdir: PLUGIN_ROOT, stdin_data: "#{input}\n")
   raise "MCP smoke failed: #{stderr}" unless status.success?
 
   stdout.lines.map { |line| JSON.parse(line) }

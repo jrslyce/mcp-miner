@@ -23,7 +23,7 @@ macOS/Linux:
 git clone https://github.com/jrslyce/mcp-miner.git
 cd mcp-miner
 npm run build:plugin-go
-ruby scripts/install_codex_plugin.rb
+sh scripts/install_codex_plugin.sh
 ```
 
 Both installers register the same local Codex plugin. The Codex plugin runs the compiled Go binary for local hooks and MCP tools.
@@ -42,7 +42,7 @@ enabled = true
 It also removes old standalone MCP server entries and legacy `diamond-mcp` entries, then creates a timestamped backup before changing an existing config. To preview the config change, run:
 
 ```sh
-ruby scripts/install_codex_plugin.rb --dry-run
+sh scripts/install_codex_plugin.sh --dry-run
 ```
 
 On Windows, use:
@@ -54,7 +54,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1 -Dry
 To remove the Codex entries later, run:
 
 ```sh
-ruby scripts/install_codex_plugin.rb --uninstall
+sh scripts/install_codex_plugin.sh --uninstall
 ```
 
 On Windows, use:
@@ -96,7 +96,7 @@ npm run test:codex-installer
 - On Windows, `plugins/mcp-miner/hooks/hooks.json` commands run through `cmd /d /c call "%PLUGIN_ROOT%\bin\mcp-miner.exe" hook ...` so `%PLUGIN_ROOT%` expands even when Codex spawns the hook without an extra shell.
 - On Unix-like systems, the equivalent command target is `"$PLUGIN_ROOT/bin/mcp-miner" hook ...`.
 - `plugins/mcp-miner/skills/mcp-miner/SKILL.md` documents the live MCP tool list and privacy behavior.
-- `scripts/install_codex_plugin.rb` safely registers the local marketplace and plugin entry in a Codex config.
+- `scripts/install_codex_plugin.sh` and `scripts/install_codex_plugin.ps1` safely register the local marketplace and plugin entry in a Codex config.
 
 ## Local State
 
@@ -161,6 +161,6 @@ After enabling the local plugin in Codex desktop, restart Codex and complete the
 Then check these flows:
 
 1. Start a new Codex turn and confirm the SessionStart hook returns MCP Miner context.
-2. Run normal Codex work, then let the Stop hook record and surface a compact `MCP Miner:` report when appropriate.
-3. Ask for MCP Miner status and confirm `get_player_status`, `get_active_orders`, `get_inventory`, `get_store_catalog`, and `open_dashboard` are available.
+2. Run normal Codex work, then let the Stop hook record the latest report. Passive `systemMessage` hook output is non-blocking and may not be shown by every Codex UI.
+3. Invoke `@mcp-miner` or ask for MCP Miner status and confirm `get_player_status`, `get_latest_report`, `get_active_orders`, `get_inventory`, `get_store_catalog`, and `open_dashboard` are available.
 4. Confirm reports never include private prompts, code, file paths, repo names, terminal output, browser content, or transcripts.

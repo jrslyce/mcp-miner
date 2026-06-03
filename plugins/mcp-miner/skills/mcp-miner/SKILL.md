@@ -10,10 +10,22 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 ## Behavior
 
 - Use MCP Miner MCP tools for player status, latest reports, active orders, inventory, settings, reward-control diagnostics, milestone status, sync state, and catalog summaries.
+- If the user invokes MCP Miner with no command, show the full current status. Fetch `get_player_status`, `get_latest_report`, `get_active_orders`, and `get_inventory`, then summarize the player, asteroid, Chonks, Space Bucks, important inventory, available/blocked orders, latest report, and useful commands.
 - Do not invent gameplay data. Gameplay content comes from the validated `data/*.yaml` files.
 - Keep reports compact unless the user asks for detail.
 - Never include private work details such as prompts, code, file paths, repo names, terminal output, or browser content in game reports.
 - Use "Chonks" for mined material and "Space Bucks" for money.
+- Treat automatic Stop-hook report display as best-effort UI behavior. The reliable user-visible status surface is an explicit MCP Miner invocation or status request.
+
+## Bare Invocation Response
+
+When the user only says `@mcp-miner`, respond with:
+
+- Current status: Space Bucks, Chonks, asteroid, suit/base or other notable status fields.
+- Latest report: the `get_latest_report` text and source when present.
+- Orders: active orders that can be fulfilled now, plus the most important blockers.
+- Inventory: highest-signal materials and any refined/fabricated items relevant to orders.
+- Commands: short examples such as `refine`, `fulfill possible orders`, `show upgrades`, `show store`, `show asteroids`, `open dashboard`, and `open store`.
 
 ## Useful Tool Intents
 
