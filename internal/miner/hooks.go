@@ -151,7 +151,7 @@ func shouldRequestVisibleReport(state, input M) bool {
 }
 
 func visibleReportReason(report string) string {
-	return "Append this privacy-safe MCP Miner footer to the previous answer. Do not include prompts, code, commands, file paths, repository names, browser content, terminal output, or any other private work details.\n\n" + report
+	return report
 }
 
 func hookTurnID(input M) string {

@@ -306,8 +306,7 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     assert("every_turn_full should request a visible full expedition footer") do
       full_stop["continue"] == true &&
         full_stop["decision"] == "block" &&
-        full_stop["reason"].include?("Append this privacy-safe MCP Miner footer") &&
-        full_stop["reason"].include?("MCP Miner Expedition Report") &&
+        full_stop["reason"].start_with?("MCP Miner Expedition Report") &&
         full_stop["systemMessage"].include?("MCP Miner Expedition Report") &&
         full_stop["systemMessage"].include?("Space Bucks:")
     end

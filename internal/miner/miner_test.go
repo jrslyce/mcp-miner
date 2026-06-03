@@ -160,7 +160,7 @@ func TestEveryTurnFullStopRequestsVisibleFooter(t *testing.T) {
 	if asString(response["decision"]) != "block" {
 		t.Fatalf("expected visible continuation decision, got %#v", response)
 	}
-	if !strings.Contains(asString(response["reason"]), "MCP Miner Expedition Report") {
+	if !strings.HasPrefix(asString(response["reason"]), "MCP Miner Expedition Report") {
 		t.Fatalf("expected report in continuation reason: %#v", response)
 	}
 	if !strings.Contains(asString(response["systemMessage"]), "MCP Miner Expedition Report") {
