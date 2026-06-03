@@ -157,11 +157,11 @@ func TestEveryTurnFullStopRequestsVisibleFooter(t *testing.T) {
 	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if asString(response["decision"]) != "block" {
-		t.Fatalf("expected visible continuation decision, got %#v", response)
+	if _, ok := response["decision"]; ok {
+		t.Fatalf("full report should not force a continuation decision: %#v", response)
 	}
-	if !strings.HasPrefix(asString(response["reason"]), "MCP Miner Expedition Report") {
-		t.Fatalf("expected report in continuation reason: %#v", response)
+	if _, ok := response["reason"]; ok {
+		t.Fatalf("full report should not emit a continuation reason: %#v", response)
 	}
 	if !strings.Contains(asString(response["systemMessage"]), "MCP Miner Expedition Report") {
 		t.Fatalf("expected report system message: %#v", response)

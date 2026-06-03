@@ -303,10 +303,10 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     update_report_mode(report_state_path, "every_turn_full")
     user_prompt("turn-full", report_state_path)
     full_stop = stop_turn("turn-full", report_state_path)
-    assert("every_turn_full should request a visible full expedition footer") do
+    assert("every_turn_full should emit a passive full expedition footer") do
       full_stop["continue"] == true &&
-        full_stop["decision"] == "block" &&
-        full_stop["reason"].start_with?("MCP Miner Expedition Report") &&
+        !full_stop.key?("decision") &&
+        !full_stop.key?("reason") &&
         full_stop["systemMessage"].include?("MCP Miner Expedition Report") &&
         full_stop["systemMessage"].include?("Space Bucks:")
     end
