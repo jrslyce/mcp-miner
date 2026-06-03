@@ -121,3 +121,64 @@ func TestHookJournalStaysPrivacySafe(t *testing.T) {
 		}
 	}
 }
+
+func TestEveryTurnFullStopRequestsVisibleFooter(t *testing.T) {
+	engine := testEngine(t)
+	_, err := engine.WithState(func(state M) (any, error) {
+		state["report_mode"] = "every_turn_full"
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	userPrompt := M{
+		"session_id":      "session-test",
+		"turn_id":         "turn-visible",
+		"hook_event_name": "UserPromptSubmit",
+		"prompt":          "please check status",
+	}
+	rawPrompt, _ := json.Marshal(userPrompt)
+	if err := RunHook(engine, "user_prompt_submit", bytes.NewReader(rawPrompt), &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	stop := M{
+		"session_id":             "session-test",
+		"turn_id":                "turn-visible",
+		"hook_event_name":        "Stop",
+		"stop_hook_active":       false,
+		"last_assistant_message": "Done.",
+	}
+	rawStop, _ := json.Marshal(stop)
+	var output bytes.Buffer
+	if err := RunHook(engine, "stop", bytes.NewReader(rawStop), &output, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	var response M
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if asString(response["decision"]) != "block" {
+		t.Fatalf("expected visible continuation decision, got %#v", response)
+	}
+	if !strings.Contains(asString(response["reason"]), "MCP Miner Expedition Report") {
+		t.Fatalf("expected report in continuation reason: %#v", response)
+	}
+	if !strings.Contains(asString(response["systemMessage"]), "MCP Miner Expedition Report") {
+		t.Fatalf("expected report system message: %#v", response)
+	}
+
+	stop["stop_hook_active"] = true
+	stop["turn_id"] = "turn-visible-active"
+	rawStop, _ = json.Marshal(stop)
+	output.Reset()
+	if err := RunHook(engine, "stop", bytes.NewReader(rawStop), &output, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	response = M{}
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := response["decision"]; ok {
+		t.Fatalf("active stop continuation should not loop: %#v", response)
+	}
+}

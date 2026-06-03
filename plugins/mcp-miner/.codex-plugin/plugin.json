@@ -1,6 +1,6 @@
 {
   "name": "mcp-miner",
-  "version": "0.1.2",
+  "version": "0.1.2+codex.20260603151059",
   "description": "Passive asteroid-mining progression for Codex work, powered by validated MCP Miner gameplay data.",
   "author": {
     "name": "Jared"

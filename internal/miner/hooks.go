@@ -121,19 +121,37 @@ func (e *Engine) hookStop(input M) M {
 	turnID := hookTurnID(input)
 	var report string
 	var should bool
+	var visible bool
 	_, _ = e.WithState(func(state M) (any, error) {
 		e.EnsureTurn(state, turnID)
 		if e.ShouldEmitReport(state) && !strings.Contains(asString(input["last_assistant_message"]), ReportPrefix) {
 			report = e.BuildReport(state)
 			e.RecordReport(state, report, turnID)
 			should = true
+			visible = shouldRequestVisibleReport(state, input)
 		}
 		return nil, nil
 	})
 	if should {
-		return M{"continue": true, "systemMessage": e.DisplayReport(report)}
+		response := M{"continue": true, "systemMessage": e.DisplayReport(report)}
+		if visible {
+			response["decision"] = "block"
+			response["reason"] = visibleReportReason(report)
+		}
+		return response
 	}
 	return M{"continue": true}
+}
+
+func shouldRequestVisibleReport(state, input M) bool {
+	if asBool(input["stop_hook_active"]) {
+		return false
+	}
+	return asString(state["report_mode"]) == "every_turn_full"
+}
+
+func visibleReportReason(report string) string {
+	return "Append this privacy-safe MCP Miner footer to the previous answer. Do not include prompts, code, commands, file paths, repository names, browser content, terminal output, or any other private work details.\n\n" + report
 }
 
 func hookTurnID(input M) string {
