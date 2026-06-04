@@ -1,12 +1,24 @@
 # MCP Miner
 
-MCP Miner is a passive asteroid-mining game for Codex work.
+MCP Miner is a passive asteroid-mining game for Codex work. You work normally in Codex, and the plugin turns abstract work signals into mining progress, Chonks, materials, Space Bucks, orders, upgrades, and compact progress reports.
+
+Website: [mcp-miner.web.app](https://mcp-miner.web.app/)
+
+## How The Game Works
+
+MCP Miner runs as a local Codex plugin. After installation and hook trust, Codex work events such as session starts, prompts, tool use, subagent activity, and turn stops feed a local Go runtime. The runtime scores those events as privacy-safe gameplay signals and advances your mining run in the background.
+
+Your miner gathers Chonks and materials from asteroids, earns Space Bucks, discovers rare finds, and fills orders. Materials can be refined, orders can be fulfilled for rewards, and earned currency can be spent on upgrades, base modules, fabrication, cosmetics, and other progression systems.
+
+The game is local-first. State is stored under `~/.mcp-miner`, and the plugin does not store prompts, source code, file paths, repo names, terminal output, browser content, transcripts, secrets, or raw Codex conversations. Optional account linking can sync abstract gameplay state to the web dashboard without sending private work content.
+
+Use the MCP Miner tools in Codex to check status, inventory, active orders, store catalog, upgrades, settings, latest reports, and the dashboard link. The website provides the public install flow, dashboard, account-linking surface, and cloud profile views.
 
 ## Install In Codex
 
 There is not currently a public self-serve OpenAI plugin marketplace submission flow documented for Codex plugins, so the simplest user install path is a public GitHub repo plus the local marketplace file in this repository.
 
-MCP Miner's Codex runtime is a compiled Go binary. Normal release installs do not require Go, Ruby, or Node on the user's machine; source checkouts need Go only when rebuilding `plugins/mcp-miner/bin/mcp-miner`.
+MCP Miner's Codex runtime is a compiled Go binary. Normal release installs do not require Go or Node on the user's machine. Source checkouts need Go only when rebuilding `plugins/mcp-miner/bin/mcp-miner`.
 
 macOS/Linux:
 
@@ -26,6 +38,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
 ```
 
 The installer backs up `~/.codex/config.toml` or `%USERPROFILE%\.codex\config.toml`, rebuilds the Go plugin binary from source if needed, registers this repo as the `mcp-miner` marketplace, removes stale standalone MCP Miner server config and legacy `diamond-mcp` entries, and enables `mcp-miner@mcp-miner`. Restart Codex after running it.
+
+After restart, ask Codex:
+
+```text
+Show my MCP Miner status
+```
 
 ## Codex Hook Trust
 
