@@ -1,5 +1,17 @@
 const THEME_STORAGE_KEY = "mcp-miner-theme";
 
+function redirectLinkSessionToPortal() {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("linkCode") && !params.has("code") && !params.has("sessionId")) {
+    return false;
+  }
+  const nextUrl = new URL("/portal.html", window.location.origin);
+  nextUrl.search = window.location.search;
+  nextUrl.hash = window.location.hash;
+  window.location.replace(nextUrl.toString());
+  return true;
+}
+
 function preferredTheme() {
   const saved = localStorage.getItem(THEME_STORAGE_KEY);
   if (saved === "light" || saved === "dark") {
@@ -88,6 +100,7 @@ function guessedOs() {
   return "mac-silicon";
 }
 
+if (!redirectLinkSessionToPortal()) {
 document.querySelector("#theme-toggle")?.addEventListener("click", () => {
   const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
@@ -103,3 +116,4 @@ document.querySelectorAll("[data-os-target]").forEach((button) => {
 applyTheme(preferredTheme());
 setupPromptCopyButtons();
 selectOsPrompt(guessedOs());
+}

@@ -13,6 +13,7 @@ const {
   publicLinkSession,
   requirePendingSession,
   sanitizeDashboardUrl,
+  linkDashboardUrl,
   secretHash,
   validateLinkSession
 } = require("../firebase/functions/src/linking");
@@ -33,10 +34,16 @@ const { session, deviceSecret, linkUrl } = newLinkSession({
 check("link session should create a short code, URL, and private device secret", () => {
   return /^link_/.test(session.sessionId) &&
     /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(session.code) &&
+    linkUrl.startsWith("https://mcp-miner.web.app/portal.html?") &&
     linkUrl.includes("linkCode=") &&
     linkUrl.includes("sessionId=") &&
     typeof deviceSecret === "string" &&
     deviceSecret.length > 20;
+});
+
+check("account links should target the portal route", () => {
+  return linkDashboardUrl("https://mcpminer.net") === "https://mcpminer.net/portal.html" &&
+    linkDashboardUrl("http://127.0.0.1:5000") === "http://127.0.0.1:5000/portal.html";
 });
 
 check("server-side link session should store only the device secret hash", () => {

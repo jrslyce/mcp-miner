@@ -73,7 +73,10 @@ assert("landing page should document gameplay, install, privacy, and account lin
     index.include?("short-lived code") &&
     index.include?("revocable local device token") &&
     landing.include?("data-os-target=\"mac-silicon\"") &&
-    landing_js.include?("function selectOsPrompt(os)")
+    landing_js.include?("function selectOsPrompt(os)") &&
+    landing_js.include?("function redirectLinkSessionToPortal()") &&
+    landing_js.include?("new URL(\"/portal.html\", window.location.origin)") &&
+    landing_js.include?("window.location.replace(nextUrl.toString())")
 end
 
 assert("landing page should use responsive production styles") do

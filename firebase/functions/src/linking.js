@@ -98,6 +98,14 @@ function sanitizeDashboardUrl(value, configured = DEFAULT_DASHBOARD_URL) {
   return parsed.origin;
 }
 
+function linkDashboardUrl(dashboardUrl) {
+  const parsed = new URL(dashboardUrl);
+  parsed.pathname = "/portal.html";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString().replace(/\/$/, "");
+}
+
 function newLinkSession({ now = new Date(), dashboardUrl = DEFAULT_DASHBOARD_URL, deviceName = "Codex" } = {}) {
   const sessionId = `link_${randomToken(18)}`;
   const deviceSecret = randomToken(32);
@@ -117,7 +125,7 @@ function newLinkSession({ now = new Date(), dashboardUrl = DEFAULT_DASHBOARD_URL
       expiresAt
     },
     deviceSecret,
-    linkUrl: `${cleanDashboardUrl}/?linkCode=${encodeURIComponent(code)}&sessionId=${encodeURIComponent(sessionId)}`
+    linkUrl: `${linkDashboardUrl(cleanDashboardUrl)}?linkCode=${encodeURIComponent(code)}&sessionId=${encodeURIComponent(sessionId)}`
   };
 }
 
@@ -181,6 +189,7 @@ module.exports = {
   deviceTokenHash,
   generateLinkCode,
   hasDeviceScope,
+  linkDashboardUrl,
   newDeviceToken,
   newLinkSession,
   normalizeDeviceSecret,
