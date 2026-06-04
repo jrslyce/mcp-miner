@@ -734,10 +734,20 @@ const rejectDeviceLink = document.querySelector("#reject-device-link");
 const linkedDevicesUsage = document.querySelector("#linked-devices-usage");
 const linkedDevicesSummary = document.querySelector("#linked-devices-summary");
 const linkedDevicesList = document.querySelector("#linked-devices-list");
+const companyNameInput = document.querySelector("#company-name");
+const claimedAsteroidName = document.querySelector("#claimed-asteroid-name");
+const portalInstallPrompt = document.querySelector("#portal-install-prompt");
 const linkParams = new URLSearchParams(window.location.search);
 const pendingLink = {
   sessionId: normalizeLinkSessionId(linkParams.get("sessionId")),
   code: normalizeLinkCodeParam(linkParams.get("linkCode") || linkParams.get("code"))
+};
+const COMPANY_STORAGE_KEY = "mcp-miner-company-name";
+const PORTAL_INSTALL_PROMPTS = {
+  "mac-silicon": "Install MCP Miner on this Apple Silicon Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.",
+  "mac-intel": "Install MCP Miner on this Intel Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.",
+  windows: "Install MCP Miner on this Windows PC. Clone https://github.com/jrslyce/mcp-miner into a local development folder if needed, open the repo root, and run powershell -ExecutionPolicy Bypass -File .\\scripts\\install_codex_plugin.ps1. If the plugin binary is missing, let the installer rebuild it with Go. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.",
+  linux: "Install MCP Miner on this Linux machine. First confirm this Codex environment supports local plugins and hook trust. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status."
 };
 
 let currentUser = null;
@@ -783,7 +793,7 @@ function preferredTheme() {
   if (saved === "light" || saved === "dark") {
     return saved;
   }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "dark";
 }
 
 function applyTheme(theme) {
@@ -799,6 +809,83 @@ function toggleTheme() {
   const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
   applyTheme(nextTheme);
+}
+
+function cleanCompanyName(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 48);
+}
+
+function currentCompanyName() {
+  return cleanCompanyName(companyNameInput && companyNameInput.value);
+}
+
+function asteroidClaimName(asteroid) {
+  const company = currentCompanyName();
+  const baseName = asteroid && asteroid.displayName ? asteroid.displayName : "Starter Rubble";
+  if (!company) {
+    return `Unclaimed ${baseName}`;
+  }
+  const normalized = company
+    .replace(/\b(company|co\.?|inc\.?|llc|mining|asteroid)\b\.?/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/[.,&-]+$/g, "")
+    .trim();
+  const seed = normalized || company;
+  return `${seed} Claim: ${baseName}`;
+}
+
+function renderCompanyClaim(asteroid = activeDashboard.asteroid) {
+  if (!claimedAsteroidName) {
+    return;
+  }
+  claimedAsteroidName.textContent = asteroidClaimName(asteroid);
+}
+
+function setupCompanyClaim() {
+  if (!companyNameInput) {
+    return;
+  }
+  companyNameInput.value = cleanCompanyName(localStorage.getItem(COMPANY_STORAGE_KEY));
+  companyNameInput.addEventListener("input", () => {
+    localStorage.setItem(COMPANY_STORAGE_KEY, currentCompanyName());
+    renderCompanyClaim(activeDashboard.asteroid);
+    if (asteroidName) {
+      asteroidName.textContent = asteroidClaimName(activeDashboard.asteroid);
+    }
+    if (activeDashboard) {
+      renderCloudDetail(activeDashboard.cloudState || {}, activeDashboard.asteroid || {}, activeDashboard.syncDevices || []);
+    }
+  });
+  renderCompanyClaim(activeDashboard.asteroid);
+}
+
+function selectPortalInstallPrompt(os) {
+  if (portalInstallPrompt && PORTAL_INSTALL_PROMPTS[os]) {
+    portalInstallPrompt.textContent = PORTAL_INSTALL_PROMPTS[os];
+  }
+  document.querySelectorAll("[data-portal-os]").forEach((button) => {
+    button.setAttribute("aria-selected", button.dataset.portalOs === os ? "true" : "false");
+  });
+}
+
+function guessedPortalOs() {
+  const platform = `${navigator.userAgent || ""} ${navigator.platform || ""}`.toLowerCase();
+  if (platform.includes("win")) {
+    return "windows";
+  }
+  if (platform.includes("linux")) {
+    return "linux";
+  }
+  return "mac-silicon";
+}
+
+function setupPortalInstallSelector() {
+  document.querySelectorAll("[data-portal-os]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectPortalInstallPrompt(button.dataset.portalOs);
+    });
+  });
+  selectPortalInstallPrompt(guessedPortalOs());
 }
 
 function cloneDemo(overrides = {}) {
@@ -2004,7 +2091,8 @@ function renderDashboard(data) {
   syncCadence.textContent = syncCadenceLabel(cadence);
   syncNextRefresh.textContent = cadence.canAcceptNow ? "Now" : timestampLabel(cadence.nextEligibleSyncAt);
   const hasAsteroidProgress = numberValue(asteroid.depletionSize) > 0;
-  asteroidName.textContent = asteroid.displayName || "-";
+  asteroidName.textContent = asteroidClaimName(asteroid);
+  renderCompanyClaim(asteroid);
   asteroidProgressLabel.textContent = hasAsteroidProgress
     ? `${formatNumber(asteroid.mined)} / ${formatNumber(asteroid.depletionSize)} mined`
     : "No asteroid progress synced yet.";
@@ -2997,6 +3085,8 @@ onAuthStateChanged(auth, async (user) => {
 applyTheme(preferredTheme());
 setLinkMode();
 setupPromptCopyButtons();
+setupCompanyClaim();
+setupPortalInstallSelector();
 renderDeviceLink(currentUser);
 renderDashboard(cloneDemo());
 loadPlanCatalog();

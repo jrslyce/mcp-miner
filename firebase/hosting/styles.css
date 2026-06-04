@@ -652,6 +652,280 @@ body {
   color: var(--ink);
 }
 
+.landing-shell {
+  --landing-bg: #07111d;
+  --landing-panel: rgba(14, 28, 43, 0.84);
+  --landing-panel-strong: rgba(13, 38, 34, 0.88);
+  --landing-line: rgba(117, 164, 165, 0.38);
+  --landing-ink: #f7fbf5;
+  --landing-muted: #b5c4c7;
+  --landing-green: #48d19a;
+  --landing-gold: #d9b46e;
+  --landing-pink: #d76cd5;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(180deg, #0c1724 0%, var(--landing-bg) 44%, #081522 100%);
+  background-size: 100% 4px, 4px 100%, auto;
+  color: var(--landing-ink);
+}
+
+.landing-shell .landing-nav {
+  width: 100%;
+  max-width: none;
+  min-height: 52px;
+  padding: 6px max(18px, calc((100vw - 1024px) / 2));
+  border-bottom: 1px solid rgba(117, 164, 165, 0.26);
+  background: rgba(9, 18, 30, 0.88);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+}
+
+.landing-brand-wordmark {
+  display: block;
+  width: 166px;
+  max-width: 42vw;
+  height: auto;
+  image-rendering: auto;
+}
+
+.landing-shell .landing-brand-mark,
+.landing-shell .landing-brand span {
+  display: none;
+}
+
+.landing-shell .landing-nav-links a {
+  color: rgba(247, 251, 245, 0.82);
+  font-weight: 750;
+}
+
+.landing-shell .landing-nav-links a:hover {
+  color: var(--landing-green);
+}
+
+.landing-shell .nav-button,
+.landing-shell .theme-toggle {
+  min-height: 36px;
+  border-color: rgba(72, 209, 154, 0.64);
+  background: rgba(9, 18, 30, 0.74);
+  color: #dff9ea;
+}
+
+.landing-shell .nav-button:not(.secondary) {
+  background: linear-gradient(180deg, #55dca6 0%, #2ebf86 100%);
+  color: #07110d;
+}
+
+.landing-shell .nav-button.secondary {
+  background: rgba(9, 18, 30, 0.72);
+  color: #dff9ea;
+}
+
+.landing-shell .landing-hero {
+  width: 100%;
+  min-height: 330px;
+  margin: 0;
+  border-radius: 0;
+  padding: 66px max(24px, calc((100vw - 1024px) / 2)) 44px;
+  background: #07111d;
+}
+
+.landing-shell .landing-hero::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, rgba(7, 17, 29, 0.96) 0%, rgba(7, 17, 29, 0.74) 44%, rgba(7, 17, 29, 0.16) 100%),
+    linear-gradient(180deg, rgba(7, 17, 29, 0.18) 0%, rgba(7, 17, 29, 0.78) 100%);
+  content: "";
+}
+
+.landing-shell .landing-hero::after {
+  background: linear-gradient(180deg, rgba(7, 17, 29, 0) 0%, rgba(7, 17, 29, 0.2) 100%);
+}
+
+.hero-poster {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(820px, 66vw);
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.94;
+}
+
+.landing-shell .hero-copy {
+  width: min(580px, 100%);
+}
+
+.landing-shell .hero-copy h1 {
+  font-size: clamp(2.25rem, 4.4vw, 4.65rem);
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.84), 0 0 22px rgba(72, 209, 154, 0.2);
+}
+
+.landing-shell .hero-lede {
+  color: rgba(247, 251, 245, 0.88);
+  font-weight: 650;
+}
+
+.landing-shell .eyebrow {
+  color: var(--landing-gold);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+.landing-shell .hero-proof div,
+.landing-shell .play-card,
+.landing-shell .privacy-columns article,
+.landing-shell .install-prompt-card,
+.landing-shell .command-card,
+.landing-shell .project-guidance article,
+.landing-shell .portal-steps article {
+  border-color: var(--landing-line);
+  background: var(--landing-panel);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.035), 0 18px 44px rgba(0, 0, 0, 0.28);
+}
+
+.landing-shell .trust-band,
+.landing-shell .privacy-section,
+.landing-shell .commands-section {
+  border-color: rgba(117, 164, 165, 0.24);
+}
+
+.landing-shell .landing-section h2,
+.landing-shell .landing-section h3,
+.landing-shell .portal-steps strong {
+  color: var(--landing-ink);
+}
+
+.landing-shell .landing-section p,
+.landing-shell .privacy-columns ul,
+.landing-shell .project-guidance p {
+  color: var(--landing-muted);
+}
+
+.privacy-columns article:first-child {
+  background: linear-gradient(135deg, rgba(21, 88, 63, 0.82) 0%, rgba(13, 38, 34, 0.86) 100%);
+}
+
+.privacy-columns article:last-child {
+  background: linear-gradient(135deg, rgba(35, 42, 58, 0.92) 0%, rgba(18, 28, 45, 0.9) 100%);
+}
+
+.privacy-columns li::marker {
+  color: var(--landing-green);
+}
+
+.privacy-columns article:last-child li::marker {
+  color: #e76e84;
+}
+
+.os-selector,
+.portal-os-selector {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.os-option {
+  min-height: 38px;
+  border: 1px solid var(--landing-line, var(--line));
+  border-radius: 6px;
+  background: rgba(9, 18, 30, 0.68);
+  color: var(--landing-muted, var(--muted));
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.os-option[aria-selected="true"] {
+  border-color: var(--landing-green, var(--accent));
+  background: linear-gradient(180deg, #55dca6 0%, #2ebf86 100%);
+  color: #07110d;
+}
+
+.landing-shell .install-prompt-grid {
+  grid-template-columns: 1fr;
+}
+
+.landing-shell .install-prompt-card[hidden] {
+  display: none;
+}
+
+.landing-shell .copy-code,
+.portal-onboarding .copy-code {
+  border-color: rgba(72, 209, 154, 0.28);
+  background: rgba(3, 9, 14, 0.92);
+  color: #c9f7df;
+}
+
+.landing-shell .portal-cta {
+  margin-top: 18px;
+}
+
+.portal-onboarding {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(72, 209, 154, 0.24);
+  border-radius: 8px;
+  padding: 18px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(12, 24, 38, 0.94) 0%, rgba(7, 17, 29, 0.96) 100%);
+  background-size: 100% 4px, auto;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+}
+
+.portal-onboarding-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.portal-onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.portal-step-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid rgba(72, 209, 154, 0.2);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(14, 28, 43, 0.78);
+}
+
+.portal-step-card h3,
+.portal-step-card p {
+  margin: 0;
+}
+
+.portal-step-card p {
+  color: var(--muted);
+  line-height: 1.48;
+}
+
+.company-claim-card label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.company-claim-card input {
+  width: 100%;
+}
+
+.company-claim-card strong {
+  color: var(--accent-strong);
+}
+
+.portal-install-card .copy-code,
+.portal-link-card .copy-code {
+  max-height: 154px;
+}
+
 .dashboard-shell {
   width: min(1480px, 100%);
   min-width: 0;
@@ -1112,6 +1386,34 @@ dd {
   background: var(--panel-raised);
 }
 
+.scan-art-shell::before,
+.scan-art-shell::after {
+  position: absolute;
+  inset: 8px;
+  z-index: 3;
+  pointer-events: none;
+  content: "";
+}
+
+.scan-art-shell::before {
+  border: 1px solid rgba(88, 199, 155, 0.54);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 22px rgba(88, 199, 155, 0.18),
+    0 0 24px rgba(88, 199, 155, 0.16);
+  animation: asteroid-frame-pulse 3.8s ease-in-out infinite;
+}
+
+.scan-art-shell::after {
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 48%, transparent 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, transparent 34%, rgba(88, 199, 155, 0.08) 100%);
+  mix-blend-mode: screen;
+  opacity: 0.68;
+  transform: translateX(-42%);
+  animation: asteroid-card-sheen 6s linear infinite;
+}
+
 .scan-art {
   position: absolute;
   inset: 0;
@@ -1123,8 +1425,30 @@ dd {
 .asteroid-canvas {
   position: absolute;
   inset: 0;
+  z-index: 2;
   width: 100%;
   height: 100%;
+}
+
+@keyframes asteroid-frame-pulse {
+  0%,
+  100% {
+    opacity: 0.58;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes asteroid-card-sheen {
+  0% {
+    transform: translateX(-70%);
+  }
+  100% {
+    transform: translateX(70%);
+  }
 }
 
 .progress-meta {
@@ -1540,6 +1864,15 @@ dd {
     padding: 72px 28px 28px;
   }
 
+  .landing-shell .landing-hero {
+    padding: 64px 24px 28px;
+  }
+
+  .hero-poster {
+    width: 100%;
+    opacity: 0.42;
+  }
+
   .hero-copy h1 {
     font-size: 3.25rem;
   }
@@ -1581,6 +1914,10 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .portal-onboarding-grid {
+    grid-template-columns: 1fr;
+  }
+
   .dashboard-shell {
     padding: 16px;
   }
@@ -1616,6 +1953,11 @@ dd {
     gap: 10px;
   }
 
+  .landing-shell .landing-nav {
+    width: 100%;
+    padding: 10px 12px;
+  }
+
   .landing-nav-links,
   .landing-nav-actions {
     justify-content: start;
@@ -1623,7 +1965,7 @@ dd {
 
   .landing-nav-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
 
@@ -1647,6 +1989,10 @@ dd {
     padding: 50px 18px 18px;
   }
 
+  .landing-shell .landing-hero {
+    padding: 44px 18px 20px;
+  }
+
   .landing-hero::after {
     background: rgba(7, 17, 15, 0.84);
   }
@@ -1656,6 +2002,10 @@ dd {
     top: -56px;
     width: 420px;
     height: 420px;
+  }
+
+  .landing-brand-wordmark {
+    width: 150px;
   }
 
   .hero-rock {
@@ -1698,6 +2048,16 @@ dd {
 
   .hero-console {
     display: none;
+  }
+
+  .os-selector,
+  .portal-os-selector,
+  .portal-onboarding-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-onboarding {
+    padding: 14px;
   }
 
   .hero-button,
@@ -1830,5 +2190,12 @@ dd {
   .panel-heading .pill,
   .panel-heading .status-dot {
     justify-self: start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-art-shell::before,
+  .scan-art-shell::after {
+    animation: none;
   }
 }

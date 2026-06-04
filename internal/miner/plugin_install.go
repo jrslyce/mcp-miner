@@ -79,8 +79,97 @@ func BuildPluginBinary(root string, stdout, stderr io.Writer) (string, error) {
 			return "", err
 		}
 	}
+	if err := writeHostHooks(root); err != nil {
+		return "", err
+	}
 
 	return binaryPath, nil
+}
+
+type pluginHookDefinition struct {
+	Name    string
+	Matcher string
+	Mode    string
+	Status  string
+}
+
+type pluginHooksConfig struct {
+	Hooks map[string][]pluginHookEntry `json:"hooks"`
+}
+
+type pluginHookEntry struct {
+	Matcher string              `json:"matcher,omitempty"`
+	Hooks   []pluginHookCommand `json:"hooks"`
+}
+
+type pluginHookCommand struct {
+	Type          string `json:"type"`
+	Command       string `json:"command"`
+	Timeout       int    `json:"timeout"`
+	StatusMessage string `json:"statusMessage"`
+}
+
+func writeHostHooks(root string) error {
+	prefix := `"$PLUGIN_ROOT/bin/mcp-miner" hook`
+	if runtime.GOOS == "windows" {
+		prefix = `cmd /d /c call "%PLUGIN_ROOT%\bin\mcp-miner.exe" hook`
+	}
+
+	definitions := []pluginHookDefinition{
+		{
+			Name:    "SessionStart",
+			Matcher: "startup|resume|clear|compact",
+			Mode:    "session_start",
+			Status:  "Powering MCP Miner",
+		},
+		{
+			Name:   "UserPromptSubmit",
+			Mode:   "user_prompt_submit",
+			Status: "Scanning asteroid work signal",
+		},
+		{
+			Name:   "SubagentStart",
+			Mode:   "subagent_start",
+			Status: "Tagging MCP Miner agent shift",
+		},
+		{
+			Name:   "SubagentStop",
+			Mode:   "subagent_stop",
+			Status: "Closing MCP Miner agent shift",
+		},
+		{
+			Name:    "PostToolUse",
+			Matcher: ".*",
+			Mode:    "post_tool_use",
+			Status:  "Mining Codex work",
+		},
+		{
+			Name:   "Stop",
+			Mode:   "stop",
+			Status: "Preparing MCP Miner report",
+		},
+	}
+
+	config := pluginHooksConfig{Hooks: map[string][]pluginHookEntry{}}
+	for _, definition := range definitions {
+		entry := pluginHookEntry{
+			Matcher: definition.Matcher,
+			Hooks: []pluginHookCommand{{
+				Type:          "command",
+				Command:       fmt.Sprintf("%s %s", prefix, definition.Mode),
+				Timeout:       10,
+				StatusMessage: definition.Status,
+			}},
+		}
+		config.Hooks[definition.Name] = []pluginHookEntry{entry}
+	}
+
+	bytes, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+	bytes = append(bytes, '\n')
+	return os.WriteFile(filepath.Join(root, "plugins", "mcp-miner", "hooks", "hooks.json"), bytes, 0o644)
 }
 
 func RunInstallCodexPlugin(args []string, stdout, stderr io.Writer) error {

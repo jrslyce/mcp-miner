@@ -17,8 +17,11 @@ def read(path)
   File.read(File.join(ROOT, path))
 end
 
-index = read("firebase/hosting/index.html")
+landing = read("firebase/hosting/index.html")
+portal = read("firebase/hosting/portal.html")
+index = "#{landing}\n#{portal}"
 auth_js = read("firebase/hosting/auth.js")
+landing_js = read("firebase/hosting/landing.js")
 subscription_catalog = JSON.parse(read("firebase/hosting/subscription-plans.json"))
 subscription_config = YAML.load_file(File.join(ROOT, "data/subscription_plans.yaml"))
 styles = read("firebase/hosting/styles.css")
@@ -37,21 +40,23 @@ asteroid_ids = %w[
 
 required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
 assert("landing page should explain MCP Miner before the dashboard") do
-  index.include?(%(<main id="home" class="landing-shell">)) &&
-    index.include?("Turn Codex work into a tiny asteroid-mining game.") &&
+  landing.include?(%(<main id="home" class="landing-shell">)) &&
+    landing.include?("Turn Your Work Into an Asteroid-Mining Adventure") &&
     index.include?("Install the plugin") &&
-    index.include?("Open dashboard") &&
+    index.include?("Open portal") &&
     index.include?(%(href="https://github.com/jrslyce/mcp-miner")) &&
-    index.include?(%(src="/assets/logo.png")) &&
-    index.include?(%(src="/assets/asteroids/asteroid_diamond_class_body.svg"))
+    index.include?(%(src="/assets/mcpminer-words.png")) &&
+    index.include?(%(src="/assets/mcpminer-hero.png")) &&
+    !landing.include?(%(<script type="module" src="/auth.js"></script>)) &&
+    portal.include?(%(<script type="module" src="/auth.js"></script>))
 end
 
 assert("landing page should document gameplay, install, privacy, and account linking") do
-  index.include?(%(id="how-it-works")) &&
-    index.include?(%(id="privacy")) &&
-    index.include?(%(id="install")) &&
-    index.include?(%(id="commands")) &&
-    index.include?(%(id="portal")) &&
+  landing.include?(%(id="how-it-works")) &&
+    landing.include?(%(id="privacy")) &&
+    landing.include?(%(id="install")) &&
+    landing.include?(%(id="commands")) &&
+    landing.include?(%(id="portal")) &&
     index.include?("Clone https://github.com/jrslyce/mcp-miner") &&
     index.include?("sh scripts/install_codex_plugin.sh") &&
     index.include?("Mac Apple Silicon") &&
@@ -65,16 +70,19 @@ assert("landing page should document gameplay, install, privacy, and account lin
     !index.include?("Diamond MCP marketplace") &&
     index.include?("Prompts stored") &&
     index.include?("Not collected for gameplay") &&
-    index.include?("short-lived approval code") &&
-    index.include?("revocable device token")
+    index.include?("short-lived code") &&
+    index.include?("revocable local device token") &&
+    landing.include?("data-os-target=\"mac-silicon\"") &&
+    landing_js.include?("function selectOsPrompt(os)")
 end
 
 assert("landing page should use responsive production styles") do
   styles.include?(".landing-hero") &&
-    styles.include?(".hero-console") &&
+    styles.include?(".hero-poster") &&
     styles.include?(".play-grid") &&
     styles.include?(".privacy-columns") &&
     styles.include?(".install-prompt-grid") &&
+    styles.include?(".os-selector") &&
     styles.include?(".command-grid") &&
     styles.include?(".copy-code") &&
     styles.include?("@media (max-width: 980px)") &&
@@ -84,9 +92,22 @@ end
 
 assert("dashboard should render the V1 dashboard panels on the first screen") do
   required_panels.all? { |panel| index.include?(%(data-panel="#{panel}")) } &&
-    index.include?(%(<script type="module" src="/auth.js"></script>)) &&
+    portal.include?(%(<script type="module" src="/auth.js"></script>)) &&
     index.include?(%(<img id="asteroid-art" class="scan-art")) &&
     index.include?(%(<canvas id="asteroid-canvas"))
+end
+
+assert("portal should include onboarding steps before the stats dashboard") do
+  portal.include?(%(class="portal-onboarding")) &&
+    portal.include?(%(id="company-name")) &&
+    portal.include?(%(id="claimed-asteroid-name")) &&
+    portal.include?(%(id="portal-install-prompt")) &&
+    portal.include?(%(id="portal-link-prompt")) &&
+    auth_js.include?("const COMPANY_STORAGE_KEY = \"mcp-miner-company-name\"") &&
+    auth_js.include?("function asteroidClaimName(asteroid)") &&
+    auth_js.include?("function setupPortalInstallSelector()") &&
+    styles.include?(".portal-onboarding-grid") &&
+    styles.include?("@keyframes asteroid-card-sheen")
 end
 
 assert("dashboard should expose concrete status, inventory, order, upgrade, report, sync, and base targets") do

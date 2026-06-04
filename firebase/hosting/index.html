@@ -14,37 +14,35 @@
     <main id="home" class="landing-shell">
       <nav class="landing-nav" aria-label="MCP Miner site">
         <a class="landing-brand" href="#home" aria-label="MCP Miner home">
-          <img class="landing-brand-mark" src="/assets/logo.png" alt="">
-          <span>MCP Miner</span>
+          <img class="landing-brand-wordmark" src="/assets/mcpminer-words.png" alt="MCP Miner">
         </a>
         <div class="landing-nav-links">
-          <a href="#how-it-works">How it works</a>
-          <a href="#privacy">Privacy</a>
+          <a href="#privacy">Safety</a>
+          <a href="#how-it-works">How it Works</a>
           <a href="#install">Install</a>
           <a href="#commands">Commands</a>
-          <a href="#portal">Portal</a>
         </div>
         <div class="landing-nav-actions">
           <button id="theme-toggle" type="button" class="theme-toggle" aria-pressed="false" aria-label="Use dark mode">
             <span id="theme-toggle-label">Dark</span>
           </button>
           <a class="nav-button" href="https://github.com/jrslyce/mcp-miner">GitHub</a>
+          <a class="nav-button secondary" href="/portal.html">Login</a>
+          <a class="nav-button" href="/portal.html">Start Mining</a>
         </div>
       </nav>
 
       <section class="landing-hero" aria-labelledby="landing-title">
         <div class="hero-background" aria-hidden="true">
-          <img class="hero-logo-ghost" src="/assets/logo.png" alt="">
-          <img class="hero-rock hero-rock-a" src="/assets/asteroids/asteroid_quartz_belt.svg" alt="">
-          <img class="hero-rock hero-rock-b" src="/assets/asteroids/asteroid_diamond_class_body.svg" alt="">
+          <img class="hero-poster" src="/assets/mcpminer-hero.png" alt="">
         </div>
         <div class="hero-copy">
-          <p class="eyebrow">Local-first Codex plugin</p>
-          <h1 id="landing-title">Turn Codex work into a tiny asteroid-mining game.</h1>
-          <p class="hero-lede">MCP Miner watches privacy-safe work signals, mines Chonks, fills space orders, unlocks upgrades, and lets you sync an optional web portal account when you want cloud progress.</p>
+          <p class="eyebrow">A 90s DOS Adventure!</p>
+          <h1 id="landing-title">Turn Your Work Into an Asteroid-Mining Adventure</h1>
+          <p class="hero-lede">MCP Miner watches privacy-safe Codex work signals, mines Chonks, fills space orders, unlocks upgrades, and lets you sync an optional web portal account when you want cloud progress.</p>
           <div class="hero-actions" aria-label="Primary actions">
             <a class="hero-button" href="#install">Install the plugin</a>
-            <a class="hero-button secondary" href="#dashboard">Open dashboard</a>
+            <a class="hero-button secondary" href="/portal.html">Open portal</a>
           </div>
           <dl class="hero-proof" aria-label="Privacy summary">
             <div>
@@ -60,29 +58,6 @@
               <dd>Optional</dd>
             </div>
           </dl>
-        </div>
-        <div class="hero-console" aria-label="MCP Miner gameplay preview">
-          <div class="console-topline">
-            <span>Asteroid scan</span>
-            <strong>Diamond-Class Body</strong>
-          </div>
-          <div class="console-stage">
-            <img src="/assets/asteroids/asteroid_diamond_class_body.svg" alt="Diamond-Class Body asteroid preview">
-          </div>
-          <div class="console-metrics">
-            <div>
-              <span>Chonks</span>
-              <strong>15,683</strong>
-            </div>
-            <div>
-              <span>Order</span>
-              <strong>Ready</strong>
-            </div>
-            <div>
-              <span>Sync</span>
-              <strong>Optional</strong>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -155,30 +130,36 @@
           <p class="eyebrow">Install</p>
           <h2 id="install-title">Paste one prompt into Codex to install MCP Miner.</h2>
           <p>MCP Miner now runs through a compiled Go plugin. Normal installs do not need Ruby, Node, or Firebase tools. If the checked-out plugin binary is missing, the installer can rebuild it with Go.</p>
+          <div class="os-selector" role="tablist" aria-label="Choose install prompt by operating system">
+            <button type="button" class="os-option" data-os-target="mac-silicon" role="tab" aria-selected="true">Mac Silicon</button>
+            <button type="button" class="os-option" data-os-target="mac-intel" role="tab" aria-selected="false">Mac Intel</button>
+            <button type="button" class="os-option" data-os-target="windows" role="tab" aria-selected="false">Windows</button>
+            <button type="button" class="os-option" data-os-target="linux" role="tab" aria-selected="false">Linux</button>
+          </div>
         </div>
         <div class="install-prompt-grid" aria-label="Copyable Codex install prompts">
-          <article class="install-prompt-card">
+          <article class="install-prompt-card" data-os-card="mac-silicon">
             <div class="prompt-card-heading">
               <h3>Mac Apple Silicon</h3>
               <button type="button" class="copy-prompt-button" data-copy-target="prompt-mac-silicon">Copy</button>
             </div>
             <pre id="prompt-mac-silicon" class="copy-code">Install MCP Miner on this Apple Silicon Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.</pre>
           </article>
-          <article class="install-prompt-card">
+          <article class="install-prompt-card" data-os-card="mac-intel" hidden>
             <div class="prompt-card-heading">
               <h3>Mac Intel</h3>
               <button type="button" class="copy-prompt-button" data-copy-target="prompt-mac-intel">Copy</button>
             </div>
             <pre id="prompt-mac-intel" class="copy-code">Install MCP Miner on this Intel Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.</pre>
           </article>
-          <article class="install-prompt-card">
+          <article class="install-prompt-card" data-os-card="windows" hidden>
             <div class="prompt-card-heading">
               <h3>Windows</h3>
               <button type="button" class="copy-prompt-button" data-copy-target="prompt-windows">Copy</button>
             </div>
             <pre id="prompt-windows" class="copy-code">Install MCP Miner on this Windows PC. Clone https://github.com/jrslyce/mcp-miner into a local development folder if needed, open the repo root, and run powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1. If the plugin binary is missing, let the installer rebuild it with Go. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.</pre>
           </article>
-          <article class="install-prompt-card">
+          <article class="install-prompt-card" data-os-card="linux" hidden>
             <div class="prompt-card-heading">
               <h3>Linux</h3>
               <button type="button" class="copy-prompt-button" data-copy-target="prompt-linux">Copy</button>
@@ -241,397 +222,26 @@
       <section id="portal" class="landing-section portal-section" aria-labelledby="portal-title">
         <div class="section-heading">
           <p class="eyebrow">Portal account</p>
-          <h2 id="portal-title">Connect Codex with a short-lived approval code.</h2>
+          <h2 id="portal-title">The portal lives on its own page.</h2>
         </div>
         <div class="portal-steps">
           <article>
-            <strong>1. Start link in Codex</strong>
-            <p>Ask MCP Miner to sync account. Codex creates a temporary link code.</p>
+            <strong>1. Log in</strong>
+            <p>Create an account or sign in before approving a Codex device.</p>
           </article>
           <article>
-            <strong>2. Sign in here</strong>
-            <p>Use Google or email/password, then approve the device shown in the portal.</p>
+            <strong>2. Claim a company</strong>
+            <p>Name your asteroid mining company, then the portal generates a claim name for your current asteroid.</p>
           </article>
           <article>
-            <strong>3. Complete in Codex</strong>
-            <p>Codex stores a revocable device token locally and can sync abstract game progress.</p>
+            <strong>3. Link and sync</strong>
+            <p>Install the plugin, approve a short-lived code, complete linking in Codex, and sync abstract game progress.</p>
           </article>
         </div>
+        <a class="hero-button portal-cta" href="/portal.html">Open the mining portal</a>
       </section>
     </main>
 
-    <section id="dashboard" class="dashboard-shell" aria-label="MCP Miner dashboard">
-      <header class="topbar">
-        <div class="brand-lockup">
-          <img class="brand-mark" src="/assets/logo.png" alt="" aria-hidden="true">
-          <div>
-            <p class="eyebrow">Space Mining Idle Game</p>
-            <h1>MCP Miner</h1>
-          </div>
-        </div>
-        <div class="topbar-actions">
-          <span id="connection-pill" class="pill">Demo mode</span>
-          <button id="refresh-dashboard" type="button" class="button-secondary">
-            <span>Refresh</span>
-          </button>
-          <button id="topbar-sign-out" type="button" class="button-secondary topbar-sign-out" disabled hidden>Log Out</button>
-        </div>
-      </header>
-
-      <section class="workspace-grid">
-        <aside class="side-rail" aria-label="Account and sync">
-          <section class="panel link-panel" data-panel="device-link" aria-labelledby="device-link-title" hidden>
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Codex link</p>
-                <h2 id="device-link-title">Connect Device</h2>
-              </div>
-              <span id="device-link-status" class="pill">Waiting</span>
-            </div>
-            <p id="device-link-summary" class="message">Sign in to approve this Codex device.</p>
-            <dl class="compact-list">
-              <div>
-                <dt>Code</dt>
-                <dd id="device-link-code">-</dd>
-              </div>
-              <div>
-                <dt>Data</dt>
-                <dd>Abstract game progress only</dd>
-              </div>
-            </dl>
-            <div class="actions">
-              <button id="approve-device-link" type="button" disabled>Approve</button>
-              <button id="reject-device-link" type="button" class="button-secondary" disabled>Reject</button>
-            </div>
-          </section>
-
-          <section class="panel auth-panel" data-panel="auth" aria-labelledby="auth-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Firebase Auth</p>
-                <h2 id="auth-title">Account</h2>
-              </div>
-              <span id="auth-status" class="status-dot">Signed out</span>
-            </div>
-
-            <button id="google-sign-in" type="button" class="google-auth">Continue with Google</button>
-
-            <form id="auth-form" class="auth-form">
-              <label>
-                Email
-                <input id="email" name="email" type="email" autocomplete="email" required>
-              </label>
-              <label>
-                Password
-                <input id="password" name="password" type="password" autocomplete="current-password" required minlength="6">
-              </label>
-              <div class="actions">
-                <button id="sign-in" type="submit">Sign In</button>
-                <button id="create-account" type="button" class="button-secondary">Create Account</button>
-                <button id="sign-out" type="button" class="button-secondary" disabled>Sign Out</button>
-              </div>
-            </form>
-            <button id="send-verification-email" type="button" class="button-secondary verification-action" disabled hidden>Resend Verification</button>
-
-            <dl class="status-grid">
-              <div>
-                <dt>Account</dt>
-                <dd id="auth-identity">Not signed in</dd>
-              </div>
-              <div>
-                <dt>Email</dt>
-                <dd id="email-verification-status">Not signed in</dd>
-              </div>
-              <div>
-                <dt>Profile</dt>
-                <dd id="profile-status">Demo preview</dd>
-              </div>
-              <div>
-                <dt>Source</dt>
-                <dd id="dashboard-source">Local demo snapshot</dd>
-              </div>
-            </dl>
-
-            <p id="auth-message" class="message" role="status" aria-live="polite"></p>
-          </section>
-
-          <section class="panel billing-panel" data-panel="billing" aria-labelledby="billing-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Pro sync</p>
-                <h2 id="billing-title">Subscription</h2>
-              </div>
-              <span id="billing-status" class="pill">Free</span>
-            </div>
-            <p id="billing-summary" class="message">Free sync batches every minute for one Codex device.</p>
-            <div id="plan-cards" class="plan-cards" role="list" aria-label="Subscription plans"></div>
-            <dl class="compact-list">
-              <div>
-                <dt>Plan</dt>
-                <dd id="billing-plan">Free</dd>
-              </div>
-              <div>
-                <dt>Devices</dt>
-                <dd id="billing-devices">1 Codex</dd>
-              </div>
-              <div>
-                <dt>Sync</dt>
-                <dd id="billing-sync">60 sec</dd>
-              </div>
-              <div>
-                <dt>Annual</dt>
-                <dd>12 months for 11</dd>
-              </div>
-            </dl>
-            <div class="actions billing-actions">
-              <button id="checkout-monthly" type="button">Monthly</button>
-              <button id="checkout-annual" type="button" class="button-secondary">Annual</button>
-              <button id="manage-billing" type="button" class="button-secondary">Manage</button>
-            </div>
-          </section>
-
-          <section class="panel devices-panel" data-panel="linked-devices" aria-labelledby="linked-devices-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Codex devices</p>
-                <h2 id="linked-devices-title">Linked Devices</h2>
-              </div>
-              <span id="linked-devices-usage" class="pill">0 / 1</span>
-            </div>
-            <p id="linked-devices-summary" class="message">Sign in to manage connected Codex computers.</p>
-            <div id="linked-devices-list" class="device-list"></div>
-          </section>
-
-          <section class="panel" data-panel="sync-privacy" aria-labelledby="sync-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Sync and privacy</p>
-                <h2 id="sync-title">Cloud State</h2>
-              </div>
-              <span id="sync-status" class="pill">Off</span>
-            </div>
-            <dl class="compact-list">
-              <div>
-                <dt>Events</dt>
-                <dd id="sync-events">0</dd>
-              </div>
-              <div>
-                <dt>Sequence</dt>
-                <dd id="sync-sequence">0</dd>
-              </div>
-              <div>
-                <dt>Conflicts</dt>
-                <dd id="sync-conflicts">None</dd>
-              </div>
-              <div>
-                <dt>Cadence</dt>
-                <dd id="sync-cadence">60 sec</dd>
-              </div>
-              <div>
-                <dt>Next sync</dt>
-                <dd id="sync-next-refresh">Manual</dd>
-              </div>
-            </dl>
-            <ul id="privacy-list" class="privacy-list"></ul>
-          </section>
-        </aside>
-
-        <section class="main-board" aria-label="Miner dashboard">
-          <section class="mode-strip" aria-label="Dashboard mode">
-            <div>
-              <p class="eyebrow">Mode</p>
-              <strong id="dashboard-mode">Signed-out demo</strong>
-            </div>
-            <div>
-              <p class="eyebrow">Last updated</p>
-              <strong id="last-updated">Ready</strong>
-            </div>
-          </section>
-
-          <section class="metric-strip" aria-label="Miner status" data-panel="status">
-            <article class="metric-card">
-              <span>Space Bucks</span>
-              <strong id="metric-space-bucks">0</strong>
-            </article>
-            <article class="metric-card">
-              <span>Chonks</span>
-              <strong id="metric-chonks">0</strong>
-            </article>
-            <article class="metric-card">
-              <span>Suit</span>
-              <strong id="metric-suit">100%</strong>
-            </article>
-            <article class="metric-card">
-              <span>Cloud Events</span>
-              <strong id="metric-events">0</strong>
-            </article>
-          </section>
-
-          <section class="panel panel-wide analytics-panel" data-panel="analytics" aria-labelledby="analytics-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Portal analytics</p>
-                <h2 id="analytics-title">History Trends</h2>
-              </div>
-              <span id="analytics-summary" class="pill">7 day history</span>
-            </div>
-            <div id="analytics-list" class="analytics-list"></div>
-            <div class="actions export-actions">
-              <button id="export-json" type="button" class="button-secondary" disabled>JSON</button>
-              <button id="export-csv" type="button" class="button-secondary" disabled>CSV</button>
-            </div>
-            <p id="export-status" class="message" role="status" aria-live="polite"></p>
-          </section>
-
-          <section class="panel panel-wide digest-panel" data-panel="weekly-digest" aria-labelledby="weekly-digest-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Pro weekly digest</p>
-                <h2 id="weekly-digest-title">Week In The Belt</h2>
-              </div>
-              <span id="weekly-digest-status" class="pill">Pro</span>
-            </div>
-            <div id="weekly-digest-summary" class="digest-summary"></div>
-            <div id="weekly-digest-list" class="digest-list"></div>
-            <div class="preference-grid">
-              <label class="toggle-row">
-                <input id="weekly-digest-enabled" type="checkbox">
-                <span>Weekly digest</span>
-              </label>
-              <label class="toggle-row">
-                <input id="beta-features-enabled" type="checkbox">
-                <span>Beta features</span>
-              </label>
-              <span id="beta-access-status" class="pill">Beta off</span>
-            </div>
-          </section>
-
-          <section class="panel panel-wide cosmetics-panel" data-panel="cosmetics" aria-labelledby="cosmetics-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">Profile cosmetics</p>
-                <h2 id="cosmetics-title">Suit And Portal Style</h2>
-              </div>
-              <span id="cosmetics-summary" class="pill">Free styles</span>
-            </div>
-            <div id="cosmetics-list" class="cosmetics-list"></div>
-            <p id="cosmetics-status" class="message" role="status" aria-live="polite"></p>
-          </section>
-
-          <section class="dashboard-grid">
-            <section class="panel panel-wide" data-panel="asteroid" aria-labelledby="asteroid-title">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Asteroid progress</p>
-                  <h2 id="asteroid-title">Current Rock</h2>
-                </div>
-                <span id="asteroid-name" class="pill">-</span>
-              </div>
-              <div class="scan-row">
-                <div class="scan-art-shell">
-                  <img id="asteroid-art" class="scan-art" src="/assets/asteroids/asteroid_starter_rubble.svg" alt="Starter Rubble procedural asteroid visualization">
-                  <canvas id="asteroid-canvas" class="asteroid-canvas" width="320" height="320" aria-hidden="true"></canvas>
-                </div>
-                <div class="progress-stack">
-                  <div class="progress-meta">
-                    <strong id="asteroid-progress-label">0 / 0 mined</strong>
-                    <span id="asteroid-progress-percent">0%</span>
-                  </div>
-                  <div class="progress-track" role="progressbar" aria-label="Asteroid depletion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-                    <span id="asteroid-progress-fill"></span>
-                  </div>
-                  <dl id="cloud-detail" class="inline-stats"></dl>
-                </div>
-              </div>
-            </section>
-
-            <section class="panel panel-wide asteroid-atlas-panel" data-panel="asteroid-atlas" aria-labelledby="asteroid-atlas-title">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Asteroid atlas</p>
-                  <h2 id="asteroid-atlas-title">Known Rock Classes</h2>
-                </div>
-              </div>
-              <div id="asteroid-atlas" class="asteroid-atlas"></div>
-            </section>
-
-            <section class="panel" data-panel="inventory" aria-labelledby="inventory-title">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Inventory</p>
-                  <h2 id="inventory-title">Materials</h2>
-                </div>
-              </div>
-              <div id="inventory-list" class="data-list"></div>
-            </section>
-
-            <section class="panel" data-panel="orders" aria-labelledby="orders-title">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Orders</p>
-                  <h2 id="orders-title">Active Board</h2>
-                </div>
-              </div>
-              <div id="orders-list" class="data-list"></div>
-            </section>
-
-            <section class="panel" data-panel="upgrades" aria-labelledby="upgrades-title">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Upgrades</p>
-                  <h2 id="upgrades-title">Systems</h2>
-                </div>
-              </div>
-              <div id="upgrades-list" class="data-list"></div>
-            </section>
-
-            <section class="panel panel-wide" data-panel="store" id="store" aria-labelledby="store-title">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Space Bucks store</p>
-                  <h2 id="store-title">Earned Purchases</h2>
-                </div>
-                <span id="store-balance" class="pill">0 Space Bucks</span>
-              </div>
-              <div id="store-list" class="store-list"></div>
-            </section>
-
-            <section class="panel" data-panel="reports" aria-labelledby="reports-title">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Reports</p>
-                  <h2 id="reports-title">Recent Signals</h2>
-                </div>
-              </div>
-              <div id="reports-list" class="report-list"></div>
-            </section>
-
-            <section class="panel panel-wide" data-panel="raw-sync" aria-labelledby="raw-sync-title">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Sync receipt audit</p>
-                  <h2 id="raw-sync-title">Raw Payloads</h2>
-                </div>
-                <span id="raw-sync-count" class="pill">0 shown</span>
-              </div>
-              <div id="raw-sync-list" class="raw-sync-list"></div>
-            </section>
-
-            <section class="panel" data-panel="base" aria-labelledby="base-title">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Base</p>
-                  <h2 id="base-title">Modules</h2>
-                </div>
-              </div>
-              <dl id="base-detail" class="compact-list"></dl>
-            </section>
-          </section>
-        </section>
-      </section>
-    </section>
-
-    <script src="/firebase-config.js"></script>
-    <script type="module" src="/auth.js"></script>
+    <script src="/landing.js"></script>
   </body>
 </html>

@@ -1,26 +1,39 @@
 {
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook post_tool_use",
+            "timeout": 10,
+            "statusMessage": "Mining Codex work"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
             "type": "command",
-            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook session_start",
+            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook session_start",
             "timeout": 10,
             "statusMessage": "Powering MCP Miner"
           }
         ]
       }
     ],
-    "UserPromptSubmit": [
+    "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook user_prompt_submit",
+            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook stop",
             "timeout": 10,
-            "statusMessage": "Scanning asteroid work signal"
+            "statusMessage": "Preparing MCP Miner report"
           }
         ]
       }
@@ -30,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook subagent_start",
+            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook subagent_start",
             "timeout": 10,
             "statusMessage": "Tagging MCP Miner agent shift"
           }
@@ -42,34 +55,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook subagent_stop",
+            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook subagent_stop",
             "timeout": 10,
             "statusMessage": "Closing MCP Miner agent shift"
           }
         ]
       }
     ],
-    "PostToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook post_tool_use",
-            "timeout": 10,
-            "statusMessage": "Mining Codex work"
-          }
-        ]
-      }
-    ],
-    "Stop": [
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "cmd /d /c call \"%PLUGIN_ROOT%\\bin\\mcp-miner.exe\" hook stop",
+            "command": "\"$PLUGIN_ROOT/bin/mcp-miner\" hook user_prompt_submit",
             "timeout": 10,
-            "statusMessage": "Preparing MCP Miner report"
+            "statusMessage": "Scanning asteroid work signal"
           }
         ]
       }
