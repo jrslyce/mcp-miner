@@ -25,7 +25,7 @@ module McpMiner
     DEFAULT_STATE_PATH = File.join(STATE_DIR, "state.json")
     DEFAULT_JOURNAL_FILENAME = "journal.jsonl"
     DEFAULT_FUNCTIONS_ORIGIN = "https://us-central1-mcp-miner.cloudfunctions.net"
-    DEFAULT_DASHBOARD_URL = "https://mcp-miner.web.app"
+    DEFAULT_DASHBOARD_URL = "https://mcpminer.net"
     DEFAULT_SYNC_CADENCE_SECONDS = 60
     REPORT_ICON_DATA_URI = "data:image/svg+xml;base64," \
       "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+" \

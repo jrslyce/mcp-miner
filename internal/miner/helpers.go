@@ -18,7 +18,7 @@ import (
 
 const (
 	CurrentStateSchemaVersion = 1
-	DefaultDashboardURL       = "https://mcp-miner.web.app"
+	DefaultDashboardURL       = "https://mcpminer.net"
 	DefaultFunctionsOrigin    = "https://us-central1-mcp-miner.cloudfunctions.net"
 	DefaultSyncCadenceSeconds = 60
 	DefaultJournalFilename    = "journal.jsonl"

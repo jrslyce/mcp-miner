@@ -380,6 +380,7 @@ body {
 }
 
 .landing-section {
+  scroll-margin-top: 92px;
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto;
   padding: 84px 0;
@@ -482,7 +483,7 @@ body {
   display: grid;
   grid-template-columns: minmax(260px, 0.75fr) minmax(320px, 1fr);
   gap: 28px;
-  align-items: center;
+  align-items: start;
 }
 
 .install-copy {
@@ -490,17 +491,90 @@ body {
   gap: 10px;
 }
 
+.install-prompt-grid,
+.command-grid,
+.project-guidance {
+  display: grid;
+  gap: 14px;
+}
+
+.install-prompt-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.install-prompt-card,
+.command-card,
+.project-guidance article {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 14px 36px var(--shadow);
+}
+
+.install-prompt-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.prompt-card-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.prompt-card-heading h3,
+.command-card h3,
+.project-guidance h3 {
+  margin: 0;
+}
+
+.copy-prompt-button {
+  min-height: 36px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 0 12px;
+  background: var(--accent);
+  color: var(--button-ink);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.copy-prompt-button:hover {
+  background: var(--accent-strong);
+}
+
+.copy-code,
 .install-terminal {
   display: grid;
   gap: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 18px;
   background: #0b1110;
   box-shadow: 0 18px 46px var(--shadow);
 }
 
-.install-terminal code {
+.copy-code {
+  display: block;
+  max-height: 220px;
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  color: #c9f7df;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 0.82rem/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.install-terminal {
+  padding: 18px;
+}
+
+.install-terminal code,
+.command-list code {
   display: block;
   min-width: 0;
   overflow-wrap: anywhere;
@@ -510,6 +584,53 @@ body {
   background: rgba(255, 255, 255, 0.05);
   color: #c9f7df;
   font: 0.92rem/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.commands-section {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.command-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.command-card,
+.project-guidance article {
+  padding: 18px;
+}
+
+.command-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.command-list code {
+  color: #d9fbe9;
+}
+
+.project-guidance {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.project-guidance p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.automation-prompt {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.automation-prompt .copy-prompt-button {
+  justify-self: start;
 }
 
 .portal-section {
@@ -1445,7 +1566,9 @@ dd {
 
   .trust-band,
   .install-section,
-  .privacy-columns {
+  .privacy-columns,
+  .command-grid,
+  .project-guidance {
     grid-template-columns: 1fr;
   }
 
@@ -1514,6 +1637,10 @@ dd {
   .landing-hero,
   .landing-section {
     width: min(1120px, calc(100% - 24px));
+  }
+
+  .landing-section {
+    scroll-margin-top: 176px;
   }
 
   .landing-hero {
@@ -1588,8 +1715,25 @@ dd {
 
   .play-grid,
   .privacy-columns,
-  .install-section {
+  .install-section,
+  .install-prompt-grid,
+  .command-grid,
+  .project-guidance {
     grid-template-columns: 1fr;
+  }
+
+  .prompt-card-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .prompt-card-heading .copy-prompt-button,
+  .automation-prompt .copy-prompt-button {
+    width: 100%;
+  }
+
+  .copy-code {
+    max-height: 260px;
+    font-size: 0.78rem;
   }
 
   .dashboard-shell {

@@ -30,12 +30,17 @@ import {
   httpsCallable
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-functions.js";
 
-const firebaseConfig = window.MCP_MINER_FIREBASE_CONFIG || {
+const configLocalHostnames = new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
+const firebaseConfig = window.MCP_MINER_FIREBASE_CONFIG || (configLocalHostnames.has(window.location.hostname) ? {
   apiKey: "demo-api-key",
   authDomain: "demo-mcp-miner.firebaseapp.com",
   projectId: "demo-mcp-miner",
   appId: "1:000000000000:web:mcpminerlocal"
-};
+} : null);
+
+if (!firebaseConfig) {
+  throw new Error("MCP Miner Firebase config is missing. Deploy firebase-config.js for this domain.");
+}
 
 const FREE_ENTITLEMENT = {
   plan: "free",
@@ -528,6 +533,10 @@ const LINK_STATE_MESSAGES = {
     label: "Completed",
     summary: "This link was already completed. Return to Codex or start a new link for another device."
   },
+  deviceLimit: {
+    label: "Device limit reached",
+    summary: "This account already has one active Codex device. Revoke the old device in Linked devices, then return to Codex and start a new link."
+  },
   approving: {
     label: "Approving",
     summary: "Approving this Codex device for abstract MCP Miner game progress sync."
@@ -537,9 +546,10 @@ const LINK_STATE_MESSAGES = {
     summary: "Rejecting this Codex device link."
   }
 };
-const LINK_LOCKED_STATES = new Set(["approved", "rejected", "expired", "invalid", "alreadyApproved", "alreadyExchanged", "approving", "rejecting"]);
+const LINK_LOCKED_STATES = new Set(["approved", "rejected", "expired", "invalid", "alreadyApproved", "alreadyExchanged", "deviceLimit", "approving", "rejecting"]);
 const LINK_ERROR_MESSAGES = [
   { status: "expired", patterns: ["expired"], message: LINK_STATE_MESSAGES.expired.summary },
+  { status: "deviceLimit", patterns: ["plan_limit_device_count", "one active codex device", "device slots", "device count"], message: LINK_STATE_MESSAGES.deviceLimit.summary },
   { status: "invalid", patterns: ["not_found", "not-found", "not found"], message: LINK_STATE_MESSAGES.invalid.summary },
   { status: "alreadyApproved", patterns: ["already_approved", "already approved"], message: LINK_STATE_MESSAGES.alreadyApproved.summary },
   { status: "alreadyExchanged", patterns: ["already_exchanged", "already exchanged", "exchanged"], message: LINK_STATE_MESSAGES.alreadyExchanged.summary },
@@ -2723,6 +2733,50 @@ async function requestCosmeticApply(category, cosmeticId) {
   }
 }
 
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (_) {
+      // Fall through to the selection-based copy path.
+    }
+  }
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.setAttribute("readonly", "");
+  textArea.style.position = "fixed";
+  textArea.style.top = "-1000px";
+  document.body.appendChild(textArea);
+  textArea.select();
+  const copied = document.execCommand("copy");
+  textArea.remove();
+  if (!copied) {
+    throw new Error("Clipboard permission denied.");
+  }
+}
+
+function setupPromptCopyButtons() {
+  document.querySelectorAll("[data-copy-target]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const target = document.getElementById(button.dataset.copyTarget);
+      if (!target) {
+        return;
+      }
+      const original = button.textContent;
+      try {
+        await copyTextToClipboard(target.textContent.trim());
+        button.textContent = "Copied";
+      } catch (_) {
+        button.textContent = "Copy failed";
+      }
+      window.setTimeout(() => {
+        button.textContent = original;
+      }, 1800);
+    });
+  });
+}
+
 async function updatePortalPreference(field, value) {
   if (!currentUser) {
     setMessage("Sign in before updating portal preferences.", true);
@@ -2942,6 +2996,7 @@ onAuthStateChanged(auth, async (user) => {
 
 applyTheme(preferredTheme());
 setLinkMode();
+setupPromptCopyButtons();
 renderDeviceLink(currentUser);
 renderDashboard(cloneDemo());
 loadPlanCatalog();

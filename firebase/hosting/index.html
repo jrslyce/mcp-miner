@@ -21,6 +21,7 @@
           <a href="#how-it-works">How it works</a>
           <a href="#privacy">Privacy</a>
           <a href="#install">Install</a>
+          <a href="#commands">Commands</a>
           <a href="#portal">Portal</a>
         </div>
         <div class="landing-nav-actions">
@@ -102,17 +103,17 @@
           <article class="play-card">
             <span class="step-number">01</span>
             <h3>Install in Codex</h3>
-            <p>Clone the public repo, run the installer, restart Codex, and trust the MCP Miner hooks.</p>
+            <p>Copy the prompt for your operating system into Codex. The installer registers the local Go plugin and prepares the hook trust flow.</p>
           </article>
           <article class="play-card">
             <span class="step-number">02</span>
             <h3>Use Codex normally</h3>
-            <p>Supported work events become abstract score receipts. Those receipts mine Chonks and materials.</p>
+            <p>After restart and hook trust, supported work events become abstract score receipts. Those receipts mine Chonks and materials.</p>
           </article>
           <article class="play-card">
             <span class="step-number">03</span>
-            <h3>Fulfill orders</h3>
-            <p>Use mined materials to complete buyer requests, earn Space Bucks, and unlock upgrades.</p>
+            <h3>Spend what you earn</h3>
+            <p>Use MCP Miner tools to refine materials, complete orders, buy upgrades, build base modules, and unlock equipment.</p>
           </article>
           <article class="play-card">
             <span class="step-number">04</span>
@@ -152,14 +153,88 @@
       <section id="install" class="landing-section install-section" aria-labelledby="install-title">
         <div class="install-copy">
           <p class="eyebrow">Install</p>
-          <h2 id="install-title">Add MCP Miner to another Codex instance.</h2>
-          <p>Run the installer from a local clone. It backs up your Codex config, repairs standalone MCP-server-only installs, registers the MCP Miner marketplace, and enables the plugin.</p>
+          <h2 id="install-title">Paste one prompt into Codex to install MCP Miner.</h2>
+          <p>MCP Miner now runs through a compiled Go plugin. Normal installs do not need Ruby, Node, or Firebase tools. If the checked-out plugin binary is missing, the installer can rebuild it with Go.</p>
         </div>
-        <div class="install-terminal" aria-label="Install commands">
-          <code>git clone https://github.com/jrslyce/mcp-miner.git</code>
-          <code>cd mcp-miner</code>
-          <code>sh scripts/install_codex_plugin.sh</code>
-          <code>Windows: powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1</code>
+        <div class="install-prompt-grid" aria-label="Copyable Codex install prompts">
+          <article class="install-prompt-card">
+            <div class="prompt-card-heading">
+              <h3>Mac Apple Silicon</h3>
+              <button type="button" class="copy-prompt-button" data-copy-target="prompt-mac-silicon">Copy</button>
+            </div>
+            <pre id="prompt-mac-silicon" class="copy-code">Install MCP Miner on this Apple Silicon Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.</pre>
+          </article>
+          <article class="install-prompt-card">
+            <div class="prompt-card-heading">
+              <h3>Mac Intel</h3>
+              <button type="button" class="copy-prompt-button" data-copy-target="prompt-mac-intel">Copy</button>
+            </div>
+            <pre id="prompt-mac-intel" class="copy-code">Install MCP Miner on this Intel Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.</pre>
+          </article>
+          <article class="install-prompt-card">
+            <div class="prompt-card-heading">
+              <h3>Windows</h3>
+              <button type="button" class="copy-prompt-button" data-copy-target="prompt-windows">Copy</button>
+            </div>
+            <pre id="prompt-windows" class="copy-code">Install MCP Miner on this Windows PC. Clone https://github.com/jrslyce/mcp-miner into a local development folder if needed, open the repo root, and run powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1. If the plugin binary is missing, let the installer rebuild it with Go. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.</pre>
+          </article>
+          <article class="install-prompt-card">
+            <div class="prompt-card-heading">
+              <h3>Linux</h3>
+              <button type="button" class="copy-prompt-button" data-copy-target="prompt-linux">Copy</button>
+            </div>
+            <pre id="prompt-linux" class="copy-code">Install MCP Miner on this Linux machine. First confirm this Codex environment supports local plugins and hook trust. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.</pre>
+          </article>
+        </div>
+      </section>
+
+      <section id="commands" class="landing-section commands-section" aria-labelledby="commands-title">
+        <div class="section-heading">
+          <p class="eyebrow">Codex commands</p>
+          <h2 id="commands-title">Play from any Codex project where the plugin is enabled.</h2>
+        </div>
+        <div class="command-grid">
+          <article class="command-card">
+            <h3>Check progress</h3>
+            <ul class="command-list">
+              <li><code>@mcp-miner status</code></li>
+              <li><code>@mcp-miner latest report</code></li>
+              <li><code>@mcp-miner show my inventory and active orders</code></li>
+              <li><code>@mcp-miner show asteroid, milestone, and sync status</code></li>
+            </ul>
+          </article>
+          <article class="command-card">
+            <h3>Spend and progress</h3>
+            <ul class="command-list">
+              <li><code>@mcp-miner fulfill any ready orders</code></li>
+              <li><code>@mcp-miner refine useful materials you recommend</code></li>
+              <li><code>@mcp-miner show affordable upgrades and base modules</code></li>
+              <li><code>@mcp-miner buy the best affordable upgrade or equipment path</code></li>
+            </ul>
+          </article>
+          <article class="command-card">
+            <h3>Portal and sync</h3>
+            <ul class="command-list">
+              <li><code>@mcp-miner open dashboard</code></li>
+              <li><code>@mcp-miner start account link</code></li>
+              <li><code>@mcp-miner complete account link</code></li>
+              <li><code>@mcp-miner sync cloud</code></li>
+            </ul>
+          </article>
+        </div>
+        <div class="project-guidance">
+          <article>
+            <h3>Should I make a new Codex project?</h3>
+            <p>You can earn passively inside normal coding projects after the plugin and hooks are trusted. A separate Codex project named something like MCP Miner Control Center is useful for game management, account linking, store decisions, and automation setup without mixing those turns into product work.</p>
+          </article>
+          <article>
+            <h3>Automation idea</h3>
+            <p>If your Codex app supports automations, copy this prompt to create a recurring maintenance loop.</p>
+            <div class="automation-prompt">
+              <button type="button" class="copy-prompt-button" data-copy-target="prompt-automation">Copy automation prompt</button>
+              <pre id="prompt-automation" class="copy-code">Create a recurring MCP Miner automation. On each run, check MCP Miner status, inventory, active orders, store catalog, upgrades, base modules, and sync status. Refine useful materials, fulfill ready orders, complete available weekly contracts, and buy the best affordable upgrades, base modules, machines, or equipment path. Prefer progression unlocks before cosmetics. Sync cloud afterward if linked. Report only the game actions taken and current game totals; do not include prompts, code, file paths, repo names, terminal output, browser content, or transcripts.</pre>
+            </div>
+          </article>
         </div>
       </section>
 

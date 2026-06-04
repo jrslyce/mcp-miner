@@ -67,7 +67,14 @@ func (e *Engine) UnlinkCloudProfilePayload(_ M) M {
 
 func (e *Engine) StartAccountLinkPayload(args M) M {
 	origin := configuredOrigin(args)
-	payload := M{"data": M{"deviceName": asString(args["device_name"]), "privacyClass": "abstract"}}
+	dashboardURL := asString(args["dashboard_url"])
+	if dashboardURL == "" {
+		dashboardURL = os.Getenv("MCP_MINER_DASHBOARD_URL")
+	}
+	if dashboardURL == "" {
+		dashboardURL = DefaultDashboardURL
+	}
+	payload := M{"data": M{"deviceName": asString(args["device_name"]), "dashboardUrl": dashboardURL, "privacyClass": "abstract"}}
 	var out M
 	if err := postJSON(origin, "createLinkSession", "", "", payload, &out); err != nil {
 		return M{"ok": false, "status": "link_error", "message": err.Error(), "privacy": PrivacyNotice}

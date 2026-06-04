@@ -2,7 +2,7 @@
 
 MCP Miner is a passive asteroid-mining game for Codex work. You work normally in Codex, and the plugin turns abstract work signals into mining progress, Chonks, materials, Space Bucks, orders, upgrades, and compact progress reports.
 
-Website: [mcp-miner.web.app](https://mcp-miner.web.app/)
+Website: [mcpminer.net](https://mcpminer.net/)
 
 ## How The Game Works
 

@@ -7,7 +7,7 @@ const DEVICE_TOKEN_PREFIX = "mcpd_";
 const LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const LINK_SESSION_ID_PATTERN = /^link_[A-Za-z0-9_-]{20,80}$/;
 const DEVICE_SECRET_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
-const DEFAULT_DASHBOARD_URL = "https://mcp-miner.web.app";
+const DEFAULT_DASHBOARD_URL = "https://mcpminer.net";
 const ALLOWED_DASHBOARD_HOSTS = new Set([
   "mcp-miner.web.app",
   "mcp-miner.firebaseapp.com",
@@ -98,7 +98,7 @@ function sanitizeDashboardUrl(value, configured = DEFAULT_DASHBOARD_URL) {
   return parsed.origin;
 }
 
-function newLinkSession({ now = new Date(), dashboardUrl = "https://mcp-miner.web.app", deviceName = "Codex" } = {}) {
+function newLinkSession({ now = new Date(), dashboardUrl = DEFAULT_DASHBOARD_URL, deviceName = "Codex" } = {}) {
   const sessionId = `link_${randomToken(18)}`;
   const deviceSecret = randomToken(32);
   const code = generateLinkCode();

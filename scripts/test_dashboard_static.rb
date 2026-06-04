@@ -50,10 +50,18 @@ assert("landing page should document gameplay, install, privacy, and account lin
   index.include?(%(id="how-it-works")) &&
     index.include?(%(id="privacy")) &&
     index.include?(%(id="install")) &&
+    index.include?(%(id="commands")) &&
     index.include?(%(id="portal")) &&
-    index.include?("git clone https://github.com/jrslyce/mcp-miner.git") &&
+    index.include?("Clone https://github.com/jrslyce/mcp-miner") &&
     index.include?("sh scripts/install_codex_plugin.sh") &&
-    index.include?("MCP Miner marketplace") &&
+    index.include?("Mac Apple Silicon") &&
+    index.include?("Mac Intel") &&
+    index.include?("Windows") &&
+    index.include?("Linux") &&
+    index.include?("Do not use Ruby") &&
+    index.include?("@mcp-miner status") &&
+    index.include?("MCP Miner Control Center") &&
+    index.include?("Create a recurring MCP Miner automation") &&
     !index.include?("Diamond MCP marketplace") &&
     index.include?("Prompts stored") &&
     index.include?("Not collected for gameplay") &&
@@ -66,7 +74,9 @@ assert("landing page should use responsive production styles") do
     styles.include?(".hero-console") &&
     styles.include?(".play-grid") &&
     styles.include?(".privacy-columns") &&
-    styles.include?(".install-terminal") &&
+    styles.include?(".install-prompt-grid") &&
+    styles.include?(".command-grid") &&
+    styles.include?(".copy-code") &&
     styles.include?("@media (max-width: 980px)") &&
     styles.include?("@media (max-width: 700px)") &&
     !styles.include?("radial-gradient")
@@ -140,6 +150,9 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     connectFunctionsEmulator
     DEMO_DASHBOARD
     EMPTY_CLOUD_DASHBOARD
+    MCP Miner Firebase config is missing
+    Device limit reached
+    plan_limit_device_count
     renderDeviceLink
     approveLinkSession
     rejectLinkSession
@@ -172,6 +185,8 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     getSyncState
     ensureLinkedProfile
     requiresEmailVerification
+    setupPromptCopyButtons
+    copyTextToClipboard
   ].all? { |needle| auth_js.include?(needle) }
 end
 
