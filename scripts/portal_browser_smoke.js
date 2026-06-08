@@ -18,7 +18,9 @@ const MIME_TYPES = {
 
 function staticPath(urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?", 1)[0]);
-  const clean = decoded === "/" ? "/index.html" : decoded;
+  const clean = decoded === "/"
+    ? "/index.html"
+    : (decoded === "/portal" || decoded.startsWith("/portal/") ? "/portal.html" : decoded);
   const target = path.normalize(path.join(HOSTING_ROOT, clean));
   if (!target.startsWith(HOSTING_ROOT)) {
     return null;
@@ -93,6 +95,58 @@ async function assertPortalState(page, baseUrl, viewport) {
   return state;
 }
 
+async function assertPortalLayoutRoutes(page, baseUrl) {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`${baseUrl}/portal.html`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(500);
+  const overview = await page.evaluate(() => ({
+    view: document.body.dataset.dashboardView,
+    tab: document.body.dataset.dashboardTab,
+    quickStartLabel: document.querySelector("#quick-start-toggle-label")?.textContent?.trim(),
+    mainHidden: getComputedStyle(document.querySelector(".main-board")).display === "none",
+    railHidden: getComputedStyle(document.querySelector(".side-rail")).display === "none",
+    modeHidden: document.querySelector(".mode-strip")?.hidden,
+    mainWidth: document.querySelector(".main-board")?.getBoundingClientRect().width,
+    shellWidth: document.querySelector(".dashboard-shell")?.getBoundingClientRect().width
+  }));
+  await page.click("[data-dashboard-tab='orders']");
+  await page.waitForTimeout(100);
+  const orders = await page.evaluate(() => ({
+    path: window.location.pathname,
+    tab: document.body.dataset.dashboardTab,
+    modeHidden: document.querySelector(".mode-strip")?.hidden,
+    ordersHidden: document.querySelector("[data-panel='orders']")?.hidden
+  }));
+  await page.goto(`${baseUrl}/portal/profile`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(500);
+  const profile = await page.evaluate(() => ({
+    path: window.location.pathname,
+    view: document.body.dataset.dashboardView,
+    tab: document.body.dataset.dashboardTab,
+    mainHidden: getComputedStyle(document.querySelector(".main-board")).display === "none",
+    railHidden: getComputedStyle(document.querySelector(".side-rail")).display === "none",
+    authHidden: document.querySelector("[data-panel='auth']")?.hidden,
+    billingHidden: document.querySelector("[data-panel='billing']")?.hidden,
+    bodyWidth: document.body.scrollWidth,
+    viewportWidth: window.innerWidth
+  }));
+  const failures = [];
+  if (overview.view !== "game" || overview.tab !== "overview") failures.push(`overview route ${overview.view}/${overview.tab}`);
+  if (overview.mainHidden || !overview.railHidden) failures.push("overview should show full-width main board only");
+  if (overview.modeHidden) failures.push("overview mode strip should be visible");
+  if (overview.shellWidth && overview.mainWidth && overview.mainWidth < overview.shellWidth * 0.9) failures.push(`main board too narrow ${overview.mainWidth}/${overview.shellWidth}`);
+  if (overview.quickStartLabel !== "Hide") failures.push(`quick start label=${overview.quickStartLabel}`);
+  if (orders.path !== "/portal/orders" || orders.tab !== "orders") failures.push(`orders route ${orders.path}/${orders.tab}`);
+  if (!orders.modeHidden || orders.ordersHidden) failures.push("orders should hide overview summary and show orders");
+  if (profile.path !== "/portal/profile" || profile.view !== "account" || profile.tab !== "profile") failures.push(`profile route ${profile.path}/${profile.view}/${profile.tab}`);
+  if (!profile.mainHidden || profile.railHidden || profile.authHidden || !profile.billingHidden) failures.push("profile route should show account page full width");
+  if (profile.bodyWidth > profile.viewportWidth + 2) failures.push(`profile horizontal overflow ${profile.bodyWidth}/${profile.viewportWidth}`);
+  if (failures.length) {
+    throw new Error(`portal route layout failed: ${failures.join("; ")}`);
+  }
+  return { overview, orders, profile };
+}
+
 async function main() {
   const { server, url } = await startServer();
   let browser;
@@ -101,9 +155,10 @@ async function main() {
     const page = await browser.newPage();
     const desktop = await assertPortalState(page, url, { width: 1280, height: 900 });
     const mobile = await assertPortalState(page, url, { width: 390, height: 844 });
+    const routes = await assertPortalLayoutRoutes(page, url);
     console.log(JSON.stringify({
       ok: true,
-      checks: 2,
+      checks: 3,
       desktop: {
         connection: desktop.connection,
         source: desktop.source
@@ -111,6 +166,11 @@ async function main() {
       mobile: {
         connection: mobile.connection,
         source: mobile.source
+      },
+      routes: {
+        overview: routes.overview.tab,
+        ordersPath: routes.orders.path,
+        profileView: routes.profile.view
       }
     }, null, 2));
   } finally {

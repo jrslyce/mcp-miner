@@ -876,9 +876,37 @@ body {
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
 }
 
-.portal-onboarding-heading {
+.quick-start-summary {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.quick-start-summary::-webkit-details-marker {
+  display: none;
+}
+
+.quick-start-summary strong {
+  display: block;
+  font-size: 1.04rem;
+  line-height: 1.2;
+}
+
+.quick-start-toggle {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pill-line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: var(--pill-bg);
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  font-weight: 850;
 }
 
 .portal-onboarding-grid {
@@ -943,10 +971,10 @@ body {
 }
 
 .dashboard-tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(108px, 1fr));
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
   border: 1px solid rgba(72, 209, 154, 0.22);
   border-radius: 8px;
   padding: 8px;
@@ -957,7 +985,6 @@ body {
 }
 
 .dashboard-tab {
-  flex: 1 1 118px;
   min-height: 38px;
   border-color: var(--line);
   background: var(--button-secondary-bg);
@@ -1148,13 +1175,13 @@ h2 {
 }
 
 .workspace-grid {
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   align-items: start;
 }
 
 body[data-link-mode="pending"] .workspace-grid {
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 body[data-link-mode="pending"] .link-panel {
@@ -1176,6 +1203,7 @@ body[data-login-mode="pending"] .dashboard-shell {
 }
 
 body[data-login-mode="pending"] .topbar,
+body[data-login-mode="pending"] .dashboard-tabs,
 body[data-login-mode="pending"] .main-board,
 body[data-login-mode="pending"] [data-panel="device-link"],
 body[data-login-mode="pending"] [data-panel="profile"],
@@ -1211,6 +1239,32 @@ body[data-login-mode="pending"] .auth-panel {
 .privacy-list {
   display: grid;
   gap: 14px;
+}
+
+.side-rail {
+  display: none;
+}
+
+body[data-dashboard-view="account"] .side-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+body[data-dashboard-view="account"] .main-board {
+  display: none;
+}
+
+body[data-dashboard-view="game"] .main-board {
+  width: 100%;
+}
+
+body[data-dashboard-view="game"] .side-rail {
+  display: none;
+}
+
+body[data-login-mode="pending"] .side-rail,
+body[data-link-mode="pending"] .side-rail {
+  display: grid;
 }
 
 .analytics-list {
@@ -1534,15 +1588,25 @@ button:disabled {
   display: none;
 }
 
+.user-menu a,
 .user-menu button {
+  display: grid;
+  min-height: 40px;
+  align-items: center;
   justify-content: start;
   width: 100%;
-  border-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0 13px;
   background: transparent;
   color: var(--ink);
+  font: inherit;
+  font-weight: 750;
+  text-decoration: none;
   text-align: left;
 }
 
+.user-menu a:hover,
 .user-menu button:hover:not(:disabled) {
   border-color: var(--line);
   background: var(--button-secondary-hover);
@@ -2180,6 +2244,10 @@ dd {
     grid-template-columns: 1fr;
   }
 
+  .dashboard-tabs {
+    grid-template-columns: repeat(3, minmax(118px, 1fr));
+  }
+
   .dashboard-shell {
     padding: 16px;
   }
@@ -2321,6 +2389,12 @@ dd {
 
   .portal-onboarding {
     padding: 14px;
+  }
+
+  .quick-start-summary,
+  .dashboard-tabs,
+  body[data-dashboard-view="account"] .side-rail {
+    grid-template-columns: 1fr;
   }
 
   .hero-button,
