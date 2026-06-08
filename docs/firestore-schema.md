@@ -44,6 +44,8 @@ Cloud Functions enforce the evaluated entitlement for device linking, device-tok
 
 Cloud sync uses per-device cursors so multiple Pro Codex instances can alternate event batches without one account-wide sequence causing stale rejections. `/players/{uid}/syncMetadata/default` remains the aggregate and legacy Firebase Auth cursor. Linked device tokens write their own `/players/{uid}/syncMetadata/{deviceId}` document while reward event IDs stay globally idempotent across the account.
 
+The first linked Codex sync writes one scrubbed current-state snapshot through `importInitialState` into `/players/{uid}/gameState/current.snapshot`, records `snapshotChecksum` and `snapshotImportedAt`, and advances only that device cursor to the local checkpoint. This establishes the account-level canonical mining state without replaying historical local events. Additional Codex installs should read `getSyncState`, adopt the cloud snapshot/cursor, and then append only new local receipts through their own device cursor. A second initial snapshot import is rejected by default so a later machine cannot accidentally overwrite or double-count the shared account state.
+
 Normalized entitlement fields:
 
 ```json

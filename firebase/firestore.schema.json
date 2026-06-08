@@ -56,7 +56,7 @@
     "players/{uid}/syncMetadata/{clientId}": {
       "owner": "uid",
       "clientAccess": ["read", "create", "update"],
-      "fields": ["ownerUid", "schemaVersion", "updatedAt", "privacyClass", "clientId", "clientVersion", "lastLocalEventId", "lastCloudEventId", "lastPulledAt", "lastPushedAt", "conflictState"]
+      "fields": ["ownerUid", "schemaVersion", "updatedAt", "privacyClass", "clientId", "clientVersion", "cursorId", "cursorMode", "deviceId", "lastLocalEventId", "lastCloudEventId", "lastPulledAt", "lastPushedAt", "lastSequence", "lastStateImportAt", "stateImportId", "stateHash", "snapshotImported", "conflictState"]
     },
     "players/{uid}/syncDevices/{deviceId}": {
       "owner": "uid",
@@ -88,7 +88,8 @@
     "players/{uid}/gameState/current": {
       "owner": "uid",
       "clientAccess": ["read"],
-      "serverOwned": true
+      "serverOwned": true,
+      "fields": ["ownerUid", "schemaVersion", "privacyClass", "importType", "snapshot", "snapshotSchemaVersion", "snapshotChecksum", "snapshotByteSize", "snapshotImportedAt", "snapshotUpdatedAt", "sourceClientId", "sourceDeviceId", "localCheckpoint", "eventCount", "workScoreTotal", "workEvents", "lastEventId", "lastSequence", "updatedAt"]
     },
     "players/{uid}/inventory/{bucket}": {
       "owner": "uid",

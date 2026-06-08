@@ -47,6 +47,40 @@ and any matching server-side device token documents. A revoked token can no long
 Requests for another user's device resolve through the caller's own player path, so they fail without
 revealing the other user's device metadata.
 
+### `importInitialState`
+
+Called by the local Codex plugin on the first linked sync before event receipts are replayed. The payload is a backup-shaped, privacy-safe snapshot of the current local MCP Miner state plus a local checkpoint:
+
+```json
+{
+  "syncType": "initial_state_import",
+  "privacyClass": "abstract",
+  "clientId": "mcp-miner-local",
+  "deviceId": "device_abc",
+  "stateSchemaVersion": 1,
+  "checkpoint": {
+    "lastLocalSequence": 42,
+    "lastLocalEventId": "evt_abc",
+    "localUpdatedAt": "2026-05-24T00:00:00Z"
+  },
+  "state": {
+    "profile": {},
+    "progress": {},
+    "inventory": {},
+    "orders": {},
+    "upgrades": {},
+    "base": {},
+    "cosmetics": {},
+    "settings": {},
+    "syncMetadata": {}
+  }
+}
+```
+
+Validation uses the same allowlisted sections as cloud backup creation and rejects prompt fields, code, commands, terminal output, file paths, repo names, browser/app content, transcripts, tokens, secrets, and workspace-looking values. The server writes the sanitized sections into `/players/{uid}/gameState/current.snapshot`, records `snapshotChecksum`, `snapshotImportedAt`, and sets the caller's cursor to `checkpoint.lastLocalSequence`. This prevents the first sync from replaying old local journal receipts and double-counting progress.
+
+If an account already has `snapshotImportedAt`, a later device-token import is rejected unless a future explicit force/merge flow is added. Additional Codex installs should read `getSyncState`, adopt the account snapshot/cursor, and then send only new post-adoption receipts through their own `/players/{uid}/syncMetadata/{deviceId}` cursor. Separate mining operations should use separate profiles/accounts rather than silently overwriting the shared account snapshot.
+
 ### `syncRewardEvents`
 
 Input:
@@ -104,7 +138,7 @@ Validation:
 Reducer writes:
 
 - `/players/{uid}/rewardEvents/{eventId}` stores the sanitized event.
-- `/players/{uid}/gameState/current` stores aggregate abstract state such as event counts, score totals, work-event counters, last event ID, and last sequence.
+- `/players/{uid}/gameState/current` stores the imported abstract snapshot plus aggregate abstract state such as event counts, score totals, work-event counters, last event ID, and last sequence.
 - `/players/{uid}/syncMetadata/default` stores aggregate sequence/counter metadata for the account and the legacy Firebase Auth cursor.
 - `/players/{uid}/syncMetadata/{deviceId}` stores the per-device cursor for linked Codex instances. Reward event IDs remain globally idempotent under `/players/{uid}/rewardEvents/{eventId}`.
 
@@ -144,11 +178,14 @@ Cloud Logging entries include operational metadata only: privacy class, UID pres
 
 ## Plugin Client
 
-The local plugin exposes `sync_cloud`, which converts local journal reward entries into V2 abstract receipts and posts them to `syncRewardEvents`. It also exposes `preview_sync_payload` so players can inspect the exact request body with redacted auth headers before sending. The plugin also exposes `get_backup_status`, `create_cloud_backup`, and `restore_cloud_backup` for Pro backup workflows.
+The local plugin exposes `sync_cloud`. On the first linked sync it posts the scrubbed current state snapshot to `importInitialState`; after that it converts local journal reward entries into V2 abstract receipts and posts them to `syncRewardEvents`. It also exposes `preview_sync_payload` so players can inspect the exact request body with redacted auth headers before sending. The plugin also exposes `get_backup_status`, `create_cloud_backup`, and `restore_cloud_backup` for Pro backup workflows.
 
 Local metadata records:
 
 - `last_pushed_sequence`
+- `initial_state_imported_at`
+- `last_state_import_at`
+- `state_import_id`
 - `pending_event_ids`
 - `duplicate_event_ids`
 - `rejected_events`

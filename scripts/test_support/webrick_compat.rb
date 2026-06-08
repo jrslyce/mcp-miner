@@ -7,7 +7,9 @@ rescue LoadError
 
   module WEBrick
     class Log
-      def initialize(*) = nil
+      def initialize(*)
+        nil
+      end
     end
 
     class Request

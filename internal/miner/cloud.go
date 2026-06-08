@@ -189,7 +189,7 @@ func (e *Engine) SyncProgressPayload(state M) M {
 		status = "unauthenticated"
 	}
 	pending := e.pendingJournalEvents(meta)
-	return M{"ok": true, "sync": M{"available": available, "status": status, "cloud_sync_enabled": asBool(state["cloud_sync"]), "state_schema_version": asInt(state["state_schema_version"]), "last_recovery": safeRecovery(state["last_recovery"]), "account_link": asMap(e.AccountLinkStatusPayload(state)["account_link"]), "metadata": M{"status": asString(meta["status"]), "last_pushed_sequence": asInt(meta["last_pushed_sequence"]), "pending_event_count": len(pending), "duplicate_event_ids": meta["duplicate_event_ids"], "rejected_events": meta["rejected_events"], "device_token_present": asString(creds["device_token"]) != "", "functions_origin": meta["functions_origin"]}, "cadence": cadencePayload(meta), "journal": M{"applied_event_count": asInt(asMap(state["journal"])["applied_event_count"]), "last_event_id": asMap(state["journal"])["last_event_id"]}}, "privacy": PrivacyNotice}
+	return M{"ok": true, "sync": M{"available": available, "status": status, "cloud_sync_enabled": asBool(state["cloud_sync"]), "state_schema_version": asInt(state["state_schema_version"]), "last_recovery": safeRecovery(state["last_recovery"]), "account_link": asMap(e.AccountLinkStatusPayload(state)["account_link"]), "metadata": M{"status": asString(meta["status"]), "last_pushed_sequence": asInt(meta["last_pushed_sequence"]), "pending_event_count": len(pending), "duplicate_event_ids": meta["duplicate_event_ids"], "rejected_events": meta["rejected_events"], "initial_state_imported_at": meta["initial_state_imported_at"], "last_state_import_at": meta["last_state_import_at"], "state_import_id": meta["state_import_id"], "device_token_present": asString(creds["device_token"]) != "", "functions_origin": meta["functions_origin"]}, "cadence": cadencePayload(meta), "journal": M{"applied_event_count": asInt(asMap(state["journal"])["applied_event_count"]), "last_event_id": asMap(state["journal"])["last_event_id"]}}, "privacy": PrivacyNotice}
 }
 
 func safeRecovery(v any) any {
@@ -229,6 +229,9 @@ func (e *Engine) PreviewSyncPayload(args M) M {
 	idToken := asString(args["id_token"])
 	events := e.buildCloudSyncEvents(meta)
 	origin := configuredOrigin(args)
+	if e.needsInitialStateImport(state, meta) {
+		return M{"ok": true, "status": "preview", "sync_type": "initial_state_import", "queued_event_count": len(events), "request": M{"method": "POST", "url": safeURLJoin(origin, "importInitialState"), "headers": redactedHeaders(idToken, token), "body": M{"data": e.buildInitialStateImportPayload(state)}}, "privacy": PrivacyNotice}
+	}
 	return M{"ok": true, "status": "preview", "queued_event_count": len(events), "request": M{"method": "POST", "url": safeURLJoin(origin, "syncRewardEvents"), "headers": redactedHeaders(idToken, token), "body": M{"data": M{"events": events}}}, "privacy": PrivacyNotice}
 }
 
@@ -262,6 +265,14 @@ func (e *Engine) SyncCloudPayload(args M) M {
 	}
 	origin := configuredOrigin(args)
 	var out M
+	if e.needsInitialStateImport(state, meta) {
+		err := postJSON(origin, "importInitialState", idToken, token, M{"data": e.buildInitialStateImportPayload(state)}, &out)
+		if err != nil {
+			return e.recordCloudError(err, events, origin)
+		}
+		result := asMap(out["result"])
+		return e.applyInitialStateImportResult(result, events, origin)
+	}
 	err := postJSON(origin, "syncRewardEvents", idToken, token, M{"data": M{"events": events}}, &out)
 	if err != nil {
 		return e.recordCloudError(err, events, origin)
@@ -301,6 +312,99 @@ func (e *Engine) buildCloudSyncEvents(meta M) []any {
 		out = append(out, event)
 	}
 	return out
+}
+
+func (e *Engine) needsInitialStateImport(state M, meta M) bool {
+	if asString(meta["initial_state_imported_at"]) != "" || asString(meta["last_state_import_at"]) != "" {
+		return false
+	}
+	if asInt(meta["last_pushed_sequence"]) > 0 {
+		return false
+	}
+	if asString(asMap(state["cloud_auth"])["status"]) != "linked" && !asBool(state["cloud_sync"]) {
+		return false
+	}
+	return true
+}
+
+func (e *Engine) buildInitialStateImportPayload(state M) M {
+	meta := asMap(state["cloud_sync_metadata"])
+	checkpoint := e.currentCloudSyncCheckpoint(state)
+	return M{
+		"syncType":           "initial_state_import",
+		"privacyClass":       "abstract",
+		"clientId":           asString(meta["client_id"]),
+		"deviceId":           meta["device_id"],
+		"stateSchemaVersion": asInt(state["state_schema_version"]),
+		"checkpoint":         checkpoint,
+		"state":              e.buildBackupPayload(state),
+	}
+}
+
+func (e *Engine) currentCloudSyncCheckpoint(state M) M {
+	entries, err := e.readJournalEntries()
+	if err != nil {
+		journal := asMap(state["journal"])
+		return M{"lastLocalSequence": asInt(journal["applied_event_count"]), "lastLocalEventId": journal["last_event_id"], "localUpdatedAt": nowISO()}
+	}
+	seq := 0
+	var lastEventID any
+	for _, entry := range entries {
+		if !strings.HasPrefix(asString(entry["event_type"]), "work_") {
+			continue
+		}
+		seq++
+		lastEventID = entry["event_id"]
+	}
+	return M{"lastLocalSequence": seq, "lastLocalEventId": lastEventID, "localUpdatedAt": nowISO()}
+}
+
+func (e *Engine) applyInitialStateImportResult(result M, events []any, origin string) M {
+	stateResult := asMap(result["state"])
+	cursor := asMap(result["syncCursor"])
+	lastSeq := asInt(cursor["lastSequence"])
+	if lastSeq == 0 {
+		lastSeq = asInt(stateResult["lastSequence"])
+	}
+	importedAt := asString(stateResult["snapshotImportedAt"])
+	if importedAt == "" {
+		importedAt = nowISO()
+	}
+	_, _ = e.WithState(func(state M) (any, error) {
+		meta := asMap(state["cloud_sync_metadata"])
+		meta["functions_origin"] = origin
+		meta["last_attempt_at"] = nowISO()
+		if asBool(result["ok"]) == false {
+			meta["status"] = "sync_error"
+			state["cloud_sync_metadata"] = meta
+			return nil, nil
+		}
+		meta["status"] = "synced"
+		meta["last_success_at"] = nowISO()
+		meta["initial_state_imported_at"] = importedAt
+		meta["last_state_import_at"] = importedAt
+		meta["state_import_id"] = cursor["stateImportId"]
+		meta["state_hash"] = stateResult["snapshotChecksum"]
+		meta["last_pushed_sequence"] = lastSeq
+		meta["pending_event_ids"] = []any{}
+		meta["duplicate_event_ids"] = []any{}
+		meta["rejected_events"] = []any{}
+		if cadence := asMap(result["syncCadence"]); len(cadence) > 0 {
+			meta["sync_cadence_seconds"] = asInt(cadence["cadenceSeconds"])
+			meta["sync_mode"] = asString(cadence["mode"])
+			meta["next_eligible_sync_at"] = cadence["nextEligibleSyncAt"]
+		}
+		if ent := asMap(result["entitlement"]); len(ent) > 0 {
+			meta["entitlement_plan"] = asString(ent["plan"])
+		}
+		state["cloud_sync_metadata"] = meta
+		return nil, nil
+	})
+	state, _ := e.State()
+	if asBool(result["ok"]) == false {
+		return M{"ok": false, "status": "sync_error", "queued_event_count": len(events), "sync": asMap(e.SyncProgressPayload(state)["sync"]), "privacy": PrivacyNotice}
+	}
+	return M{"ok": true, "status": "initial_state_imported", "queued_event_count": len(events), "sync": asMap(e.SyncProgressPayload(state)["sync"]), "privacy": PrivacyNotice}
 }
 
 func redactedHeaders(idToken, deviceToken string) M {

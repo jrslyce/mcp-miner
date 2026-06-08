@@ -8,6 +8,7 @@ const {
   hasPrivateKeys,
   prepareSyncBatch,
   reduceCloudState,
+  sanitizeInitialStateImport,
   scoreForReceipt,
   validateRewardEvent,
   validateSyncReceipt
@@ -233,6 +234,68 @@ check("accepted events should reduce into abstract cloud state", () => {
     reduced.workEvents.work_apply_patch === 1 &&
     reduced.lastEventId === valid.eventId &&
     reduced.lastSequence === valid.sequence;
+});
+
+check("initial state import should sanitize a backup-shaped snapshot", () => {
+  const imported = sanitizeInitialStateImport({
+    syncType: "initial_state_import",
+    privacyClass: "abstract",
+    clientId: "mcp-miner-local",
+    deviceId: "device_sync_1",
+    stateSchemaVersion: 1,
+    checkpoint: {
+      lastLocalSequence: 2,
+      lastLocalEventId: "evt_sync_2",
+      localUpdatedAt: "2026-05-24T00:00:01Z"
+    },
+    state: {
+      profile: {
+        miner_name: "Prospector"
+      },
+      progress: {
+        space_bucks: 42,
+        stats: {
+          work_score_total: 12.5,
+          work_events: {
+            work_search: 1,
+            work_apply_patch: 1
+          }
+        }
+      },
+      inventory: {
+        chonk: 3
+      }
+    }
+  }, "firebase_uid_123", "2026-05-24T00:00:02Z");
+  return imported.snapshot.progress.space_bucks === 42 &&
+    imported.snapshotChecksum.length === 64 &&
+    imported.eventCount === 2 &&
+    imported.workScoreTotal === 12.5 &&
+    imported.lastSequence === 2 &&
+    imported.privacyClass === "abstract";
+});
+
+check("initial state import should reject private local data", () => {
+  try {
+    sanitizeInitialStateImport({
+      syncType: "initial_state_import",
+      privacyClass: "abstract",
+      checkpoint: {
+        lastLocalSequence: 0
+      },
+      state: {
+        progress: {
+          stats: {}
+        },
+        settings: {
+          path: "/Users/example/private"
+        }
+      }
+    }, "firebase_uid_123");
+  } catch (error) {
+    return error.code === "private_fields" || /not allowed|private workspace/.test(error.message);
+  }
+  return false;
 });
 
 console.log(JSON.stringify({

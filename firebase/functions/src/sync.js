@@ -1,6 +1,9 @@
 "use strict";
 
 const crypto = require("crypto");
+const {
+  sanitizeBackupPayload
+} = require("./backups");
 
 const CURRENT_SYNC_SCHEMA_VERSION = 1;
 const CURRENT_RECEIPT_SCHEMA_VERSION = 2;
@@ -314,6 +317,93 @@ function initialCloudState(uid) {
   };
 }
 
+function integerAtLeast(value, minimum, code, message) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < minimum) {
+    fail(code, message);
+  }
+  return number;
+}
+
+function sanitizedInitialStats(sections) {
+  const progress = sections && sections.progress && typeof sections.progress === "object" ? sections.progress : {};
+  const stats = progress.stats && typeof progress.stats === "object" ? progress.stats : {};
+  const workEvents = stats.work_events && typeof stats.work_events === "object" && !Array.isArray(stats.work_events)
+    ? stats.work_events
+    : {};
+  const normalizedWorkEvents = {};
+  Object.entries(workEvents).forEach(([eventType, count]) => {
+    const numeric = Number(count || 0);
+    if (/^work_[a-z_]+$/.test(eventType) && Number.isFinite(numeric) && numeric > 0) {
+      normalizedWorkEvents[eventType] = Math.floor(numeric);
+    }
+  });
+  const workScoreTotal = Number(stats.work_score_total || 0);
+  const eventCount = Object.values(normalizedWorkEvents).reduce((sum, count) => sum + Number(count || 0), 0);
+  return {
+    eventCount,
+    workScoreTotal: Number.isFinite(workScoreTotal) ? roundScore(workScoreTotal) : 0,
+    workEvents: normalizedWorkEvents
+  };
+}
+
+function sanitizeInitialStateImport(input, uid, receivedAt = new Date().toISOString()) {
+  if (!uid) {
+    fail("unauthenticated", "authenticated uid is required");
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    fail("invalid_import", "initial state import must be an object");
+  }
+  if (hasPrivateKeys(input)) {
+    fail("private_fields", "initial state import contains private field names");
+  }
+  if (input.ownerUid && input.ownerUid !== uid) {
+    fail("owner_mismatch", "initial state ownerUid must match authenticated user");
+  }
+  if (input.syncType !== "initial_state_import") {
+    fail("sync_type", "syncType must be initial_state_import");
+  }
+  if (input.privacyClass !== "abstract") {
+    fail("privacy_class", "privacyClass must be abstract");
+  }
+
+  const checkpoint = input.checkpoint && typeof input.checkpoint === "object" && !Array.isArray(input.checkpoint)
+    ? input.checkpoint
+    : {};
+  const lastLocalSequence = integerAtLeast(checkpoint.lastLocalSequence || 0, 0, "sequence", "lastLocalSequence must be a non-negative integer");
+  const lastLocalEventId = checkpoint.lastLocalEventId === null || typeof checkpoint.lastLocalEventId === "undefined"
+    ? null
+    : String(checkpoint.lastLocalEventId || "").slice(0, 160);
+  const backup = sanitizeBackupPayload(input.state || input.snapshot || {});
+  const stats = sanitizedInitialStats(backup.sections);
+
+  return {
+    ownerUid: uid,
+    schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
+    privacyClass: "abstract",
+    importType: "initial_state_import",
+    snapshotSchemaVersion: integerAtLeast(input.stateSchemaVersion || CURRENT_SYNC_SCHEMA_VERSION, 1, "state_schema_version", "stateSchemaVersion must be a positive integer"),
+    snapshot: backup.sections,
+    snapshotChecksum: backup.checksum,
+    snapshotByteSize: backup.byteSize,
+    snapshotImportedAt: receivedAt,
+    snapshotUpdatedAt: receivedAt,
+    sourceClientId: typeof input.clientId === "string" ? input.clientId.slice(0, 80) : null,
+    sourceDeviceId: typeof input.deviceId === "string" ? input.deviceId.slice(0, 120) : null,
+    localCheckpoint: {
+      lastLocalSequence,
+      lastLocalEventId,
+      localUpdatedAt: typeof checkpoint.localUpdatedAt === "string" ? checkpoint.localUpdatedAt.slice(0, 80) : null
+    },
+    eventCount: stats.eventCount,
+    workScoreTotal: stats.workScoreTotal,
+    workEvents: stats.workEvents,
+    lastEventId: lastLocalEventId,
+    lastSequence: lastLocalSequence,
+    updatedAt: receivedAt
+  };
+}
+
 function reduceCloudState(state, event, reducedAt) {
   const next = {
     ...initialCloudState(state.ownerUid),
@@ -386,6 +476,7 @@ module.exports = {
   hasPrivateKeys,
   prepareSyncBatch,
   reduceCloudState,
+  sanitizeInitialStateImport,
   sanitizeRewardEvent,
   scoreForReceipt,
   stableJson,
