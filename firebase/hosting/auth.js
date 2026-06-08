@@ -1766,7 +1766,29 @@ async function ensureLinkedProfile(user) {
   const playerRef = doc(db, "players", user.uid);
   const profileRef = doc(db, "players", user.uid, "profile", "current");
   const settingsRef = doc(db, "players", user.uid, "settings", "current");
-  const existing = await getDoc(playerRef);
+  const [existing, existingProfile] = await Promise.all([
+    getDoc(playerRef),
+    getDoc(profileRef)
+  ]);
+  const existingPlayerData = existing.exists() ? existing.data() : {};
+  const existingProfileData = existingProfile.exists() ? existingProfile.data() : {};
+  const defaultDisplayName = user.displayName || "Local Prospector";
+  const defaultMinerName = user.displayName || "Prospector";
+  const existingDisplayName = cleanSpaceUserName(existingProfileData.displayName) ||
+    cleanSpaceUserName(existingProfileData.minerName) ||
+    cleanSpaceUserName(existingPlayerData.displayName) ||
+    cleanSpaceUserName(existingPlayerData.minerName);
+  const existingMinerName = cleanSpaceUserName(existingProfileData.minerName) ||
+    cleanSpaceUserName(existingProfileData.displayName) ||
+    cleanSpaceUserName(existingPlayerData.minerName) ||
+    cleanSpaceUserName(existingPlayerData.displayName);
+  const profileNamePatch = {};
+  if (!cleanSpaceUserName(existingProfileData.displayName)) {
+    profileNamePatch.displayName = existingDisplayName || defaultDisplayName;
+  }
+  if (!cleanSpaceUserName(existingProfileData.minerName)) {
+    profileNamePatch.minerName = existingMinerName || defaultMinerName;
+  }
 
   if (!existing.exists()) {
     await setDoc(playerRef, profilePayload(user));
@@ -1784,8 +1806,7 @@ async function ensureLinkedProfile(user) {
     schemaVersion: 1,
     updatedAt: serverTimestamp(),
     privacyClass: "abstract",
-    displayName: user.displayName || "Local Prospector",
-    minerName: user.displayName || "Prospector"
+    ...profileNamePatch
   }, { merge: true });
 
   await setDoc(settingsRef, {
@@ -2345,7 +2366,7 @@ async function loadDashboardForUser(user) {
     refreshWarning: refreshWarning(reads)
   });
 
-  fallback.profile = { ...fallback.profile, ...profile, ...player };
+  fallback.profile = { ...fallback.profile, ...player, ...profile };
   fallback.player = {
     ...fallback.player,
     spaceBucks: numberValue(cloudState.spaceBucks ?? cloudState.space_bucks, fallback.player.spaceBucks),
@@ -3224,14 +3245,23 @@ async function saveSpaceUserNameProfile() {
   spaceNameStatus.textContent = "Saving space user name.";
   spaceNameStatus.dataset.tone = "";
   try {
-    await setDoc(doc(db, "players", currentUser.uid, "profile", "current"), {
-      ownerUid: currentUser.uid,
-      schemaVersion: 1,
-      updatedAt: serverTimestamp(),
-      privacyClass: "abstract",
-      minerName,
-      displayName: minerName
-    }, { merge: true });
+    await Promise.all([
+      setDoc(doc(db, "players", currentUser.uid), {
+        ownerUid: currentUser.uid,
+        updatedAt: serverTimestamp(),
+        privacyClass: "abstract",
+        minerName,
+        displayName: minerName
+      }, { merge: true }),
+      setDoc(doc(db, "players", currentUser.uid, "profile", "current"), {
+        ownerUid: currentUser.uid,
+        schemaVersion: 1,
+        updatedAt: serverTimestamp(),
+        privacyClass: "abstract",
+        minerName,
+        displayName: minerName
+      }, { merge: true })
+    ]);
     activeDashboard.profile = {
       ...(activeDashboard.profile || {}),
       minerName,

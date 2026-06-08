@@ -162,6 +162,18 @@ assert("portal should expose profile, referral crew, billing, and promo code acc
     styles.include?(".promo-row")
 end
 
+assert("space user name saves should survive dashboard refreshes") do
+  auth_js.include?("const [existing, existingProfile] = await Promise.all([") &&
+    auth_js.include?("const existingPlayerData = existing.exists() ? existing.data() : {};") &&
+    auth_js.include?("cleanSpaceUserName(existingPlayerData.displayName)") &&
+    auth_js.include?("const profileNamePatch = {};") &&
+    auth_js.include?("...profileNamePatch") &&
+    auth_js.include?("fallback.profile = { ...fallback.profile, ...player, ...profile };") &&
+    auth_js.include?("await Promise.all([") &&
+    auth_js.include?("setDoc(doc(db, \"players\", currentUser.uid),") &&
+    auth_js.include?("setDoc(doc(db, \"players\", currentUser.uid, \"profile\", \"current\"),")
+end
+
 assert("login route should render only the login card with referral support") do
   auth_js.include?("const pendingLogin = linkParams.has(\"login\")") &&
     auth_js.include?("const LOGIN_REFERRAL_STORAGE_KEY = \"mcp-miner-login-referral-code\"") &&
