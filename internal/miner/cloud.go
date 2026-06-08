@@ -189,7 +189,7 @@ func (e *Engine) SyncProgressPayload(state M) M {
 		status = "unauthenticated"
 	}
 	pending := e.pendingJournalEvents(meta)
-	return M{"ok": true, "sync": M{"available": available, "status": status, "cloud_sync_enabled": asBool(state["cloud_sync"]), "state_schema_version": asInt(state["state_schema_version"]), "last_recovery": safeRecovery(state["last_recovery"]), "account_link": asMap(e.AccountLinkStatusPayload(state)["account_link"]), "metadata": M{"status": asString(meta["status"]), "last_pushed_sequence": asInt(meta["last_pushed_sequence"]), "pending_event_count": len(pending), "duplicate_event_ids": meta["duplicate_event_ids"], "rejected_events": meta["rejected_events"], "initial_state_imported_at": meta["initial_state_imported_at"], "last_state_import_at": meta["last_state_import_at"], "state_import_id": meta["state_import_id"], "device_token_present": asString(creds["device_token"]) != "", "functions_origin": meta["functions_origin"]}, "cadence": cadencePayload(meta), "journal": M{"applied_event_count": asInt(asMap(state["journal"])["applied_event_count"]), "last_event_id": asMap(state["journal"])["last_event_id"]}}, "privacy": PrivacyNotice}
+	return M{"ok": true, "sync": M{"available": available, "status": status, "cloud_sync_enabled": asBool(state["cloud_sync"]), "state_schema_version": asInt(state["state_schema_version"]), "last_recovery": safeRecovery(state["last_recovery"]), "account_link": asMap(e.AccountLinkStatusPayload(state)["account_link"]), "metadata": M{"status": asString(meta["status"]), "last_pushed_sequence": asInt(meta["last_pushed_sequence"]), "last_pulled_version": meta["last_pulled_version"], "last_attempt_at": meta["last_attempt_at"], "last_success_at": meta["last_success_at"], "next_retry_at": meta["next_retry_at"], "retry_count": asInt(meta["retry_count"]), "pending_event_count": len(pending), "duplicate_event_ids": meta["duplicate_event_ids"], "rejected_events": meta["rejected_events"], "last_error": meta["last_error"], "initial_state_imported_at": meta["initial_state_imported_at"], "last_state_import_at": meta["last_state_import_at"], "state_import_id": meta["state_import_id"], "device_token_present": asString(creds["device_token"]) != "", "functions_origin": meta["functions_origin"]}, "cadence": cadencePayload(meta), "journal": M{"applied_event_count": asInt(asMap(state["journal"])["applied_event_count"]), "last_event_id": asMap(state["journal"])["last_event_id"]}}, "privacy": PrivacyNotice}
 }
 
 func safeRecovery(v any) any {
@@ -225,9 +225,10 @@ func retryAfter(iso string) int {
 func (e *Engine) PreviewSyncPayload(args M) M {
 	state, _ := e.State()
 	meta := asMap(state["cloud_sync_metadata"])
+	auth := asMap(state["cloud_auth"])
 	token := asString(args["device_token"])
 	idToken := asString(args["id_token"])
-	events := e.buildCloudSyncEvents(meta)
+	events := e.buildCloudSyncEventsForUID(meta, asString(auth["uid"]))
 	origin := configuredOrigin(args)
 	if e.needsInitialStateImport(state, meta) {
 		return M{"ok": true, "status": "preview", "sync_type": "initial_state_import", "queued_event_count": len(events), "request": M{"method": "POST", "url": safeURLJoin(origin, "importInitialState"), "headers": redactedHeaders(idToken, token), "body": M{"data": e.buildInitialStateImportPayload(state)}}, "privacy": PrivacyNotice}
@@ -238,13 +239,14 @@ func (e *Engine) PreviewSyncPayload(args M) M {
 func (e *Engine) SyncCloudPayload(args M) M {
 	state, _ := e.State()
 	meta := asMap(state["cloud_sync_metadata"])
-	events := e.buildCloudSyncEvents(meta)
+	auth := asMap(state["cloud_auth"])
+	events := e.buildCloudSyncEventsForUID(meta, asString(auth["uid"]))
 	token := asString(args["device_token"])
 	idToken := asString(args["id_token"])
 	if token == "" {
 		token = asString(e.readAuthCredentials()["device_token"])
 	}
-	if asString(asMap(state["cloud_auth"])["status"]) != "linked" && idToken == "" && token == "" {
+	if asString(auth["status"]) != "linked" && idToken == "" && token == "" {
 		_, _ = e.WithState(func(s M) (any, error) {
 			asMap(s["cloud_sync_metadata"])["status"] = "queued_unauthenticated"
 			return nil, nil
@@ -302,16 +304,78 @@ func (e *Engine) pendingJournalEvents(meta M) []M {
 }
 
 func (e *Engine) buildCloudSyncEvents(meta M) []any {
+	return e.buildCloudSyncEventsForUID(meta, "")
+}
+
+func (e *Engine) buildCloudSyncEventsForUID(meta M, uid string) []any {
 	pending := e.pendingJournalEvents(meta)
 	out := []any{}
 	seq := asInt(meta["last_pushed_sequence"])
 	for _, entry := range pending {
 		seq++
-		event := M{"eventId": asString(entry["event_id"]), "eventType": asString(entry["event_type"]), "schemaVersion": 2, "receiptType": "abstract_work", "sequence": seq, "timestamp": asString(entry["timestamp"]), "turnId": asString(entry["turn_id"]), "observedFields": M{"scoreHint": asFloat(entry["score"]), "category": asString(asMap(e.Data.WorkEventByID[asString(entry["event_type"])])["category"]), "rewardControlReasons": asSlice(asMap(entry["reward_control"])["reasons"])}, "privacyClass": "abstract", "source": "codex_hook", "signature": "v2.local-placeholder"}
-		event["checksum"] = shaHex(stableJSON(event))
+		if len(out) >= CloudSyncEventBatchLimit {
+			break
+		}
+		eventType := asString(entry["event_type"])
+		rule := asMap(e.Data.WorkEventByID[eventType])
+		if len(rule) == 0 {
+			continue
+		}
+		control := asMap(entry["reward_control"])
+		category := asString(control["category"])
+		if category == "" {
+			category = asString(rule["category"])
+		}
+		event := M{
+			"eventId":       asString(entry["event_id"]),
+			"eventType":     eventType,
+			"schemaVersion": 2,
+			"receiptType":   "abstract_work",
+			"sequence":      seq,
+			"timestamp":     asString(entry["timestamp"]),
+			"observedFields": M{
+				"scoreHint":            round(asFloat(entry["score"]), 2),
+				"category":             category,
+				"rewardControlReasons": asSlice(control["reasons"]),
+			},
+			"privacyClass": "abstract",
+			"source":       "codex_hook",
+			"signature":    "v2.local." + shaHex(uid + ":" + asString(entry["event_id"]))[:16],
+		}
+		if uid != "" {
+			event["ownerUid"] = uid
+		}
+		if sessionID := asString(entry["session_id"]); sessionID != "" {
+			event["sessionId"] = sessionID
+		}
+		if turnID := asString(entry["turn_id"]); turnID != "" {
+			event["turnId"] = turnID
+		}
+		event["checksum"] = cloudSyncEventChecksum(event)
 		out = append(out, event)
 	}
 	return out
+}
+
+func cloudSyncEventChecksum(event M) string {
+	payload := M{
+		"eventId":        event["eventId"],
+		"eventType":      event["eventType"],
+		"observedFields": event["observedFields"],
+		"privacyClass":   event["privacyClass"],
+		"schemaVersion":  event["schemaVersion"],
+		"sequence":       event["sequence"],
+		"source":         event["source"],
+		"timestamp":      event["timestamp"],
+		"turnId":         nil,
+	}
+	if event["observedFields"] == nil {
+		payload["observedFields"] = M{}
+	}
+	if turnID := asString(event["turnId"]); turnID != "" {
+		payload["turnId"] = turnID
+	}
+	return shaHex(stableJSON(payload))
 }
 
 func (e *Engine) needsInitialStateImport(state M, meta M) bool {
@@ -379,8 +443,16 @@ func (e *Engine) applyInitialStateImportResult(result M, events []any, origin st
 			state["cloud_sync_metadata"] = meta
 			return nil, nil
 		}
+		auth := asMap(state["cloud_auth"])
+		auth["status"] = "linked"
+		auth["last_error"] = nil
+		auth["updated_at"] = nowISO()
+		state["cloud_auth"] = auth
 		meta["status"] = "synced"
 		meta["last_success_at"] = nowISO()
+		meta["last_error"] = nil
+		meta["next_retry_at"] = nil
+		meta["retry_count"] = 0
 		meta["initial_state_imported_at"] = importedAt
 		meta["last_state_import_at"] = importedAt
 		meta["state_import_id"] = cursor["stateImportId"]
@@ -438,12 +510,20 @@ func (e *Engine) applyCloudSyncResult(result M, events []any, origin string) M {
 			auth["last_error"] = "cloud sync rejected events"
 			state["cloud_auth"] = auth
 		} else {
+			auth := asMap(state["cloud_auth"])
+			auth["status"] = "linked"
+			auth["last_error"] = nil
+			auth["updated_at"] = nowISO()
+			state["cloud_auth"] = auth
 			meta["status"] = "synced"
 			meta["last_success_at"] = nowISO()
 			meta["last_pushed_sequence"] = maxSeq
 			meta["pending_event_ids"] = []any{}
 			meta["duplicate_event_ids"] = stringAnySlice(duplicateIDs)
 			meta["rejected_events"] = []any{}
+			meta["last_error"] = nil
+			meta["next_retry_at"] = nil
+			meta["retry_count"] = 0
 		}
 		if cadence := asMap(result["syncCadence"]); len(cadence) > 0 {
 			meta["sync_cadence_seconds"] = asInt(cadence["cadenceSeconds"])

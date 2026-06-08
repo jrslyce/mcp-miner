@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "digest"
 require "open3"
 require "tmpdir"
 require_relative "test_support/webrick_compat"
@@ -30,6 +31,32 @@ def tool_payload(response)
   JSON.parse(response.dig("result", "content", 0, "text"))
 end
 
+def stable_json(value)
+  case value
+  when Hash
+    "{#{value.keys.sort.map { |key| "#{JSON.generate(key)}:#{stable_json(value[key])}" }.join(",")}}"
+  when Array
+    "[#{value.map { |item| stable_json(item) }.join(",")}]"
+  else
+    JSON.generate(value)
+  end
+end
+
+def sync_event_checksum(event)
+  payload = {
+    "eventId" => event["eventId"],
+    "eventType" => event["eventType"],
+    "observedFields" => event["observedFields"] || {},
+    "privacyClass" => event["privacyClass"],
+    "schemaVersion" => event["schemaVersion"],
+    "sequence" => event["sequence"],
+    "source" => event["source"],
+    "timestamp" => event["timestamp"],
+    "turnId" => event["turnId"]
+  }
+  Digest::SHA256.hexdigest(stable_json(payload))
+end
+
 def seed_reward_events(engine)
   engine.write_state(engine.initial_state)
   engine.with_state do |state|
@@ -50,6 +77,23 @@ def seed_reward_events(engine)
       line_count: 10,
       event_key_suffix: "patch"
     )
+  end
+end
+
+def seed_many_reward_events(engine, count)
+  engine.write_state(engine.initial_state)
+  engine.with_state do |state|
+    engine.ensure_turn(state, "turn-sync-batch")
+    count.times do |index|
+      engine.add_event_reward(
+        state,
+        index.even? ? "work_search" : "work_apply_patch",
+        turn_id: "turn-sync-batch",
+        hook_event_name: "PostToolUse",
+        line_count: index.even? ? 0 : 10,
+        event_key_suffix: "batch-#{index}"
+      )
+    end
   end
 end
 
@@ -218,6 +262,7 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
             event.dig("observedFields", "scoreHint").is_a?(Numeric) &&
             !event.dig("observedFields", "score") &&
             event["checksum"].to_s.length == 64 &&
+            event["checksum"] == sync_event_checksum(event) &&
             event["signature"].to_s.start_with?("v2.")
         end
     end
@@ -229,7 +274,55 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
         !serialized_request.include?(ROOT)
     end
 
+    Dir.mktmpdir("mcp-miner-cloud-sync-batch", dir) do |batch_dir|
+      batch_state_path = File.join(batch_dir, "state.json")
+      batch_engine = McpMiner::GameEngine.new(root: ROOT, state_path: batch_state_path)
+      seed_many_reward_events(batch_engine, 60)
+      batch_engine.with_state do |state|
+        state["cloud_sync"] = true
+        state["cloud_auth"]["status"] = "linked"
+        state["cloud_auth"]["uid"] = "firebase_uid_sync"
+        state["cloud_sync_metadata"]["initial_state_imported_at"] = Time.now.utc.iso8601
+        state["cloud_sync_metadata"]["last_state_import_at"] = Time.now.utc.iso8601
+        state["cloud_sync_metadata"]["last_pushed_sequence"] = 0
+      end
+      response_queue << {
+        body: {
+          result: {
+            ok: true,
+            accepted: [],
+            duplicates: [],
+            rejected: [],
+            state: {
+              eventCount: 50,
+              lastSequence: 50
+            }
+          }
+        }
+      }
+      batch_response = tool_payload(run_mcp(batch_state_path, [
+        { jsonrpc: "2.0", id: 61, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin, force: true } } }
+      ]).last)
+      batch_request = requests.last
+      batch_events = batch_request.dig(:body, "data", "events")
+      assert("sync_cloud should cap each reward event batch at the Cloud Functions limit") do
+        batch_response["ok"] == true &&
+          batch_events.length == 50 &&
+          batch_events.first["sequence"] == 1 &&
+          batch_events.last["sequence"] == 50 &&
+          batch_response.dig("sync", "metadata", "last_pushed_sequence") == 50 &&
+          batch_response.dig("sync", "metadata", "pending_event_count") == 10
+      end
+    end
+
     future_sync_at = (Time.now.utc + 60).iso8601
+    engine.with_state do |state|
+      state["cloud_auth"]["status"] = "sync_error"
+      state["cloud_auth"]["last_error"] = "previous timeout"
+      state["cloud_sync_metadata"]["last_error"] = "previous timeout"
+      state["cloud_sync_metadata"]["retry_count"] = 2
+      state["cloud_sync_metadata"]["next_retry_at"] = Time.now.utc.iso8601
+    end
     response_queue << {
       body: {
         result: {
@@ -267,7 +360,11 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
         synced.dig("sync", "metadata", "last_pushed_sequence") == max_sequence &&
         synced.dig("sync", "metadata", "pending_event_count") == 0 &&
         synced.dig("sync", "cadence", "sync_cadence_seconds") == 60 &&
-        synced.dig("sync", "cadence", "next_eligible_sync_at") == future_sync_at
+        synced.dig("sync", "cadence", "next_eligible_sync_at") == future_sync_at &&
+        synced.dig("sync", "account_link", "status") == "linked" &&
+        synced.dig("sync", "account_link", "last_error").nil? &&
+        synced.dig("sync", "metadata", "last_error").nil? &&
+        synced.dig("sync", "metadata", "retry_count").to_i == 0
     end
 
     request_count_before_debounce = requests.length

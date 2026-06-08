@@ -21,6 +21,7 @@ const (
 	DefaultDashboardURL       = "https://mcpminer.net"
 	DefaultFunctionsOrigin    = "https://us-central1-mcp-miner.cloudfunctions.net"
 	DefaultSyncCadenceSeconds = 60
+	CloudSyncEventBatchLimit  = 50
 	DefaultJournalFilename    = "journal.jsonl"
 	ReportPrefix              = "MCP Miner:"
 	MeaningfulScore           = 3.0

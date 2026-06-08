@@ -27,6 +27,7 @@ module McpMiner
     DEFAULT_FUNCTIONS_ORIGIN = "https://us-central1-mcp-miner.cloudfunctions.net"
     DEFAULT_DASHBOARD_URL = "https://mcpminer.net"
     DEFAULT_SYNC_CADENCE_SECONDS = 60
+    CLOUD_SYNC_EVENT_BATCH_LIMIT = 50
     REPORT_ICON_DATA_URI = "data:image/svg+xml;base64," \
       "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+" \
       "PHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiByeD0iMyIgZmlsbD0iIzJmN2Q2ZCIvPjxjaXJjbGUgY3g9Ijgi" \
@@ -3019,6 +3020,7 @@ module McpMiner
       entries.each_with_index.each_with_object([]) do |(entry, index), events|
         sequence = index + 1
         next if sequence <= last_sequence.to_i
+        break if events.length >= CLOUD_SYNC_EVENT_BATCH_LIMIT
         next unless work_event_by_id.key?(safe_string(entry["event_type"]))
 
         event = cloud_sync_event_for_entry(entry, uid, sequence)
