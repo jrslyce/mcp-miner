@@ -15,7 +15,7 @@ MCP Miner is a passive asteroid-mining game for Codex. Users work normally in Co
 - Keep reports compact unless the user asks for detail.
 - Never include private work details such as prompts, code, file paths, repo names, terminal output, or browser content in game reports.
 - Use "Chonks" for mined material and "Space Bucks" for money.
-- Treat automatic Stop-hook report display as best-effort UI behavior. The reliable user-visible status surface is an explicit MCP Miner invocation or status request.
+- Automatic Stop-hook report display should append the exact generated footer when the hook requests it. If the app shell does not show it, fetch `get_latest_report` during explicit MCP Miner requests.
 
 ## Bare Invocation Response
 
@@ -36,6 +36,7 @@ When the user only says `@mcp-miner`, respond with:
 - `get_inventory`: current inventory with material names, categories, rarity, and value totals.
 - `get_asteroid_status`: inspect unlocked asteroid classes, selection, depletion, hazards, and pity.
 - `select_asteroid`: switch mining to an unlocked asteroid class.
+- `claim_asteroid`: claim a fresh unlocked asteroid class after the current claim is depleted, then select it.
 - `get_fabrication_status`: inspect fabrication machines, queues, completed products, and throughput.
 - `queue_fabrication`: consume recipe materials and queue a fabricated product.
 - `get_active_orders`: current generated orders.

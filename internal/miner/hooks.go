@@ -121,9 +121,11 @@ func (e *Engine) hookStop(input M) M {
 	turnID := hookTurnID(input)
 	var report string
 	var should bool
+	alreadyHasReport := strings.Contains(asString(input["last_assistant_message"]), ReportPrefix)
+	stopHookActive := asBool(input["stop_hook_active"])
 	_, _ = e.WithState(func(state M) (any, error) {
 		e.EnsureTurn(state, turnID)
-		if e.ShouldEmitReport(state) && !strings.Contains(asString(input["last_assistant_message"]), ReportPrefix) {
+		if e.ShouldEmitReport(state) && !alreadyHasReport {
 			report = e.BuildReport(state)
 			e.RecordReport(state, report, turnID)
 			should = true
@@ -131,9 +133,11 @@ func (e *Engine) hookStop(input M) M {
 		return nil, nil
 	})
 	if should {
-		// Blocking hook decisions make reports visible but disruptive in Codex.
-		// Keep Stop output passive and expose the reliable report through MCP tools.
-		return M{"continue": true, "systemMessage": e.DisplayReport(report)}
+		display := e.DisplayReport(report)
+		if stopHookActive {
+			return M{"continue": true, "systemMessage": display}
+		}
+		return M{"decision": "block", "reason": e.ReportContinuationInstruction(display)}
 	}
 	return M{"continue": true}
 }

@@ -157,14 +157,11 @@ func TestEveryTurnFullStopRecordsPassiveFooter(t *testing.T) {
 	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := response["decision"]; ok {
-		t.Fatalf("full report should not force a continuation decision: %#v", response)
+	if asString(response["decision"]) != "block" {
+		t.Fatalf("full report should request a footer continuation: %#v", response)
 	}
-	if _, ok := response["reason"]; ok {
-		t.Fatalf("full report should not emit a continuation reason: %#v", response)
-	}
-	if !strings.Contains(asString(response["systemMessage"]), "MCP Miner Expedition Report") {
-		t.Fatalf("expected report system message: %#v", response)
+	if !strings.Contains(asString(response["reason"]), "MCP Miner Expedition Report") {
+		t.Fatalf("expected report continuation reason: %#v", response)
 	}
 
 	stop["stop_hook_active"] = true
@@ -181,4 +178,128 @@ func TestEveryTurnFullStopRecordsPassiveFooter(t *testing.T) {
 	if _, ok := response["decision"]; ok {
 		t.Fatalf("active stop continuation should not loop: %#v", response)
 	}
+}
+
+func TestAsteroidDepletionUnlocksInCatalogOrderAndClaimsRepeat(t *testing.T) {
+	engine := testEngine(t)
+	_, err := engine.WithState(func(state M) (any, error) {
+		state["unlocked_asteroid_class_ids"] = []any{"asteroid_starter_rubble", "asteroid_quartz_belt", "asteroid_iron_tumblers"}
+		state["current_asteroid_class_id"] = "asteroid_iron_tumblers"
+		state["asteroid_progress"] = M{"asteroid_class_id": "asteroid_iron_tumblers", "mined": 2598}
+		state["asteroid_progress_by_id"] = M{
+			"asteroid_starter_rubble": M{"asteroid_class_id": "asteroid_starter_rubble", "mined": 1000},
+			"asteroid_quartz_belt":    M{"asteroid_class_id": "asteroid_quartz_belt", "mined": 1800},
+			"asteroid_iron_tumblers":  M{"asteroid_class_id": "asteroid_iron_tumblers", "mined": 2598},
+		}
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = engine.WithState(func(state M) (any, error) {
+		engine.ApplyJournalEntry(state, M{
+			"event_id":      "evt_deplete_iron",
+			"event_type":    "work_apply_patch",
+			"timestamp":     "2026-06-08T00:00:00Z",
+			"turn_id":       "turn-deplete-iron",
+			"privacy_class": "abstract",
+			"score":         4,
+			"rewards": M{
+				"chonks":               2,
+				"materials":            M{},
+				"asteroid_class_id":    "asteroid_iron_tumblers",
+				"asteroid_mined_delta": 8,
+				"suit_damage":          0,
+				"rare_find":            false,
+			},
+		})
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := mustState(t, engine)
+	if asString(state["current_asteroid_class_id"]) != "asteroid_sapphire_debris_field" {
+		t.Fatalf("expected same-tier Sapphire unlock, got %s", asString(state["current_asteroid_class_id"]))
+	}
+	if !hasString(strSlice(state["unlocked_asteroid_class_ids"]), "asteroid_sapphire_debris_field") {
+		t.Fatalf("sapphire field was not unlocked: %#v", state["unlocked_asteroid_class_ids"])
+	}
+	if asInt(asMap(state["asteroid_progress"])["mined"]) != 6 {
+		t.Fatalf("expected overflow 6 to carry forward, got %#v", state["asteroid_progress"])
+	}
+
+	claimed := engine.ClaimAsteroidPayload(M{"asteroid_id": "asteroid_starter_rubble"})
+	if asString(claimed["status"]) != "claimed_new_asteroid" {
+		t.Fatalf("expected starter rubble repeat claim, got %#v", claimed)
+	}
+	state = mustState(t, engine)
+	if asString(state["current_asteroid_class_id"]) != "asteroid_starter_rubble" || asInt(asMap(state["asteroid_progress"])["mined"]) != 0 {
+		t.Fatalf("claim did not reset and select starter rubble: %#v", state["asteroid_progress"])
+	}
+}
+
+func TestRareFindPityResetsOnRareReward(t *testing.T) {
+	engine := testEngine(t)
+	_, err := engine.WithState(func(state M) (any, error) {
+		engine.ApplyJournalEntry(state, M{
+			"event_id":      "evt_common",
+			"event_type":    "work_search",
+			"timestamp":     "2026-06-08T00:00:00Z",
+			"turn_id":       "turn-common",
+			"privacy_class": "abstract",
+			"score":         1,
+			"rewards": M{
+				"chonks":               1,
+				"materials":            M{},
+				"asteroid_class_id":    "asteroid_starter_rubble",
+				"asteroid_mined_delta": 1,
+				"suit_damage":          0,
+				"rare_find":            false,
+			},
+		})
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := mustState(t, engine)
+	if asFloat(state["rare_find_pity_score"]) != 1.0 {
+		t.Fatalf("expected pity to increment by 1, got %#v", state["rare_find_pity_score"])
+	}
+	_, err = engine.WithState(func(state M) (any, error) {
+		engine.ApplyJournalEntry(state, M{
+			"event_id":      "evt_rare",
+			"event_type":    "work_search",
+			"timestamp":     "2026-06-08T00:01:00Z",
+			"turn_id":       "turn-rare",
+			"privacy_class": "abstract",
+			"score":         1,
+			"rewards": M{
+				"chonks":               1,
+				"materials":            M{"mat_fictional_sparkglass": 1},
+				"asteroid_class_id":    "asteroid_starter_rubble",
+				"asteroid_mined_delta": 2,
+				"suit_damage":          0,
+				"rare_find":            true,
+			},
+		})
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state = mustState(t, engine)
+	if asFloat(state["rare_find_pity_score"]) != 0.0 {
+		t.Fatalf("expected pity reset on rare find, got %#v", state["rare_find_pity_score"])
+	}
+}
+
+func mustState(t *testing.T, engine *Engine) M {
+	t.Helper()
+	state, err := engine.State()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return state
 }

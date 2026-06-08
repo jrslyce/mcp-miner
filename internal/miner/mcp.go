@@ -73,7 +73,7 @@ func errorResponse(id any, code int, message string) M {
 func tools() []any {
 	names := []string{
 		"get_player_status", "get_latest_report", "get_profile", "update_profile", "get_inventory",
-		"get_asteroid_status", "select_asteroid", "get_fabrication_status", "queue_fabrication",
+		"get_asteroid_status", "select_asteroid", "claim_asteroid", "get_fabrication_status", "queue_fabrication",
 		"get_active_orders", "get_weekly_contracts", "complete_weekly_contract", "fulfill_order",
 		"refine_material", "sell_material", "get_upgrade_status", "purchase_upgrade",
 		"get_store_catalog", "purchase_store_item", "get_base_status", "purchase_base_module",
@@ -97,6 +97,8 @@ func toolDescription(name string) string {
 		return "Return the local MCP Miner player status, inventory summary, settings, and current asteroid."
 	case "get_latest_report":
 		return "Return the latest compact MCP Miner report."
+	case "claim_asteroid":
+		return "Claim a fresh unlocked asteroid class after its current claim is depleted, then select it."
 	case "sync_cloud":
 		return "Push queued privacy-safe MCP Miner journal events to the configured Cloud Functions sync API."
 	case "check_for_update":
@@ -115,7 +117,7 @@ func schemaFor(name string) M {
 		for _, key := range []string{"display_name", "miner_name", "pronouns", "suit_style", "avatar_concept_prompt", "add_customization_unlock", "generated_asset_ref"} {
 			props[key] = M{"type": "string"}
 		}
-	case "select_asteroid":
+	case "select_asteroid", "claim_asteroid":
 		props["asteroid_id"] = M{"type": "string"}
 	case "queue_fabrication":
 		props["recipe_id"] = M{"type": "string"}
@@ -189,6 +191,8 @@ func callTool(engine *Engine, name string, args M) (M, error) {
 		return engine.AsteroidStatusPayload(nil), nil
 	case "select_asteroid":
 		return engine.SelectAsteroidPayload(args), nil
+	case "claim_asteroid":
+		return engine.ClaimAsteroidPayload(args), nil
 	case "get_fabrication_status":
 		return engine.FabricationStatusPayload(nil), nil
 	case "queue_fabrication":

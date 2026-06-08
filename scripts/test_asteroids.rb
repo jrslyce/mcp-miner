@@ -69,7 +69,7 @@ Dir.mktmpdir("mcp-miner-asteroids") do |dir|
   quartz = asteroid(asteroid_status, "asteroid_quartz_belt")
 
   assert("tools/list should expose asteroid actions") do
-    %w[get_asteroid_status select_asteroid].all? { |tool_name| tool_names.include?(tool_name) }
+    %w[get_asteroid_status select_asteroid claim_asteroid].all? { |tool_name| tool_names.include?(tool_name) }
   end
   assert("get_asteroid_status should expose unlocked, selected, depletion, and composition data") do
     starter["unlocked"] == true &&
@@ -150,6 +150,29 @@ Dir.mktmpdir("mcp-miner-asteroids") do |dir|
       depleted_state.dig("asteroid_progress_by_id", "asteroid_starter_rubble", "mined") == 1000 &&
       depleted_state["asteroid_depletions"].last["unlocked_asteroid_class_id"] == "asteroid_quartz_belt" &&
       depleted_state.dig("asteroid_progress", "mined").positive?
+  end
+
+  claim_responses = run_mcp(state_path, [
+    { jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "get_asteroid_status", arguments: {} } },
+    { jsonrpc: "2.0", id: 8, method: "tools/call", params: { name: "claim_asteroid", arguments: { asteroid_id: "asteroid_starter_rubble" } } },
+    { jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "get_asteroid_status", arguments: {} } }
+  ])
+  claimable_status = tool_payload(claim_responses[0])
+  claimed_payload = tool_payload(claim_responses[1])
+  after_claim_status = tool_payload(claim_responses[2])
+  starter_before_claim = asteroid(claimable_status, "asteroid_starter_rubble")
+  starter_after_claim = asteroid(after_claim_status, "asteroid_starter_rubble")
+  assert("depleted unlocked asteroid classes should be claimable") do
+    starter_before_claim["claimable"] == true &&
+      starter_before_claim.dig("depletion", "depleted") == true
+  end
+  assert("claim_asteroid should reset depleted unlocked classes without changing composition") do
+    claimed_payload["ok"] == true &&
+      claimed_payload["status"] == "claimed_new_asteroid" &&
+      starter_after_claim["selected"] == true &&
+      starter_after_claim["claimable"] == false &&
+      starter_after_claim.dig("depletion", "mined") == 0 &&
+      starter_after_claim["composition"].any? { |entry| entry["material_id"] == "mat_element_c" }
   end
 
   serialized = JSON.generate([asteroid_status, selected, pity_payload, depleted_state["asteroid_depletions"], depleted_state["hazard_log"]])

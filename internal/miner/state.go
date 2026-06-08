@@ -579,14 +579,10 @@ func (e *Engine) applyRewardJournalEntry(state M, entry M) {
 	mined := asInt(progress["mined"]) + asInt(rewards["asteroid_mined_delta"])
 	asteroid := e.Data.AsteroidByID[asString(progress["asteroid_class_id"])]
 	depletionSize := asInt(asteroid["depletion_size"])
+	progress["mined"] = mined
+	asMap(state["asteroid_progress_by_id"])[asString(progress["asteroid_class_id"])] = M{"asteroid_class_id": asString(progress["asteroid_class_id"]), "mined": mined}
 	if depletionSize > 0 && mined >= depletionSize {
-		mined = depletionSize
-		progress["mined"] = mined
-		asMap(state["asteroid_progress_by_id"])[asString(progress["asteroid_class_id"])] = M{"asteroid_class_id": asString(progress["asteroid_class_id"]), "mined": mined}
-		e.handleAsteroidDepletion(state, asString(progress["asteroid_class_id"]))
-	} else {
-		progress["mined"] = mined
-		asMap(state["asteroid_progress_by_id"])[asString(progress["asteroid_class_id"])] = M{"asteroid_class_id": asString(progress["asteroid_class_id"]), "mined": mined}
+		e.handleAsteroidDepletion(state, asString(entry["timestamp"]))
 	}
 	if hazard := asMap(rewards["hazard"]); asString(hazard["hazard_id"]) != "" {
 		log := asSlice(state["hazard_log"])
@@ -601,7 +597,11 @@ func (e *Engine) applyRewardJournalEntry(state M, entry M) {
 		}
 		state["hazard_log"] = log
 	}
-	state["rare_find_pity_score"] = mathMin(3.0, asFloat(state["rare_find_pity_score"])+0.1)
+	if asBool(rewards["rare_find"]) {
+		state["rare_find_pity_score"] = 0.0
+	} else {
+		state["rare_find_pity_score"] = mathMin(asFloat(asMap(e.Data.Balance["pity"])["max_score"]), asFloat(state["rare_find_pity_score"])+1.0)
+	}
 	if projectID := asString(entry["project_id"]); projectID != "" {
 		project := asMap(asMap(state["project_stats"])[projectID])
 		if len(project) == 0 {

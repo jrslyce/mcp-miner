@@ -185,7 +185,7 @@ assert("install docs should cover state path, hook trust, reset, backup, and smo
     install_doc.include?("sh scripts/install_codex_plugin.sh") &&
     install_doc.include?(".\\scripts\\install_codex_plugin.ps1") &&
     install_doc.include?("standalone MCP server") &&
-    install_doc.include?("may not be shown by every Codex UI") &&
+    install_doc.include?("request the exact footer as a final-paragraph continuation") &&
     install_doc.include?("npm run test:plugin-install") &&
     install_doc.include?("npm run test:codex-installer") &&
     install_doc.include?("npm run validate:plugin")

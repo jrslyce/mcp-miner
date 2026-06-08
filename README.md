@@ -12,7 +12,7 @@ Your miner gathers Chonks and materials from asteroids, earns Space Bucks, disco
 
 The game is local-first. State is stored under `~/.mcp-miner`, and the plugin does not store prompts, source code, file paths, repo names, terminal output, browser content, transcripts, secrets, or raw Codex conversations. Optional account linking can sync abstract gameplay state to the web dashboard without sending private work content.
 
-Use the MCP Miner tools in Codex to check status, inventory, active orders, store catalog, upgrades, settings, latest reports, and the dashboard link. The website provides the public install flow, dashboard, account-linking surface, and cloud profile views.
+Use the MCP Miner tools in Codex to check status, inventory, active orders, asteroid claims, store catalog, upgrades, settings, latest reports, and the dashboard link. The website provides the public install flow, dashboard, account-linking surface, and cloud profile views.
 
 ## Install In Codex
 
