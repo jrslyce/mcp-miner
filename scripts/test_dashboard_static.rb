@@ -38,7 +38,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth account-settings billing device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
+required_panels = %w[auth profile account-settings billing promo-code device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
 assert("landing page should explain MCP Miner before the dashboard") do
   landing.include?(%(<main id="home" class="landing-shell">)) &&
     landing.include?("Turn Your Work Into an Asteroid-Mining Adventure") &&
@@ -47,6 +47,9 @@ assert("landing page should explain MCP Miner before the dashboard") do
     index.include?(%(href="https://github.com/jrslyce/mcp-miner")) &&
     index.include?(%(src="/assets/mcpminer-words.png")) &&
     index.include?(%(src="/assets/mcpminer-hero.png")) &&
+    landing.include?(%(href="/portal?login=1">Login</a>)) &&
+    !landing.include?("Start Mining") &&
+    !landing.include?(%(id="theme-toggle")) &&
     !landing.include?(%(<script type="module" src="/auth.js"></script>)) &&
     portal.include?(%(<script type="module" src="/auth.js"></script>))
 end
@@ -102,10 +105,10 @@ assert("dashboard should render the V1 dashboard panels on the first screen") do
 end
 
 assert("portal should include onboarding steps before the stats dashboard") do
-  portal.include?(%(class="portal-onboarding")) &&
+    portal.include?(%(class="portal-onboarding")) &&
     portal.include?(%(class="dashboard-tabs")) &&
     portal.include?(%(data-dashboard-tab="overview")) &&
-    portal.include?(%(data-dashboard-tab="account")) &&
+    portal.include?(%(data-panel="profile")) &&
     portal.include?(%(id="company-name")) &&
     portal.include?(%(id="claimed-asteroid-name")) &&
     portal.include?(%(id="portal-install-prompt")) &&
@@ -120,17 +123,27 @@ assert("portal should include onboarding steps before the stats dashboard") do
     styles.include?("@keyframes asteroid-card-sheen")
 end
 
-assert("portal should expose referral crew and promo code account settings") do
-  portal.include?(%(data-panel="account-settings")) &&
+assert("portal should expose profile, referral crew, billing, and promo code account pages") do
+  portal.include?(%(id="user-menu-button")) &&
+    portal.include?(%(id="user-menu-logout")) &&
+    portal.include?(%(data-menu-tab="profile")) &&
+    portal.include?(%(data-menu-tab="billing")) &&
+    portal.include?(%(data-menu-tab="promo")) &&
+    portal.include?(%(id="space-user-name")) &&
+    portal.include?(%(data-panel="account-settings")) &&
     portal.include?(%(id="referral-code")) &&
     portal.include?(%(id="referral-link")) &&
     portal.include?(%(id="referral-redeem-form")) &&
+    portal.include?(%(data-panel="promo-code")) &&
     portal.include?(%(id="promo-code-form")) &&
     portal.include?("Referral Crew") &&
-    portal.include?("Promo Code") &&
+    portal.include?("Promo code") &&
+    portal.include?("Space User Name") &&
     auth_js.include?("httpsCallable(functions, \"getAccountStatus\")") &&
     auth_js.include?("httpsCallable(functions, isReferral ? \"redeemReferralCode\" : \"redeemPromoCode\")") &&
+    auth_js.include?("function saveSpaceUserNameProfile()") &&
     auth_js.include?("function renderAccountStatus(status = activeAccountStatus)") &&
+    styles.include?(".user-menu-button") &&
     styles.include?(".account-settings-panel") &&
     styles.include?(".promo-row")
 end
@@ -181,7 +194,7 @@ assert("dashboard brand copy should describe the game instead of Firebase infras
     !index.include?(%(<p class="eyebrow">Firebase dashboard</p>))
 end
 
-assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo mode") do
+assert("dashboard JavaScript should support Auth, Firestore, Functions, and empty cloud state") do
   %w[
     getAuth
     GoogleAuthProvider
@@ -194,7 +207,6 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and demo
     getFunctions
     httpsCallable
     connectFunctionsEmulator
-    DEMO_DASHBOARD
     EMPTY_CLOUD_DASHBOARD
     MCP Miner Firebase config is missing
     Device limit reached
@@ -367,13 +379,14 @@ assert("disabled dashboard buttons should use explicit readable colors instead o
     !styles.include?("opacity: 0.55")
 end
 
-assert("dashboard should support a persistent accessible theme toggle") do
-  index.include?(%(id="theme-toggle")) &&
+assert("dashboard should support persistent theme preferences without a nav toggle") do
+  !index.include?(%(id="theme-toggle")) &&
     index.include?(%(<script src="/theme.js"></script>)) &&
     read("firebase/hosting/theme.js").include?(%(localStorage.getItem("mcp-miner-theme"))) &&
     auth_js.include?("const THEME_STORAGE_KEY = \"mcp-miner-theme\"") &&
     auth_js.include?("function applyTheme(theme)") &&
-    auth_js.include?("themeToggle.setAttribute(\"aria-pressed\"") &&
+    auth_js.include?("if (themeToggle && themeToggleLabel)") &&
+    auth_js.include?("themeToggle?.addEventListener(\"click\"") &&
     styles.include?(":root[data-theme=\"dark\"]") &&
     styles.include?("--button-secondary-bg")
 end
@@ -420,7 +433,7 @@ end
 assert("privacy metadata should render as player-readable text") do
   auth_js.include?("[\"Data class\", \"Abstract progress only\"]") &&
     auth_js.include?("[\"Private details\", \"Not collected\"]") &&
-    auth_js.include?("[\"Owner scope\", currentUser ? \"Private profile boundary\" : \"Local demo\"]") &&
+    auth_js.include?("[\"Owner scope\", currentUser ? \"Private profile boundary\" : \"Signed out\"]") &&
     !auth_js.include?("[\"Data class\", \"abstract\"]") &&
     !auth_js.include?("[\"Private details\", \"not fetched\"]") &&
     !auth_js.include?("Firebase UID boundary")
@@ -438,13 +451,15 @@ end
 assert("auth buttons should reflect signed-in and signed-out states") do
   auth_js.include?("function updateAuthControls(user)") &&
     index.include?(%(id="google-sign-in")) &&
-    index.include?(%(id="topbar-sign-out")) &&
+    index.include?(%(id="user-menu-wrapper")) &&
+    index.include?(%(id="user-menu-logout")) &&
+    !index.include?(%(id="topbar-sign-out")) &&
+    !index.include?(%(id="sign-out")) &&
     auth_js.include?("googleSignInButton.disabled = signedIn") &&
     auth_js.include?("signInButton.disabled = signedIn") &&
     auth_js.include?("createAccount.disabled = signedIn") &&
-    auth_js.include?("signOutButton.disabled = !signedIn") &&
-    auth_js.include?("topbarSignOutButton.hidden = !signedIn") &&
-    auth_js.include?("topbarSignOutButton.disabled = !signedIn")
+    auth_js.include?("userMenuWrapper.hidden = !signedIn") &&
+    auth_js.include?("handleAuth(() => signOutCurrentUser())")
 end
 
 assert("password auth should require email verification before cloud sync and device linking") do
@@ -460,7 +475,7 @@ assert("password auth should require email verification before cloud sync and de
     auth_js.include?("await currentUser.getIdToken(true)")
 end
 
-assert("link URLs should promote device linking above the demo dashboard") do
+assert("link URLs should promote device linking above the dashboard") do
   index.index(%(data-panel="device-link")) < index.index(%(data-panel="auth")) &&
     auth_js.include?("const pendingLink = {") &&
     auth_js.include?("const LINK_SESSION_ID_PATTERN = /^link_[A-Za-z0-9_-]{20,80}$/;") &&
@@ -542,8 +557,9 @@ end
 
 assert("store controls should not render active signed-in purchases without a purchase API") do
   auth_js.include?("state === \"affordable\" && !currentUser") &&
-    auth_js.include?("applyDemoStorePurchase") &&
-    auth_js.include?("purchased with earned Space Bucks")
+    auth_js.include?("Sign in and sync progress before using the store.") &&
+    !auth_js.include?("applyDemoStorePurchase") &&
+    !auth_js.include?("purchased with earned Space Bucks")
 end
 
 assert("store action labels should distinguish disabled states from active buys") do
@@ -571,8 +587,8 @@ assert("store cost labels should show material quantities and names") do
 end
 
 assert("signed-out dashboard refresh should replace stale action messages") do
-  auth_js.include?("Demo preview refreshed.") &&
-    auth_js.include?("purchased with earned Space Bucks.")
+  auth_js.include?("Sign in to view your cloud profile.") &&
+    auth_js.include?("No account loaded")
 end
 
 assert("signed-in dashboard refresh should warn when cloud reads are partial") do
