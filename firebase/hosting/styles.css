@@ -883,18 +883,24 @@ body {
 
 .portal-onboarding-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
 .portal-step-card {
   display: grid;
-  gap: 10px;
+  align-content: start;
+  gap: 8px;
   min-width: 0;
   border: 1px solid rgba(72, 209, 154, 0.2);
   border-radius: 8px;
-  padding: 14px;
+  padding: 12px;
   background: rgba(14, 28, 43, 0.78);
+}
+
+.portal-step-card .step-number {
+  width: 38px;
+  height: 38px;
 }
 
 .portal-step-card h3,
@@ -904,6 +910,7 @@ body {
 
 .portal-step-card p {
   color: var(--muted);
+  font-size: 0.9rem;
   line-height: 1.48;
 }
 
@@ -921,9 +928,105 @@ body {
   color: var(--accent-strong);
 }
 
+.portal-onboarding .portal-os-selector {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 4px;
+}
+
+.portal-onboarding .os-option {
+  min-height: 34px;
+}
+
 .portal-install-card .copy-code,
 .portal-link-card .copy-code {
-  max-height: 154px;
+  max-height: 90px;
+}
+
+.dashboard-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  border: 1px solid rgba(72, 209, 154, 0.22);
+  border-radius: 8px;
+  padding: 8px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(14, 28, 43, 0.72) 0%, rgba(16, 28, 26, 0.72) 100%);
+  background-size: 100% 4px, auto;
+}
+
+.dashboard-tab {
+  flex: 1 1 118px;
+  min-height: 38px;
+  border-color: var(--line);
+  background: var(--button-secondary-bg);
+  color: var(--muted);
+}
+
+.dashboard-tab[aria-selected="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--button-ink);
+}
+
+.account-settings-panel,
+.account-card,
+.redeem-form,
+.promo-redemptions {
+  display: grid;
+  gap: 12px;
+}
+
+.account-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--panel-soft);
+}
+
+.account-card-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.account-card-heading h3,
+.account-card-heading p {
+  margin: 0;
+}
+
+.account-card-heading p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.copy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.copy-row button {
+  min-width: 82px;
+}
+
+.promo-row {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--panel-raised);
+}
+
+.promo-row span {
+  color: var(--muted);
+  font-size: 0.84rem;
 }
 
 .dashboard-shell {
@@ -1032,6 +1135,11 @@ body[data-link-mode="pending"] .workspace-grid {
 body[data-link-mode="pending"] .link-panel {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent), 0 12px 34px var(--shadow);
+}
+
+body[data-link-mode="pending"] .portal-onboarding,
+body[data-referral-mode="pending"] .portal-onboarding {
+  display: none;
 }
 
 .side-rail,
@@ -1924,6 +2032,7 @@ dd {
 
   .topbar,
   .workspace-grid,
+  body[data-link-mode="pending"] .workspace-grid,
   .mode-strip,
   .scan-row {
     grid-template-columns: 1fr;

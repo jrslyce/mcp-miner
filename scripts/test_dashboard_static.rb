@@ -38,7 +38,7 @@ asteroid_ids = %w[
   asteroid_diamond_class_body
 ]
 
-required_panels = %w[auth billing device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
+required_panels = %w[auth account-settings billing device-link linked-devices sync-privacy status analytics weekly-digest cosmetics asteroid asteroid-atlas inventory orders upgrades store reports raw-sync base]
 assert("landing page should explain MCP Miner before the dashboard") do
   landing.include?(%(<main id="home" class="landing-shell">)) &&
     landing.include?("Turn Your Work Into an Asteroid-Mining Adventure") &&
@@ -75,7 +75,8 @@ assert("landing page should document gameplay, install, privacy, and account lin
     landing.include?("data-os-target=\"mac-silicon\"") &&
     landing_js.include?("function selectOsPrompt(os)") &&
     landing_js.include?("function redirectLinkSessionToPortal()") &&
-    landing_js.include?("new URL(\"/portal.html\", window.location.origin)") &&
+    landing.include?(%(href="/portal")) &&
+    landing_js.include?("new URL(\"/link\", window.location.origin)") &&
     landing_js.include?("window.location.replace(nextUrl.toString())")
 end
 
@@ -102,6 +103,9 @@ end
 
 assert("portal should include onboarding steps before the stats dashboard") do
   portal.include?(%(class="portal-onboarding")) &&
+    portal.include?(%(class="dashboard-tabs")) &&
+    portal.include?(%(data-dashboard-tab="overview")) &&
+    portal.include?(%(data-dashboard-tab="account")) &&
     portal.include?(%(id="company-name")) &&
     portal.include?(%(id="claimed-asteroid-name")) &&
     portal.include?(%(id="portal-install-prompt")) &&
@@ -109,8 +113,26 @@ assert("portal should include onboarding steps before the stats dashboard") do
     auth_js.include?("const COMPANY_STORAGE_KEY = \"mcp-miner-company-name\"") &&
     auth_js.include?("function asteroidClaimName(asteroid)") &&
     auth_js.include?("function setupPortalInstallSelector()") &&
+    auth_js.include?("function setupDashboardTabs()") &&
+    auth_js.include?("function setDashboardTab(tab)") &&
     styles.include?(".portal-onboarding-grid") &&
+    styles.include?(".dashboard-tabs") &&
     styles.include?("@keyframes asteroid-card-sheen")
+end
+
+assert("portal should expose referral crew and promo code account settings") do
+  portal.include?(%(data-panel="account-settings")) &&
+    portal.include?(%(id="referral-code")) &&
+    portal.include?(%(id="referral-link")) &&
+    portal.include?(%(id="referral-redeem-form")) &&
+    portal.include?(%(id="promo-code-form")) &&
+    portal.include?("Referral Crew") &&
+    portal.include?("Promo Code") &&
+    auth_js.include?("httpsCallable(functions, \"getAccountStatus\")") &&
+    auth_js.include?("httpsCallable(functions, isReferral ? \"redeemReferralCode\" : \"redeemPromoCode\")") &&
+    auth_js.include?("function renderAccountStatus(status = activeAccountStatus)") &&
+    styles.include?(".account-settings-panel") &&
+    styles.include?(".promo-row")
 end
 
 assert("dashboard should expose concrete status, inventory, order, upgrade, report, sync, and base targets") do

@@ -100,7 +100,7 @@ function sanitizeDashboardUrl(value, configured = DEFAULT_DASHBOARD_URL) {
 
 function linkDashboardUrl(dashboardUrl) {
   const parsed = new URL(dashboardUrl);
-  parsed.pathname = "/portal.html";
+  parsed.pathname = "/link";
   parsed.search = "";
   parsed.hash = "";
   return parsed.toString().replace(/\/$/, "");

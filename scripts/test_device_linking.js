@@ -34,7 +34,7 @@ const { session, deviceSecret, linkUrl } = newLinkSession({
 check("link session should create a short code, URL, and private device secret", () => {
   return /^link_/.test(session.sessionId) &&
     /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(session.code) &&
-    linkUrl.startsWith("https://mcp-miner.web.app/portal.html?") &&
+    linkUrl.startsWith("https://mcp-miner.web.app/link?") &&
     linkUrl.includes("linkCode=") &&
     linkUrl.includes("sessionId=") &&
     typeof deviceSecret === "string" &&
@@ -42,8 +42,8 @@ check("link session should create a short code, URL, and private device secret",
 });
 
 check("account links should target the portal route", () => {
-  return linkDashboardUrl("https://mcpminer.net") === "https://mcpminer.net/portal.html" &&
-    linkDashboardUrl("http://127.0.0.1:5000") === "http://127.0.0.1:5000/portal.html";
+  return linkDashboardUrl("https://mcpminer.net") === "https://mcpminer.net/link" &&
+    linkDashboardUrl("http://127.0.0.1:5000") === "http://127.0.0.1:5000/link";
 });
 
 check("server-side link session should store only the device secret hash", () => {

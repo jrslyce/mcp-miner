@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("crypto");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
@@ -217,6 +218,135 @@ function requireSignedInOwner(request, action) {
   }
   requireVerifiedFirebaseAuth(request);
   return request.auth.uid;
+}
+
+const REFERRAL_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const REFERRAL_CODE_PATTERN = /^[A-Z2-9]{4}-[A-Z2-9]{4}$/;
+const PROMO_CODE_PATTERN = /^[A-Z0-9_-]{3,24}$/;
+const ACCOUNT_DASHBOARD_URL = "https://mcpminer.net";
+const PROMO_CATALOG = {
+  LAUNCHCREW: {
+    code: "LAUNCHCREW",
+    displayName: "Launch Crew",
+    description: "Founding portal promo recorded for this account.",
+    rewardLabel: "Launch crew badge queue"
+  },
+  ASTEROID25: {
+    code: "ASTEROID25",
+    displayName: "Asteroid 25",
+    description: "Early asteroid operations promo recorded for this account.",
+    rewardLabel: "Starter supply queue"
+  }
+};
+
+function shortHash(value, length = 8) {
+  const digest = crypto.createHash("sha256").update(String(value)).digest();
+  return Array.from(digest)
+    .slice(0, length)
+    .map((byte) => REFERRAL_CODE_ALPHABET[byte % REFERRAL_CODE_ALPHABET.length])
+    .join("");
+}
+
+function generatedReferralCode(uid) {
+  const raw = shortHash(`mcp-miner-referral:${uid}`, 8);
+  return `${raw.slice(0, 4)}-${raw.slice(4)}`;
+}
+
+function cleanReferralCode(value) {
+  const compact = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const formatted = compact.length === 8 ? `${compact.slice(0, 4)}-${compact.slice(4)}` : compact;
+  if (!REFERRAL_CODE_PATTERN.test(formatted)) {
+    throw new HttpsError("invalid-argument", "Enter a valid MCP Miner referral code.");
+  }
+  return formatted;
+}
+
+function cleanPromoCode(value) {
+  const code = String(value || "").toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 24);
+  if (!PROMO_CODE_PATTERN.test(code)) {
+    throw new HttpsError("invalid-argument", "Enter a valid promo code.");
+  }
+  return code;
+}
+
+async function ensureReferralCode(uid, now = new Date().toISOString()) {
+  const referralRef = db.doc(`players/${uid}/referral/current`);
+  const code = generatedReferralCode(uid);
+  const codeRef = db.doc(`referralCodes/${code}`);
+  await db.runTransaction(async (transaction) => {
+    const [referralSnap, codeSnap] = await Promise.all([
+      transaction.get(referralRef),
+      transaction.get(codeRef)
+    ]);
+    const referral = referralSnap.exists ? referralSnap.data() : {};
+    if (referral.code && referral.code !== code) {
+      return;
+    }
+    if (codeSnap.exists && codeSnap.data().ownerUid && codeSnap.data().ownerUid !== uid) {
+      throw new HttpsError("already-exists", "Referral code collision. Try again shortly.");
+    }
+    transaction.set(referralRef, {
+      ownerUid: uid,
+      schemaVersion: 1,
+      privacyClass: "abstract",
+      code,
+      crewSize: referral.crewSize || 0,
+      recruitedCount: referral.recruitedCount || 0,
+      rewardLabel: "Crew recruitment bonuses",
+      createdAt: referral.createdAt || now,
+      updatedAt: now
+    }, { merge: true });
+    transaction.set(codeRef, {
+      ownerUid: uid,
+      schemaVersion: 1,
+      privacyClass: "abstract",
+      code,
+      createdAt: codeSnap.exists && codeSnap.data().createdAt ? codeSnap.data().createdAt : now,
+      updatedAt: now
+    }, { merge: true });
+  });
+  return code;
+}
+
+async function publicAccountStatus(uid, now = new Date().toISOString()) {
+  const code = await ensureReferralCode(uid, now);
+  const [referralSnap, recruitsSnap, promoSnap] = await Promise.all([
+    db.doc(`players/${uid}/referral/current`).get(),
+    db.collection(`players/${uid}/referralRecruits`).limit(50).get(),
+    db.collection(`players/${uid}/promoRedemptions`).orderBy("redeemedAt", "desc").limit(8).get()
+  ]);
+  const referral = referralSnap.exists ? referralSnap.data() : {};
+  const recruits = recruitsSnap.docs.map((docSnap) => {
+    const data = docSnap.data() || {};
+    return {
+      recruitId: docSnap.id,
+      joinedAt: data.joinedAt || null,
+      rewardLabel: data.rewardLabel || "Crew recruit bonus"
+    };
+  });
+  const promos = promoSnap.docs.map((docSnap) => {
+    const data = docSnap.data() || {};
+    return {
+      code: data.code || docSnap.id,
+      displayName: data.displayName || data.code || docSnap.id,
+      rewardLabel: data.rewardLabel || "Promo recorded",
+      redeemedAt: data.redeemedAt || null
+    };
+  });
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    referral: {
+      code,
+      inviteUrl: `${ACCOUNT_DASHBOARD_URL}/portal?ref=${encodeURIComponent(code)}`,
+      crewSize: Number(referral.crewSize || recruits.length || 0),
+      recruitedCount: Number(referral.recruitedCount || recruits.length || 0),
+      referredByCode: referral.referredByCode || null,
+      rewardLabel: referral.rewardLabel || "Crew recruitment bonuses",
+      recruits
+    },
+    promos
+  };
 }
 
 function cleanDeviceId(value) {
@@ -968,6 +1098,148 @@ exports.applyCosmeticSelection = onCall({ region: "us-central1" }, async (reques
     entitlement: publicEntitlement(result.entitlement),
     cosmetics: result.cosmetics
   };
+});
+
+exports.getAccountStatus = onCall({ region: "us-central1" }, async (request) => {
+  const uid = requireSignedInOwner(request, "loading account settings");
+  const now = new Date().toISOString();
+  return publicAccountStatus(uid, now);
+});
+
+exports.redeemReferralCode = onCall({ region: "us-central1" }, async (request) => {
+  const uid = requireSignedInOwner(request, "redeeming a referral code");
+  const code = cleanReferralCode(request.data && request.data.code);
+  const now = new Date().toISOString();
+  const ownCode = await ensureReferralCode(uid, now);
+  if (code === ownCode) {
+    throw new HttpsError("failed-precondition", "You cannot redeem your own referral code.");
+  }
+
+  const codeRef = db.doc(`referralCodes/${code}`);
+  const inviteeRef = db.doc(`players/${uid}/referral/current`);
+  const result = await db.runTransaction(async (transaction) => {
+    const [codeSnap, inviteeSnap] = await Promise.all([
+      transaction.get(codeRef),
+      transaction.get(inviteeRef)
+    ]);
+    if (!codeSnap.exists || !codeSnap.data().ownerUid) {
+      throw new HttpsError("not-found", "Referral code was not found.");
+    }
+    const inviterUid = codeSnap.data().ownerUid;
+    if (inviterUid === uid) {
+      throw new HttpsError("failed-precondition", "You cannot redeem your own referral code.");
+    }
+    const invitee = inviteeSnap.exists ? inviteeSnap.data() : {};
+    if (invitee.referredByUid) {
+      throw new HttpsError("already-exists", "This account already joined a referral crew.");
+    }
+    const inviterRef = db.doc(`players/${inviterUid}/referral/current`);
+    const recruitRef = db.doc(`players/${inviterUid}/referralRecruits/${uid}`);
+    const rewardInviteeRef = db.doc(`players/${uid}/accountRewards/referral_join`);
+    const rewardInviterRef = db.doc(`players/${inviterUid}/accountRewards/referral_${uid}`);
+    transaction.set(inviteeRef, {
+      ownerUid: uid,
+      schemaVersion: 1,
+      privacyClass: "abstract",
+      code: invitee.code || ownCode,
+      referredByUid: inviterUid,
+      referredByCode: code,
+      rewardLabel: "Crew join bonus",
+      updatedAt: now,
+      createdAt: invitee.createdAt || now
+    }, { merge: true });
+    transaction.set(inviterRef, {
+      ownerUid: inviterUid,
+      schemaVersion: 1,
+      privacyClass: "abstract",
+      code,
+      recruitedCount: FieldValue.increment(1),
+      crewSize: FieldValue.increment(1),
+      rewardLabel: "Crew recruitment bonuses",
+      updatedAt: now
+    }, { merge: true });
+    transaction.set(recruitRef, {
+      ownerUid: inviterUid,
+      recruitUid: uid,
+      schemaVersion: 1,
+      privacyClass: "abstract",
+      joinedAt: now,
+      referralCode: code,
+      rewardLabel: "Crew recruit bonus"
+    }, { merge: false });
+    transaction.set(rewardInviteeRef, {
+      ownerUid: uid,
+      schemaVersion: 1,
+      privacyClass: "abstract",
+      source: "referral",
+      rewardLabel: "Crew join bonus",
+      status: "recorded",
+      createdAt: now
+    }, { merge: true });
+    transaction.set(rewardInviterRef, {
+      ownerUid: inviterUid,
+      schemaVersion: 1,
+      privacyClass: "abstract",
+      source: "referral",
+      rewardLabel: "Crew recruit bonus",
+      status: "recorded",
+      createdAt: now
+    }, { merge: true });
+    return { inviterUid };
+  });
+
+  logger.info("mcp_miner_referral_redeemed", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    inviterUidPresent: Boolean(result.inviterUid)
+  });
+
+  return publicAccountStatus(uid, now);
+});
+
+exports.redeemPromoCode = onCall({ region: "us-central1" }, async (request) => {
+  const uid = requireSignedInOwner(request, "redeeming a promo code");
+  const code = cleanPromoCode(request.data && request.data.code);
+  const promo = PROMO_CATALOG[code];
+  if (!promo) {
+    throw new HttpsError("not-found", "Promo code was not found.");
+  }
+  const now = new Date().toISOString();
+  const redemptionRef = db.doc(`players/${uid}/promoRedemptions/${code}`);
+  await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(redemptionRef);
+    if (snap.exists) {
+      throw new HttpsError("already-exists", "Promo code already redeemed for this account.");
+    }
+    transaction.set(redemptionRef, {
+      ownerUid: uid,
+      schemaVersion: 1,
+      privacyClass: "abstract",
+      code: promo.code,
+      displayName: promo.displayName,
+      description: promo.description,
+      rewardLabel: promo.rewardLabel,
+      redeemedAt: now
+    }, { merge: false });
+    transaction.set(db.doc(`players/${uid}/accountRewards/promo_${code}`), {
+      ownerUid: uid,
+      schemaVersion: 1,
+      privacyClass: "abstract",
+      source: "promo",
+      promoCode: promo.code,
+      rewardLabel: promo.rewardLabel,
+      status: "recorded",
+      createdAt: now
+    }, { merge: true });
+  });
+
+  logger.info("mcp_miner_promo_redeemed", {
+    privacyClass: "abstract",
+    uidPresent: true,
+    promoCode: code
+  });
+
+  return publicAccountStatus(uid, now);
 });
 
 exports.exportDashboardHistory = onCall({ region: "us-central1" }, async (request) => {

@@ -5,7 +5,7 @@ function redirectLinkSessionToPortal() {
   if (!params.has("linkCode") && !params.has("code") && !params.has("sessionId")) {
     return false;
   }
-  const nextUrl = new URL("/portal.html", window.location.origin);
+  const nextUrl = new URL("/link", window.location.origin);
   nextUrl.search = window.location.search;
   nextUrl.hash = window.location.hash;
   window.location.replace(nextUrl.toString());

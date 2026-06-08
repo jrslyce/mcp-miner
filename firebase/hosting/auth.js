@@ -737,11 +737,27 @@ const linkedDevicesList = document.querySelector("#linked-devices-list");
 const companyNameInput = document.querySelector("#company-name");
 const claimedAsteroidName = document.querySelector("#claimed-asteroid-name");
 const portalInstallPrompt = document.querySelector("#portal-install-prompt");
+const dashboardTabButtons = Array.from(document.querySelectorAll(".dashboard-tab[data-dashboard-tab]"));
+const dashboardGroupedPanels = Array.from(document.querySelectorAll("[data-dashboard-group]"));
+const accountStatus = document.querySelector("#account-status");
+const referralCodeInput = document.querySelector("#referral-code");
+const referralLinkInput = document.querySelector("#referral-link");
+const referralCrewSize = document.querySelector("#referral-crew-size");
+const referralRedeemForm = document.querySelector("#referral-redeem-form");
+const referralRedeemCode = document.querySelector("#referral-redeem-code");
+const redeemReferralButton = document.querySelector("#redeem-referral");
+const referralStatus = document.querySelector("#referral-status");
+const promoCodeForm = document.querySelector("#promo-code-form");
+const promoCodeInput = document.querySelector("#promo-code");
+const redeemPromoButton = document.querySelector("#redeem-promo");
+const promoRedemptions = document.querySelector("#promo-redemptions");
+const promoStatus = document.querySelector("#promo-status");
 const linkParams = new URLSearchParams(window.location.search);
 const pendingLink = {
   sessionId: normalizeLinkSessionId(linkParams.get("sessionId")),
   code: normalizeLinkCodeParam(linkParams.get("linkCode") || linkParams.get("code"))
 };
+const pendingReferralCode = normalizeReferralCodeParam(linkParams.get("ref") || linkParams.get("referral"));
 const COMPANY_STORAGE_KEY = "mcp-miner-company-name";
 const PORTAL_INSTALL_PROMPTS = {
   "mac-silicon": "Install MCP Miner on this Apple Silicon Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.",
@@ -752,6 +768,8 @@ const PORTAL_INSTALL_PROMPTS = {
 
 let currentUser = null;
 let activeDashboard = cloneDemo();
+let activeAccountStatus = null;
+let activeDashboardTab = "overview";
 let activeCosmeticPreview = null;
 let activeAsteroidVisual = ASTEROID_CLASSES[0];
 let activeAsteroidProgress = 0;
@@ -886,6 +904,38 @@ function setupPortalInstallSelector() {
     });
   });
   selectPortalInstallPrompt(guessedPortalOs());
+}
+
+function validDashboardTab(tab) {
+  return ["overview", "orders", "inventory", "upgrades", "devices", "account", "advanced"].includes(tab)
+    ? tab
+    : "overview";
+}
+
+function setDashboardTab(tab) {
+  activeDashboardTab = validDashboardTab(tab);
+  document.body.dataset.dashboardTab = activeDashboardTab;
+  dashboardTabButtons.forEach((button) => {
+    const selected = button.dataset.dashboardTab === activeDashboardTab;
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+  });
+  dashboardGroupedPanels.forEach((panel) => {
+    const group = panel.dataset.dashboardGroup || "overview";
+    if (panel.dataset.panel === "device-link" && hasPendingLink()) {
+      panel.hidden = false;
+      return;
+    }
+    panel.hidden = group !== activeDashboardTab;
+  });
+}
+
+function setupDashboardTabs() {
+  dashboardTabButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setDashboardTab(button.dataset.dashboardTab);
+    });
+  });
+  setDashboardTab(activeDashboardTab);
 }
 
 function cloneDemo(overrides = {}) {
@@ -1201,6 +1251,88 @@ function renderLinkedDevices(devices = [], rawEntitlement = FREE_ENTITLEMENT) {
   }).join("");
 }
 
+function emptyAccountStatus() {
+  return {
+    referral: {
+      code: "Sign in",
+      inviteUrl: "Sign in",
+      crewSize: 0,
+      recruitedCount: 0,
+      referredByCode: null,
+      rewardLabel: "Crew recruitment bonuses",
+      recruits: []
+    },
+    promos: []
+  };
+}
+
+function renderAccountStatus(status = activeAccountStatus) {
+  const account = status || emptyAccountStatus();
+  const referral = account.referral || emptyAccountStatus().referral;
+  const signedIn = Boolean(currentUser);
+  accountStatus.textContent = signedIn ? "Ready" : "Sign in";
+  referralCodeInput.value = signedIn ? referral.code || "" : "Sign in";
+  referralLinkInput.value = signedIn ? referral.inviteUrl || "" : "Sign in";
+  referralCrewSize.textContent = `${formatNumber(referral.crewSize || referral.recruitedCount || 0)} crew`;
+  referralRedeemCode.disabled = !signedIn;
+  redeemReferralButton.disabled = !signedIn;
+  promoCodeInput.disabled = !signedIn;
+  redeemPromoButton.disabled = !signedIn;
+
+  const referred = referral.referredByCode ? ` Joined through ${referral.referredByCode}.` : "";
+  referralStatus.textContent = signedIn
+    ? `Share your code to recruit crew members.${referred}`
+    : "Sign in to create your referral crew.";
+  referralStatus.dataset.tone = signedIn ? "success" : "";
+
+  const promos = Array.isArray(account.promos) ? account.promos : [];
+  promoRedemptions.innerHTML = promos.length
+    ? promos.map((promo) => `
+      <div class="promo-row">
+        <strong>${escapeHtml(promo.displayName || promo.code)}</strong>
+        <span>${escapeHtml(promo.rewardLabel || "Promo recorded")}</span>
+      </div>
+    `).join("")
+    : "<p class=\"empty-state\">No promo codes redeemed yet.</p>";
+}
+
+async function redeemAccountCode(kind, code) {
+  if (!currentUser) {
+    setMessage("Sign in before redeeming account codes.", true);
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setMessage(EMAIL_VERIFICATION_REQUIRED, true);
+    return;
+  }
+  const isReferral = kind === "referral";
+  const button = isReferral ? redeemReferralButton : redeemPromoButton;
+  const status = isReferral ? referralStatus : promoStatus;
+  button.disabled = true;
+  status.textContent = isReferral ? "Joining crew." : "Applying promo code.";
+  status.dataset.tone = "";
+  try {
+    const callable = httpsCallable(functions, isReferral ? "redeemReferralCode" : "redeemPromoCode");
+    const result = await callable({ code });
+    activeAccountStatus = result && result.data ? result.data : activeAccountStatus;
+    renderAccountStatus(activeAccountStatus);
+    if (isReferral) {
+      referralRedeemCode.value = "";
+      referralStatus.textContent = "Referral crew joined.";
+      referralStatus.dataset.tone = "success";
+    } else {
+      promoCodeInput.value = "";
+      promoStatus.textContent = "Promo code applied.";
+      promoStatus.dataset.tone = "success";
+    }
+  } catch (error) {
+    status.textContent = error.message || "Code redemption failed.";
+    status.dataset.tone = "error";
+  } finally {
+    button.disabled = !currentUser;
+  }
+}
+
 function nextEligibleFromMetadata(syncMetadata, cadenceSeconds) {
   const lastAccepted = syncMetadata && (syncMetadata.lastAcceptedBatchAt || syncMetadata.last_accepted_batch_at);
   const lastMillis = Date.parse(lastAccepted || "");
@@ -1273,6 +1405,7 @@ function hasPendingLink() {
 
 function setLinkMode() {
   document.body.dataset.linkMode = hasPendingLink() ? "pending" : "dashboard";
+  document.body.dataset.referralMode = pendingReferralCode ? "pending" : "none";
 }
 
 function linkModeLabel(user) {
@@ -1555,6 +1688,12 @@ function normalizeLinkSessionId(value) {
 function normalizeLinkCodeParam(value) {
   const code = String(value || "").trim().toUpperCase();
   return LINK_CODE_PATTERN.test(code) ? code : "";
+}
+
+function normalizeReferralCodeParam(value) {
+  const compact = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const code = compact.length === 8 ? `${compact.slice(0, 4)}-${compact.slice(4)}` : compact;
+  return /^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code) ? code : "";
 }
 
 function sanitizeCssColor(value, fallback = "#66766d") {
@@ -1985,6 +2124,7 @@ async function loadDashboardForUser(user) {
   const getDashboardAnalytics = httpsCallable(functions, "getDashboardAnalytics");
   const getWeeklyDigest = httpsCallable(functions, "getWeeklyDigest");
   const getCosmeticCatalog = httpsCallable(functions, "getCosmeticCatalog");
+  const getAccountStatus = httpsCallable(functions, "getAccountStatus");
   const reads = await Promise.allSettled([
     getDoc(doc(db, "players", user.uid)),
     getDoc(doc(db, "players", user.uid, "profile", "current")),
@@ -2000,7 +2140,8 @@ async function loadDashboardForUser(user) {
     getSyncState({}),
     getDashboardAnalytics({}),
     getWeeklyDigest({}),
-    getCosmeticCatalog({})
+    getCosmeticCatalog({}),
+    getAccountStatus({})
   ]);
 
   const player = docsData(reads, 0) || {};
@@ -2014,6 +2155,7 @@ async function loadDashboardForUser(user) {
   const analytics = reads[12] && reads[12].status === "fulfilled" ? reads[12].value.data : null;
   const weeklyDigest = reads[13] && reads[13].status === "fulfilled" ? reads[13].value.data.weeklyDigest : null;
   const cosmetics = reads[14] && reads[14].status === "fulfilled" ? reads[14].value.data.cosmetics : null;
+  const account = reads[15] && reads[15].status === "fulfilled" ? reads[15].value.data : null;
   const cloudState = callable.state || directState;
   const syncMetadata = callable.syncMetadata || directSync;
   const inventory = normalizeInventoryRows(queryResult(reads, 7) || { forEach() {} }, cloudState);
@@ -2060,6 +2202,7 @@ async function loadDashboardForUser(user) {
   fallback.analytics = analytics || fallback.analytics;
   fallback.weeklyDigest = weeklyDigest || fallback.weeklyDigest;
   fallback.cosmetics = cosmetics || fallback.cosmetics;
+  fallback.accountStatus = account || emptyAccountStatus();
   return fallback;
 }
 
@@ -2118,6 +2261,8 @@ function renderDashboard(data) {
   renderPrivacy(data);
   renderBilling(data.entitlement);
   renderLinkedDevices(data.syncDevices || [], data.entitlement);
+  renderAccountStatus(data.accountStatus || emptyAccountStatus());
+  setDashboardTab(activeDashboardTab);
 }
 
 function renderAsteroidArt(asteroid, progress) {
@@ -2865,6 +3010,27 @@ function setupPromptCopyButtons() {
   });
 }
 
+function setupInputCopyButtons() {
+  document.querySelectorAll("[data-copy-input]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const target = document.getElementById(button.dataset.copyInput);
+      if (!target) {
+        return;
+      }
+      const original = button.textContent;
+      try {
+        await copyTextToClipboard(target.value.trim());
+        button.textContent = "Copied";
+      } catch (_) {
+        button.textContent = "Copy failed";
+      }
+      window.setTimeout(() => {
+        button.textContent = original;
+      }, 1800);
+    });
+  });
+}
+
 async function updatePortalPreference(field, value) {
   if (!currentUser) {
     setMessage("Sign in before updating portal preferences.", true);
@@ -2981,6 +3147,16 @@ betaFeaturesEnabled.addEventListener("change", () => {
   updatePortalPreference("betaFeaturesEnabled", betaFeaturesEnabled.checked);
 });
 
+referralRedeemForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  redeemAccountCode("referral", referralRedeemCode.value);
+});
+
+promoCodeForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  redeemAccountCode("promo", promoCodeInput.value);
+});
+
 planCards.addEventListener("click", (event) => {
   const button = event.target.closest(".plan-action");
   if (!button || button.disabled) {
@@ -3043,6 +3219,8 @@ onAuthStateChanged(auth, async (user) => {
     }
     password.value = "";
     setMessage("");
+    activeAccountStatus = emptyAccountStatus();
+    renderAccountStatus(activeAccountStatus);
     renderDashboard(cloneDemo());
     return;
   }
@@ -3058,6 +3236,8 @@ onAuthStateChanged(auth, async (user) => {
     profileStatus.textContent = "Verification required";
     renderDeviceLink(user);
     renderDashboard(verificationDashboard());
+    activeAccountStatus = emptyAccountStatus();
+    renderAccountStatus(activeAccountStatus);
     const verificationJustSent = Date.now() - verificationEmailSentAt < 5000;
     setMessage(verificationJustSent ? EMAIL_VERIFICATION_SENT : EMAIL_VERIFICATION_REQUIRED, !verificationJustSent);
     return;
@@ -3084,9 +3264,18 @@ onAuthStateChanged(auth, async (user) => {
 
 applyTheme(preferredTheme());
 setLinkMode();
+setupDashboardTabs();
 setupPromptCopyButtons();
+setupInputCopyButtons();
 setupCompanyClaim();
 setupPortalInstallSelector();
+if (pendingReferralCode) {
+  referralRedeemCode.value = pendingReferralCode;
+  setDashboardTab("account");
+}
+if (hasPendingLink()) {
+  setDashboardTab("devices");
+}
 renderDeviceLink(currentUser);
 renderDashboard(cloneDemo());
 loadPlanCatalog();
