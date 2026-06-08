@@ -613,10 +613,9 @@ const spaceUserName = document.querySelector("#space-user-name");
 const saveSpaceUserName = document.querySelector("#save-space-user-name");
 const spaceNameStatus = document.querySelector("#space-name-status");
 const linkParams = new URLSearchParams(window.location.search);
-const pendingLink = {
-  sessionId: normalizeLinkSessionId(linkParams.get("sessionId")),
-  code: normalizeLinkCodeParam(linkParams.get("linkCode") || linkParams.get("code"))
-};
+const LINK_SESSION_STORAGE_KEY = "mcp-miner-pending-link";
+const LINK_SESSION_STORAGE_TTL_MS = 15 * 60 * 1000;
+const pendingLink = pendingLinkFromLocation();
 const pendingReferralCode = normalizeReferralCodeParam(linkParams.get("ref") || linkParams.get("referral"));
 const pendingLogin = linkParams.has("login") || window.location.hash === "#login" || window.location.hash === "#account";
 const COMPANY_STORAGE_KEY = "mcp-miner-company-name";
@@ -858,6 +857,64 @@ function setupLoginReferralCode() {
   });
 }
 
+function storedPendingLink() {
+  try {
+    const raw = sessionStorage.getItem(LINK_SESSION_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    const storedAt = Number(parsed.storedAt || 0);
+    if (!storedAt || Date.now() - storedAt > LINK_SESSION_STORAGE_TTL_MS) {
+      sessionStorage.removeItem(LINK_SESSION_STORAGE_KEY);
+      return null;
+    }
+    const sessionId = normalizeLinkSessionId(parsed.sessionId);
+    const code = normalizeLinkCodeParam(parsed.code);
+    return sessionId || code ? { sessionId, code } : null;
+  } catch (_) {
+    sessionStorage.removeItem(LINK_SESSION_STORAGE_KEY);
+    return null;
+  }
+}
+
+function rememberPendingLink(link) {
+  if (!link || (!link.sessionId && !link.code)) {
+    return;
+  }
+  try {
+    sessionStorage.setItem(LINK_SESSION_STORAGE_KEY, JSON.stringify({
+      sessionId: link.sessionId,
+      code: link.code,
+      storedAt: Date.now()
+    }));
+  } catch (_) {
+  }
+}
+
+function forgetPendingLink() {
+  try {
+    sessionStorage.removeItem(LINK_SESSION_STORAGE_KEY);
+  } catch (_) {
+  }
+}
+
+function pendingLinkFromLocation() {
+  const fromParams = {
+    sessionId: normalizeLinkSessionId(linkParams.get("sessionId")),
+    code: normalizeLinkCodeParam(linkParams.get("linkCode") || linkParams.get("code"))
+  };
+  if (fromParams.sessionId || fromParams.code) {
+    rememberPendingLink(fromParams);
+    return fromParams;
+  }
+  const pathParts = window.location.pathname.split("/").filter(Boolean);
+  if (pathParts[0] === "link" || (pathParts[0] === "portal" && pathParts[1] === "devices")) {
+    return storedPendingLink() || { sessionId: "", code: "" };
+  }
+  return { sessionId: "", code: "" };
+}
+
 function validDashboardTab(tab) {
   return VALID_DASHBOARD_TABS.includes(tab)
     ? tab
@@ -904,8 +961,8 @@ function setDashboardTab(tab, options = {}) {
   });
   dashboardGroupedPanels.forEach((panel) => {
     const group = panel.dataset.dashboardGroup || "overview";
-    if (panel.dataset.panel === "device-link" && hasPendingLink()) {
-      panel.hidden = false;
+    if (panel.dataset.panel === "device-link") {
+      panel.hidden = !hasPendingLink();
       return;
     }
     panel.hidden = group !== activeDashboardTab;
@@ -1639,10 +1696,14 @@ async function submitDeviceLink(action) {
       sessionId: pendingLink.sessionId,
       code: pendingLink.code
     });
+    forgetPendingLink();
     renderDeviceLink(currentUser, action === "approve" ? "approved" : "rejected");
     setMessage(action === "approve" ? "Codex device approved." : "Codex device rejected.");
   } catch (error) {
     const friendly = friendlyLinkMessage(error);
+    if (["expired", "invalid", "approved", "rejected"].includes(friendly.status)) {
+      forgetPendingLink();
+    }
     renderDeviceLink(currentUser, friendly.status);
     setMessage(friendly.message, true);
   }
@@ -3386,7 +3447,7 @@ onAuthStateChanged(auth, async (user) => {
         cloudSyncEnabled: false
       }
     }));
-    setDashboardTab(pendingLogin ? "profile" : dashboardTabFromLocation(), { replaceRoute: pendingLogin });
+    setDashboardTab(hasPendingLink() ? "devices" : (pendingLogin ? "profile" : dashboardTabFromLocation()), { replaceRoute: pendingLogin });
     return;
   }
 
@@ -3411,6 +3472,8 @@ onAuthStateChanged(auth, async (user) => {
   clearLoginRouteAfterSignIn();
   if (!hasPendingLink() && pendingLogin) {
     setDashboardTab("overview", { updateRoute: true, replaceRoute: true });
+  } else if (hasPendingLink()) {
+    setDashboardTab("devices");
   }
 
   profileStatus.textContent = "Loading";

@@ -20,7 +20,7 @@ function staticPath(urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?", 1)[0]);
   const clean = decoded === "/"
     ? "/index.html"
-    : (decoded === "/portal" || decoded.startsWith("/portal/") ? "/portal.html" : decoded);
+    : (decoded === "/portal" || decoded.startsWith("/portal/") || decoded === "/link" || decoded.startsWith("/link/") ? "/portal.html" : decoded);
   const target = path.normalize(path.join(HOSTING_ROOT, clean));
   if (!target.startsWith(HOSTING_ROOT)) {
     return null;
@@ -147,6 +147,53 @@ async function assertPortalLayoutRoutes(page, baseUrl) {
   return { overview, orders, profile };
 }
 
+async function assertDeviceLinkRoutes(page, baseUrl) {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`${baseUrl}/portal/devices`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(500);
+  const devices = await page.evaluate(() => ({
+    path: window.location.pathname,
+    tab: document.body.dataset.dashboardTab,
+    linkMode: document.body.dataset.linkMode,
+    linkHidden: document.querySelector("[data-panel='device-link']")?.hidden,
+    linkedDevicesHidden: document.querySelector("[data-panel='linked-devices']")?.hidden,
+    code: document.querySelector("#device-link-code")?.textContent?.trim(),
+    summary: document.querySelector("#device-link-summary")?.textContent?.trim()
+  }));
+  await page.goto(`${baseUrl}/link?linkCode=ABCD-1234&sessionId=link_ABCDEFGHIJKLMNOPQRST`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(500);
+  const link = await page.evaluate(() => ({
+    path: window.location.pathname,
+    tab: document.body.dataset.dashboardTab,
+    linkMode: document.body.dataset.linkMode,
+    linkHidden: document.querySelector("[data-panel='device-link']")?.hidden,
+    code: document.querySelector("#device-link-code")?.textContent?.trim(),
+    summary: document.querySelector("#device-link-summary")?.textContent?.trim()
+  }));
+  await page.goto(`${baseUrl}/portal/devices`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(500);
+  const recovered = await page.evaluate(() => ({
+    path: window.location.pathname,
+    tab: document.body.dataset.dashboardTab,
+    linkMode: document.body.dataset.linkMode,
+    linkHidden: document.querySelector("[data-panel='device-link']")?.hidden,
+    code: document.querySelector("#device-link-code")?.textContent?.trim()
+  }));
+  const failures = [];
+  if (devices.path !== "/portal/devices" || devices.tab !== "devices") failures.push(`devices route ${devices.path}/${devices.tab}`);
+  if (devices.linkMode !== "dashboard" || devices.linkHidden !== true) failures.push(`plain devices exposed link panel ${devices.linkMode}/${devices.linkHidden}/${devices.summary}`);
+  if (devices.linkedDevicesHidden) failures.push("plain devices should show linked devices panel");
+  if (devices.code !== "-") failures.push(`plain devices code=${devices.code}`);
+  if (link.path !== "/link" || link.tab !== "devices" || link.linkMode !== "pending") failures.push(`link route ${link.path}/${link.tab}/${link.linkMode}`);
+  if (link.linkHidden || link.code !== "ABCD-1234") failures.push(`link panel hidden/code ${link.linkHidden}/${link.code}`);
+  if (!/sign in/i.test(link.summary)) failures.push(`link summary=${link.summary}`);
+  if (recovered.linkMode !== "pending" || recovered.linkHidden || recovered.code !== "ABCD-1234") failures.push(`recovered link ${recovered.linkMode}/${recovered.linkHidden}/${recovered.code}`);
+  if (failures.length) {
+    throw new Error(`device link route layout failed: ${failures.join("; ")}`);
+  }
+  return { devices, link, recovered };
+}
+
 async function main() {
   const { server, url } = await startServer();
   let browser;
@@ -156,9 +203,10 @@ async function main() {
     const desktop = await assertPortalState(page, url, { width: 1280, height: 900 });
     const mobile = await assertPortalState(page, url, { width: 390, height: 844 });
     const routes = await assertPortalLayoutRoutes(page, url);
+    const deviceRoutes = await assertDeviceLinkRoutes(page, url);
     console.log(JSON.stringify({
       ok: true,
-      checks: 3,
+      checks: 4,
       desktop: {
         connection: desktop.connection,
         source: desktop.source
@@ -170,7 +218,9 @@ async function main() {
       routes: {
         overview: routes.overview.tab,
         ordersPath: routes.orders.path,
-        profileView: routes.profile.view
+        profileView: routes.profile.view,
+        devicesLinkHidden: deviceRoutes.devices.linkHidden,
+        recoveredLinkCode: deviceRoutes.recovered.code
       }
     }, null, 2));
   } finally {

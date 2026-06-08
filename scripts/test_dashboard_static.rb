@@ -509,7 +509,12 @@ end
 
 assert("link URLs should promote device linking above the dashboard") do
   index.index(%(data-panel="device-link")) < index.index(%(data-panel="auth")) &&
-    auth_js.include?("const pendingLink = {") &&
+    auth_js.include?("const pendingLink = pendingLinkFromLocation()") &&
+    auth_js.include?("const LINK_SESSION_STORAGE_KEY = \"mcp-miner-pending-link\"") &&
+    auth_js.include?("function pendingLinkFromLocation()") &&
+    auth_js.include?("function rememberPendingLink(link)") &&
+    auth_js.include?("function forgetPendingLink()") &&
+    auth_js.include?("panel.hidden = !hasPendingLink()") &&
     auth_js.include?("const LINK_SESSION_ID_PATTERN = /^link_[A-Za-z0-9_-]{20,80}$/;") &&
     auth_js.include?("function normalizeLinkSessionId(value)") &&
     auth_js.include?("function normalizeLinkCodeParam(value)") &&
