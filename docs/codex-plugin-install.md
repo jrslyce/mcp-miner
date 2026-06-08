@@ -184,6 +184,6 @@ After enabling the local plugin in Codex desktop, restart Codex and complete the
 Then check these flows:
 
 1. Start a new Codex turn and confirm the SessionStart hook returns MCP Miner context.
-2. Run normal Codex work, then let the Stop hook record the latest report. Passive `systemMessage` hook output is non-blocking and may not be shown by every Codex UI.
+2. Run normal Codex work, then let the Stop hook record the latest report and request the exact footer as a final-paragraph continuation when the selected report mode should display one.
 3. Invoke `@mcp-miner` or ask for MCP Miner status and confirm `get_player_status`, `get_latest_report`, `get_active_orders`, `get_inventory`, `get_store_catalog`, and `open_dashboard` are available.
 4. Confirm reports never include private prompts, code, file paths, repo names, terminal output, browser content, or transcripts.

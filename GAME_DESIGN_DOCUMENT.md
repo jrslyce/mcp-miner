@@ -696,6 +696,12 @@ Base modules:
 
 Asteroids are the main explorable units. Each asteroid has a composition profile, depletion meter, hazard profile, and order suitability score. The player chooses where to mine based on current orders, needed upgrades, and risk tolerance.
 
+Runtime state distinguishes an asteroid class from the player's active claim on that class. When a
+claim is depleted, progression unlocks the next eligible catalog class in order and carries overflow
+mining into that new claim. A depleted unlocked class remains claimable again, which lets players
+return to important early materials such as Carbon without changing the class composition table or
+erasing partial progress on a live claim.
+
 ### Starter Rubble
 
 Intro asteroid class. Low risk, common Chonks, iron, nickel, silicon, carbon, and frequent scrap.
@@ -1118,6 +1124,9 @@ Commands should be optional utility tools, not the main game loop.
 - `open_dashboard`
 - `open_store`
 - `get_active_orders`
+- `get_asteroid_status`
+- `select_asteroid`
+- `claim_asteroid`
 - `get_settings`
 - `get_milestone_status`
 - `get_catalog_summary`

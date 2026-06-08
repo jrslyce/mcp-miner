@@ -272,29 +272,55 @@ func (e *Engine) drillMultiplier(state M) float64 {
 	return e.upgradeEffectByID("upgrade_drill_power", asInt(asMap(state["upgrades"])["upgrade_drill_power"]))
 }
 
-func (e *Engine) handleAsteroidDepletion(state M, asteroidID string) {
-	nextID := ""
-	current := e.Data.AsteroidByID[asteroidID]
-	currentTier := asInt(current["unlock_tier"])
+func (e *Engine) handleAsteroidDepletion(state M, timestamp string) {
+	for guard := 0; guard < len(e.Data.Asteroids)+1; guard++ {
+		asteroid := e.asteroidFor(state)
+		asteroidID := asString(asteroid["id"])
+		progress := asMap(state["asteroid_progress"])
+		depletionSize := asInt(asteroid["depletion_size"])
+		mined := asInt(progress["mined"])
+		if depletionSize <= 0 || mined < depletionSize {
+			return
+		}
+
+		overflow := mined - depletionSize
+		progress = M{"asteroid_class_id": asteroidID, "mined": depletionSize}
+		state["asteroid_progress"] = progress
+		asMap(state["asteroid_progress_by_id"])[asteroidID] = clone(progress)
+
+		nextAsteroid := e.nextAsteroidUnlock(state, asteroid)
+		depletion := M{"asteroid_class_id": asteroidID, "overflow_mined": overflow, "depleted_at": firstNonEmpty(timestamp, nowISO())}
+		if nextAsteroid != nil {
+			depletion["unlocked_asteroid_class_id"] = asString(nextAsteroid["id"])
+		}
+		depletions := append(asSlice(state["asteroid_depletions"]), depletion)
+		if len(depletions) > 20 {
+			depletions = depletions[len(depletions)-20:]
+		}
+		state["asteroid_depletions"] = depletions
+
+		if nextAsteroid == nil {
+			return
+		}
+		nextID := asString(nextAsteroid["id"])
+		state["unlocked_asteroid_class_ids"] = anySlice(uniqueAppend(strSlice(state["unlocked_asteroid_class_ids"]), nextID))
+		nextProgress := M{"asteroid_class_id": nextID, "mined": overflow}
+		state["current_asteroid_class_id"] = nextID
+		state["asteroid_progress"] = nextProgress
+		asMap(state["asteroid_progress_by_id"])[nextID] = clone(nextProgress)
+	}
+}
+
+func (e *Engine) nextAsteroidUnlock(state M, depletedAsteroid M) M {
+	unlocked := strSlice(state["unlocked_asteroid_class_ids"])
+	currentTier := asInt(depletedAsteroid["unlock_tier"])
 	for _, asteroid := range e.Data.Asteroids {
 		id := asString(asteroid["id"])
-		if asInt(asteroid["unlock_tier"]) > currentTier {
-			nextID = id
-			break
+		if !hasString(unlocked, id) && asInt(asteroid["unlock_tier"]) <= currentTier+1 {
+			return asteroid
 		}
 	}
-	if nextID == "" && len(e.Data.Asteroids) > 0 {
-		nextID = asString(e.Data.Asteroids[0]["id"])
-	}
-	unlocked := strSlice(state["unlocked_asteroid_class_ids"])
-	unlocked = uniqueAppend(unlocked, nextID)
-	state["unlocked_asteroid_class_ids"] = anySlice(unlocked)
-	state["current_asteroid_class_id"] = nextID
-	state["asteroid_progress"] = M{"asteroid_class_id": nextID, "mined": 1}
-	asMap(state["asteroid_progress_by_id"])[nextID] = M{"asteroid_class_id": nextID, "mined": 1}
-	depletions := asSlice(state["asteroid_depletions"])
-	depletions = append(depletions, M{"asteroid_class_id": asteroidID, "unlocked_asteroid_class_id": nextID, "depleted_at": nowISO()})
-	state["asteroid_depletions"] = depletions
+	return nil
 }
 
 func anySlice(items []string) []any {
@@ -346,6 +372,10 @@ func (e *Engine) DisplayReport(report string) string {
 		return icon + "\n" + report
 	}
 	return icon + " " + report
+}
+
+func (e *Engine) ReportContinuationInstruction(displayReport string) string {
+	return "Append this exact MCP Miner footer as the final paragraph of your response, without adding private work details or changing the text:\n\n" + displayReport
 }
 
 func (e *Engine) RecordReport(state M, report, turnID string) {
@@ -726,12 +756,8 @@ func (e *Engine) SelectAsteroidPayload(args M) M {
 		if !hasString(strSlice(state["unlocked_asteroid_class_ids"]), asteroidID) {
 			return M{"ok": false, "status": "locked", "asteroid": e.asteroidSummary(asteroidID), "required_unlock_tier": asInt(asteroid["unlock_tier"]), "unlocked_asteroid_class_ids": state["unlocked_asteroid_class_ids"], "privacy": PrivacyNotice}, nil
 		}
-		currentProgress := asMap(state["asteroid_progress"])
-		asMap(state["asteroid_progress_by_id"])[asString(currentProgress["asteroid_class_id"])] = M{"asteroid_class_id": asString(currentProgress["asteroid_class_id"]), "mined": asInt(currentProgress["mined"])}
-		progress := asMap(asMap(state["asteroid_progress_by_id"])[asteroidID])
-		if len(progress) == 0 {
-			progress = M{"asteroid_class_id": asteroidID, "mined": 0}
-		}
+		persistCurrentAsteroidProgress(state)
+		progress := asteroidProgressForState(state, asteroidID)
 		state["current_asteroid_class_id"] = asteroidID
 		state["asteroid_progress"] = clone(progress)
 		return M{"ok": true, "status": "selected", "current_asteroid": e.asteroidStatusFor(asteroid, state), "privacy": PrivacyNotice}, nil
@@ -739,29 +765,84 @@ func (e *Engine) SelectAsteroidPayload(args M) M {
 	return result.(M)
 }
 
+func (e *Engine) ClaimAsteroidPayload(args M) M {
+	asteroidID := asString(args["asteroid_id"])
+	asteroid := e.Data.AsteroidByID[asteroidID]
+	if asteroid == nil {
+		return M{"ok": false, "status": "unknown_asteroid", "asteroid_id": asteroidID, "privacy": PrivacyNotice}
+	}
+	result, _ := e.WithState(func(state M) (any, error) {
+		if !hasString(strSlice(state["unlocked_asteroid_class_ids"]), asteroidID) {
+			return M{"ok": false, "status": "locked", "asteroid": e.asteroidSummary(asteroidID), "required_unlock_tier": asInt(asteroid["unlock_tier"]), "unlocked_asteroid_class_ids": state["unlocked_asteroid_class_ids"], "privacy": PrivacyNotice}, nil
+		}
+		persistCurrentAsteroidProgress(state)
+		progress := asteroidProgressForState(state, asteroidID)
+		depletionSize := asInt(asteroid["depletion_size"])
+		if depletionSize > 0 && asInt(progress["mined"]) < depletionSize {
+			state["current_asteroid_class_id"] = asteroidID
+			state["asteroid_progress"] = clone(progress)
+			return M{"ok": true, "status": "existing_claim_selected", "current_asteroid": e.asteroidStatusFor(asteroid, state), "privacy": PrivacyNotice}, nil
+		}
+		previous := clone(progress)
+		nextProgress := M{"asteroid_class_id": asteroidID, "mined": 0}
+		state["current_asteroid_class_id"] = asteroidID
+		state["asteroid_progress"] = clone(nextProgress)
+		asMap(state["asteroid_progress_by_id"])[asteroidID] = clone(nextProgress)
+		return M{"ok": true, "status": "claimed_new_asteroid", "asteroid": e.asteroidSummary(asteroidID), "previous_depletion": previous, "current_asteroid": e.asteroidStatusFor(asteroid, state), "privacy": PrivacyNotice}, nil
+	})
+	return result.(M)
+}
+
 func (e *Engine) asteroidStatusFor(asteroid M, state M) M {
 	id := asString(asteroid["id"])
-	progress := asMap(asMap(state["asteroid_progress_by_id"])[id])
-	if asString(asMap(state["asteroid_progress"])["asteroid_class_id"]) == id {
-		progress = asMap(state["asteroid_progress"])
-	}
+	progress := asteroidProgressForState(state, id)
 	depletionSize := asInt(asteroid["depletion_size"])
 	mined := asInt(progress["mined"])
-	if progress == nil || len(progress) == 0 {
-		progress = M{"asteroid_class_id": id, "mined": 0}
-	}
+	unlocked := hasString(strSlice(state["unlocked_asteroid_class_ids"]), id)
+	depleted := depletionSize > 0 && mined >= depletionSize
 	return M{
 		"asteroid_class_id": id,
 		"display_name":      asString(asteroid["display_name"]),
 		"unlock_tier":       asInt(asteroid["unlock_tier"]),
-		"unlocked":          hasString(strSlice(state["unlocked_asteroid_class_ids"]), id),
+		"unlocked":          unlocked,
 		"selected":          asString(state["current_asteroid_class_id"]) == id,
-		"depletion":         M{"mined": mined, "depletion_size": depletionSize, "remaining": maxInt(0, depletionSize-mined)},
+		"depletion":         M{"mined": mined, "depletion_size": depletionSize, "remaining": maxInt(0, depletionSize-mined), "percent_complete": percentComplete(mined, depletionSize), "depleted": depleted},
+		"claimable":         unlocked && depleted,
 		"composition":       asSlice(asteroid["composition"]),
 		"base_rare_rate":    asFloat(asteroid["base_rare_rate"]),
 		"rare_find_chance":  e.rareFindChance(state, asteroid, ""),
 		"yield_multiplier":  asFloat(asteroid["yield_multiplier"]),
 	}
+}
+
+func asteroidProgressForState(state M, asteroidID string) M {
+	if asString(asMap(state["asteroid_progress"])["asteroid_class_id"]) == asteroidID {
+		return asMap(state["asteroid_progress"])
+	}
+	progress := asMap(asMap(state["asteroid_progress_by_id"])[asteroidID])
+	if len(progress) == 0 {
+		return M{"asteroid_class_id": asteroidID, "mined": 0}
+	}
+	return progress
+}
+
+func persistCurrentAsteroidProgress(state M) {
+	currentProgress := asMap(state["asteroid_progress"])
+	currentID := asString(currentProgress["asteroid_class_id"])
+	if currentID == "" {
+		currentID = asString(state["current_asteroid_class_id"])
+	}
+	if currentID == "" {
+		return
+	}
+	asMap(state["asteroid_progress_by_id"])[currentID] = M{"asteroid_class_id": currentID, "mined": asInt(currentProgress["mined"])}
+}
+
+func percentComplete(mined int, depletionSize int) float64 {
+	if depletionSize <= 0 {
+		return 0
+	}
+	return round(float64(mined)/float64(depletionSize)*100, 2)
 }
 
 func (e *Engine) rareFindChance(state M, asteroid M, eventType string) float64 {

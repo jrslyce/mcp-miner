@@ -95,6 +95,12 @@ def stop_turn(turn_id, state_path, last_message: "Implemented and tested.")
   }, state_path)
 end
 
+def report_instruction?(payload, *snippets)
+  payload["decision"] == "block" &&
+    payload["reason"].to_s.include?("Append this exact MCP Miner footer") &&
+    snippets.all? { |snippet| payload["reason"].to_s.include?(snippet) }
+end
+
 def update_report_mode(state_path, mode)
   run_mcp(state_path, [
     { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
@@ -130,11 +136,8 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
 
   user_prompt("turn-every", state_path)
   every_stop = stop_turn("turn-every", state_path)
-  assert("every_turn_compact should emit a non-blocking report for prompt-only turns") do
-    every_stop["continue"] == true &&
-      !every_stop.key?("decision") &&
-      every_stop["systemMessage"].start_with?("![MCP Miner](data:image/svg+xml;base64,") &&
-      every_stop["systemMessage"].include?(") MCP Miner:")
+  assert("every_turn_compact should request a visible footer for prompt-only turns") do
+    report_instruction?(every_stop, "![MCP Miner](data:image/svg+xml;base64,", ") MCP Miner:")
   end
   duplicate_stop = stop_turn("turn-every", state_path)
   assert("Stop hook should not duplicate an existing MCP Miner report") do
@@ -171,11 +174,8 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
             response: { "status" => "success" })
 
   work_stop = stop_turn("turn-work", state_path)
-  assert("meaningful concrete work should emit a non-blocking MCP Miner report") do
-    work_stop["continue"] == true &&
-      !work_stop.key?("decision") &&
-      work_stop["systemMessage"].start_with?("![MCP Miner](data:image/svg+xml;base64,") &&
-      work_stop["systemMessage"].include?("MCP Miner:")
+  assert("meaningful concrete work should request a visible MCP Miner footer") do
+    report_instruction?(work_stop, "![MCP Miner](data:image/svg+xml;base64,", "MCP Miner:")
   end
 
   after_work = state(state_path)
@@ -303,12 +303,8 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
     update_report_mode(report_state_path, "every_turn_full")
     user_prompt("turn-full", report_state_path)
     full_stop = stop_turn("turn-full", report_state_path)
-    assert("every_turn_full should emit a passive full expedition footer") do
-      full_stop["continue"] == true &&
-        !full_stop.key?("decision") &&
-        !full_stop.key?("reason") &&
-        full_stop["systemMessage"].include?("MCP Miner Expedition Report") &&
-        full_stop["systemMessage"].include?("Space Bucks:")
+    assert("every_turn_full should request a visible full expedition footer") do
+      report_instruction?(full_stop, "MCP Miner Expedition Report", "Space Bucks:")
     end
 
     update_report_mode(report_state_path, "session_summary_only")
@@ -319,11 +315,8 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
               command: patch_command(path: "session.rb"),
               response: { "status" => "success" })
     session_stop = stop_turn("turn-session", report_state_path)
-    assert("session_summary_only should emit detailed summaries for concrete work") do
-      session_stop["continue"] == true &&
-        !session_stop.key?("decision") &&
-        session_stop["systemMessage"].include?("MCP Miner Expedition Report") &&
-        session_stop["systemMessage"].include?("Asteroid:")
+    assert("session_summary_only should request detailed summaries for concrete work") do
+      report_instruction?(session_stop, "MCP Miner Expedition Report", "Asteroid:")
     end
 
     update_report_mode(report_state_path, "milestones_only")
@@ -338,10 +331,7 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
               response: { "status" => "success" })
     milestone_stop = stop_turn("turn-milestone", report_state_path)
     assert("milestones_only should emit deterministic milestone reports") do
-      milestone_stop["continue"] == true &&
-        !milestone_stop.key?("decision") &&
-        milestone_stop["systemMessage"].include?("MCP Miner milestone:") &&
-        milestone_stop["systemMessage"].include?("Space Bucks balance")
+      report_instruction?(milestone_stop, "MCP Miner milestone:", "Space Bucks balance")
     end
 
     update_report_mode(report_state_path, "every_turn_compact")
@@ -363,10 +353,7 @@ Dir.mktmpdir("mcp-miner-hooks") do |dir|
               response: { "status" => "success" })
     order_stop = stop_turn("turn-order", report_state_path)
     assert("compact reports should use order progress templates when orders are active") do
-      order_stop["continue"] == true &&
-        !order_stop.key?("decision") &&
-        order_stop["systemMessage"].include?("order +100%") &&
-        order_stop["systemMessage"].include?("#{target_order.fetch('expires_in_days')} days left")
+      report_instruction?(order_stop, "order +100%", "#{target_order.fetch('expires_in_days')} days left")
     end
   end
 

@@ -673,6 +673,56 @@ module McpMiner
       end
     end
 
+    def claim_asteroid_payload(args)
+      asteroid_id = safe_string(args["asteroid_id"])
+      asteroid = asteroid_by_id[asteroid_id]
+      return unknown_asteroid_payload(asteroid_id) unless asteroid
+
+      with_state do |current_state|
+        unless (current_state["unlocked_asteroid_class_ids"] || []).include?(asteroid_id)
+          next {
+            ok: false,
+            status: "locked",
+            asteroid: asteroid_summary(asteroid_id),
+            required_unlock_tier: asteroid["unlock_tier"],
+            unlocked_asteroid_class_ids: current_state["unlocked_asteroid_class_ids"],
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        persist_current_asteroid_progress!(current_state)
+        progress = asteroid_progress_for(asteroid_id, current_state)
+        depletion_size = asteroid["depletion_size"].to_i
+        if depletion_size.positive? && progress["mined"].to_i < depletion_size
+          current_state["current_asteroid_class_id"] = asteroid_id
+          current_state["asteroid_progress"] = progress.dup
+          next {
+            ok: true,
+            status: "existing_claim_selected",
+            current_asteroid: asteroid_status_for(asteroid, current_state),
+            privacy: PRIVACY_NOTICE
+          }
+        end
+
+        previous = progress.dup
+        next_progress = {
+          "asteroid_class_id" => asteroid_id,
+          "mined" => 0
+        }
+        current_state["current_asteroid_class_id"] = asteroid_id
+        current_state["asteroid_progress"] = next_progress.dup
+        current_state["asteroid_progress_by_id"][asteroid_id] = next_progress.dup
+        {
+          ok: true,
+          status: "claimed_new_asteroid",
+          asteroid: asteroid_summary(asteroid_id),
+          previous_depletion: previous,
+          current_asteroid: asteroid_status_for(asteroid, current_state),
+          privacy: PRIVACY_NOTICE
+        }
+      end
+    end
+
     def fabrication_status_payload(current_state = state)
       {
         machines: machine_list.map { |machine| machine_status(machine, current_state) },
@@ -3188,8 +3238,10 @@ module McpMiner
           mined: mined,
           depletion_size: depletion_size,
           remaining: [depletion_size - mined, 0].max,
-          percent_complete: depletion_size.positive? ? ((mined.to_f / depletion_size) * 100).round(2) : 0.0
+          percent_complete: depletion_size.positive? ? ((mined.to_f / depletion_size) * 100).round(2) : 0.0,
+          depleted: depletion_size.positive? && mined >= depletion_size
         },
+        claimable: (state["unlocked_asteroid_class_ids"] || []).include?(asteroid["id"]) && depletion_size.positive? && mined >= depletion_size,
         yield_multiplier: asteroid["yield_multiplier"].to_f,
         hazard_multiplier: asteroid["hazard_multiplier"].to_f,
         base_rare_rate: asteroid["base_rare_rate"].to_f,
