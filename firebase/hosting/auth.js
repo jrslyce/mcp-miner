@@ -594,6 +594,8 @@ const referralRedeemForm = document.querySelector("#referral-redeem-form");
 const referralRedeemCode = document.querySelector("#referral-redeem-code");
 const redeemReferralButton = document.querySelector("#redeem-referral");
 const referralStatus = document.querySelector("#referral-status");
+const loginReferralCode = document.querySelector("#login-referral-code");
+const loginReferralStatus = document.querySelector("#login-referral-status");
 const promoCodeForm = document.querySelector("#promo-code-form");
 const promoCodeInput = document.querySelector("#promo-code");
 const redeemPromoButton = document.querySelector("#redeem-promo");
@@ -615,6 +617,7 @@ const pendingLink = {
 const pendingReferralCode = normalizeReferralCodeParam(linkParams.get("ref") || linkParams.get("referral"));
 const pendingLogin = linkParams.has("login") || window.location.hash === "#login" || window.location.hash === "#account";
 const COMPANY_STORAGE_KEY = "mcp-miner-company-name";
+const LOGIN_REFERRAL_STORAGE_KEY = "mcp-miner-login-referral-code";
 const PORTAL_INSTALL_PROMPTS = {
   "mac-silicon": "Install MCP Miner on this Apple Silicon Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.",
   "mac-intel": "Install MCP Miner on this Intel Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.",
@@ -769,6 +772,51 @@ function setupPortalInstallSelector() {
     });
   });
   selectPortalInstallPrompt(guessedPortalOs());
+}
+
+function setLoginReferralStatus(text, tone = "") {
+  if (!loginReferralStatus) {
+    return;
+  }
+  loginReferralStatus.textContent = text;
+  loginReferralStatus.dataset.tone = tone;
+}
+
+function currentLoginReferralCode() {
+  return normalizeReferralCodeParam(loginReferralCode && loginReferralCode.value);
+}
+
+function syncLoginReferralCode(code, options = {}) {
+  const clean = normalizeReferralCodeParam(code);
+  if (loginReferralCode) {
+    loginReferralCode.value = clean;
+  }
+  if (referralRedeemCode && clean) {
+    referralRedeemCode.value = clean;
+  }
+  if (clean) {
+    localStorage.setItem(LOGIN_REFERRAL_STORAGE_KEY, clean);
+    if (!options.quiet) {
+      setLoginReferralStatus("Referral code ready.", "success");
+    }
+  } else {
+    localStorage.removeItem(LOGIN_REFERRAL_STORAGE_KEY);
+    if (!options.quiet) {
+      setLoginReferralStatus("Optional crew code.");
+    }
+  }
+  return clean;
+}
+
+function setupLoginReferralCode() {
+  if (!loginReferralCode) {
+    return;
+  }
+  const stored = normalizeReferralCodeParam(localStorage.getItem(LOGIN_REFERRAL_STORAGE_KEY));
+  syncLoginReferralCode(pendingReferralCode || stored, { quiet: true });
+  loginReferralCode.addEventListener("input", () => {
+    syncLoginReferralCode(loginReferralCode.value);
+  });
 }
 
 function validDashboardTab(tab) {
@@ -1264,6 +1312,32 @@ async function redeemAccountCode(kind, code) {
     status.dataset.tone = "error";
   } finally {
     button.disabled = !currentUser;
+  }
+}
+
+async function redeemLoginReferralIfReady() {
+  const code = currentLoginReferralCode();
+  if (!code || !currentUser || requiresEmailVerification(currentUser)) {
+    return;
+  }
+  syncLoginReferralCode(code, { quiet: true });
+  if (loginReferralCode) {
+    loginReferralCode.disabled = true;
+  }
+  setLoginReferralStatus("Joining referral crew.");
+  try {
+    const callable = httpsCallable(functions, "redeemReferralCode");
+    const result = await callable({ code });
+    activeAccountStatus = result && result.data ? result.data : activeAccountStatus;
+    renderAccountStatus(activeAccountStatus);
+    syncLoginReferralCode("", { quiet: true });
+    setLoginReferralStatus("Referral code applied.", "success");
+  } catch (error) {
+    setLoginReferralStatus(error.message || "Referral code could not be applied.", "error");
+  } finally {
+    if (loginReferralCode) {
+      loginReferralCode.disabled = false;
+    }
   }
 }
 
@@ -3254,6 +3328,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   await refreshForCurrentUser();
+  await redeemLoginReferralIfReady();
 });
 
 applyTheme(preferredTheme());
@@ -3263,8 +3338,9 @@ setupPromptCopyButtons();
 setupInputCopyButtons();
 setupCompanyClaim();
 setupPortalInstallSelector();
+setupLoginReferralCode();
 if (pendingReferralCode) {
-  referralRedeemCode.value = pendingReferralCode;
+  syncLoginReferralCode(pendingReferralCode, { quiet: true });
   setDashboardTab("profile");
 }
 if (pendingLogin) {
