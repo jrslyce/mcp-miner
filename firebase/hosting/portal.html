@@ -135,6 +135,15 @@
                 <button id="create-account" type="button" class="button-secondary">Create Account</button>
               </div>
             </form>
+
+            <div class="login-referral-card">
+              <label for="login-referral-code">Referral code</label>
+              <div class="copy-row">
+                <input id="login-referral-code" type="text" maxlength="9" autocomplete="off" placeholder="ABCD-2345">
+                <a class="button-secondary referral-search-link" href="https://www.google.com/search?q=MCP+Miner+referral+code" target="_blank" rel="noopener">Search</a>
+              </div>
+              <p id="login-referral-status" class="message" role="status" aria-live="polite">Optional crew code.</p>
+            </div>
             <button id="send-verification-email" type="button" class="button-secondary verification-action" disabled hidden>Resend Verification</button>
 
             <dl class="status-grid">

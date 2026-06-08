@@ -134,6 +134,8 @@ assert("portal should expose profile, referral crew, billing, and promo code acc
     portal.include?(%(id="referral-code")) &&
     portal.include?(%(id="referral-link")) &&
     portal.include?(%(id="referral-redeem-form")) &&
+    portal.include?(%(id="login-referral-code")) &&
+    portal.include?(%(id="login-referral-status")) &&
     portal.include?(%(data-panel="promo-code")) &&
     portal.include?(%(id="promo-code-form")) &&
     portal.include?("Referral Crew") &&
@@ -146,6 +148,21 @@ assert("portal should expose profile, referral crew, billing, and promo code acc
     styles.include?(".user-menu-button") &&
     styles.include?(".account-settings-panel") &&
     styles.include?(".promo-row")
+end
+
+assert("login route should render only the login card with referral support") do
+  auth_js.include?("const pendingLogin = linkParams.has(\"login\")") &&
+    auth_js.include?("const LOGIN_REFERRAL_STORAGE_KEY = \"mcp-miner-login-referral-code\"") &&
+    auth_js.include?("function setupLoginReferralCode()") &&
+    auth_js.include?("function redeemLoginReferralIfReady()") &&
+    auth_js.include?("await redeemLoginReferralIfReady();") &&
+    styles.include?("body[data-login-mode=\"pending\"] .topbar") &&
+    styles.include?("body[data-login-mode=\"pending\"] .main-board") &&
+    styles.include?("body[data-login-mode=\"pending\"] [data-panel=\"account-settings\"]") &&
+    styles.include?("body[data-login-mode=\"pending\"] [data-panel=\"profile\"]") &&
+    styles.include?("body[data-login-mode=\"pending\"] .workspace-grid") &&
+    styles.include?(".login-referral-card") &&
+    styles.include?(".referral-search-link")
 end
 
 assert("dashboard should expose concrete status, inventory, order, upgrade, report, sync, and base targets") do
