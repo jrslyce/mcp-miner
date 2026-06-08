@@ -34,20 +34,24 @@
               </span>
             </button>
             <div id="user-menu" class="user-menu" role="menu" hidden>
-              <button type="button" role="menuitem" data-menu-tab="profile">Profile</button>
-              <button type="button" role="menuitem" data-menu-tab="billing">Billing</button>
-              <button type="button" role="menuitem" data-menu-tab="promo">Promo code</button>
+              <a role="menuitem" href="/portal" data-menu-page="overview">Dashboard</a>
+              <a role="menuitem" href="/portal/profile" data-menu-page="profile">Profile</a>
+              <a role="menuitem" href="/portal/billing" data-menu-page="billing">Billing</a>
+              <a role="menuitem" href="/portal/promo" data-menu-page="promo">Promo code</a>
               <button id="user-menu-logout" type="button" role="menuitem" class="user-menu-logout">Logout</button>
             </div>
           </div>
         </div>
       </header>
 
-      <section class="portal-onboarding" aria-labelledby="portal-onboarding-title">
-        <div class="portal-onboarding-heading">
-          <p class="eyebrow">Mining portal</p>
-          <h2 id="portal-onboarding-title">Set up your account in four steps.</h2>
-        </div>
+      <details id="quick-start" class="portal-onboarding quick-start" aria-labelledby="portal-onboarding-title" open>
+        <summary class="quick-start-summary">
+          <span>
+            <span class="eyebrow">Quick Start</span>
+            <strong id="portal-onboarding-title">Set up your account in four steps.</strong>
+          </span>
+          <span id="quick-start-toggle-label" class="quick-start-toggle">Hide</span>
+        </summary>
         <div class="portal-onboarding-grid">
           <article class="portal-step-card">
             <span class="step-number">01</span>
@@ -81,7 +85,16 @@
             <pre id="portal-link-prompt" class="copy-code">@mcp-miner start account link using https://mcpminer.net as the dashboard URL. Open the returned link, sign in, approve this Codex device, then come back and run @mcp-miner complete account link followed by @mcp-miner sync cloud. Explain that sync stores a revocable local device token and sends only abstract game progress.</pre>
           </article>
         </div>
-      </section>
+      </details>
+
+      <nav class="dashboard-tabs" aria-label="Portal sections">
+        <button type="button" class="dashboard-tab" data-dashboard-tab="overview" aria-selected="true">Overview</button>
+        <button type="button" class="dashboard-tab" data-dashboard-tab="orders" aria-selected="false">Orders</button>
+        <button type="button" class="dashboard-tab" data-dashboard-tab="inventory" aria-selected="false">Inventory</button>
+        <button type="button" class="dashboard-tab" data-dashboard-tab="upgrades" aria-selected="false">Upgrades</button>
+        <button type="button" class="dashboard-tab" data-dashboard-tab="devices" aria-selected="false">Devices &amp; Sync</button>
+        <button type="button" class="dashboard-tab" data-dashboard-tab="advanced" aria-selected="false">Advanced</button>
+      </nav>
 
       <section class="workspace-grid">
         <aside class="side-rail" aria-label="Account and sync">
@@ -340,16 +353,7 @@
         </aside>
 
         <section class="main-board" aria-label="Miner dashboard">
-          <nav class="dashboard-tabs" aria-label="Portal sections">
-            <button type="button" class="dashboard-tab" data-dashboard-tab="overview" aria-selected="true">Overview</button>
-            <button type="button" class="dashboard-tab" data-dashboard-tab="orders" aria-selected="false">Orders</button>
-            <button type="button" class="dashboard-tab" data-dashboard-tab="inventory" aria-selected="false">Inventory</button>
-            <button type="button" class="dashboard-tab" data-dashboard-tab="upgrades" aria-selected="false">Upgrades</button>
-            <button type="button" class="dashboard-tab" data-dashboard-tab="devices" aria-selected="false">Devices &amp; Sync</button>
-            <button type="button" class="dashboard-tab" data-dashboard-tab="advanced" aria-selected="false">Advanced</button>
-          </nav>
-
-          <section class="mode-strip" aria-label="Dashboard mode">
+          <section class="mode-strip" aria-label="Dashboard mode" data-panel="overview-summary" data-dashboard-group="overview">
             <div>
               <p class="eyebrow">Mode</p>
               <strong id="dashboard-mode">Sign in</strong>

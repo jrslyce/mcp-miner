@@ -104,8 +104,11 @@ assert("dashboard should render the V1 dashboard panels on the first screen") do
     index.include?(%(<canvas id="asteroid-canvas"))
 end
 
-assert("portal should include onboarding steps before the stats dashboard") do
-    portal.include?(%(class="portal-onboarding")) &&
+assert("portal should include collapsible Quick Start before the stats dashboard") do
+    portal.include?(%(class="portal-onboarding quick-start")) &&
+    portal.include?(%(id="quick-start")) &&
+    portal.include?("Quick Start") &&
+    portal.include?(%(id="quick-start-toggle-label")) &&
     portal.include?(%(class="dashboard-tabs")) &&
     portal.include?(%(data-dashboard-tab="overview")) &&
     portal.include?(%(data-panel="profile")) &&
@@ -116,9 +119,12 @@ assert("portal should include onboarding steps before the stats dashboard") do
     auth_js.include?("const COMPANY_STORAGE_KEY = \"mcp-miner-company-name\"") &&
     auth_js.include?("function asteroidClaimName(asteroid)") &&
     auth_js.include?("function setupPortalInstallSelector()") &&
+    auth_js.include?("function setupQuickStartToggle()") &&
     auth_js.include?("function setupDashboardTabs()") &&
-    auth_js.include?("function setDashboardTab(tab)") &&
+    auth_js.include?("function setDashboardTab(tab, options = {})") &&
+    auth_js.include?("const QUICK_START_STORAGE_KEY = \"mcp-miner-quick-start-open\"") &&
     styles.include?(".portal-onboarding-grid") &&
+    styles.include?(".quick-start-summary") &&
     styles.include?(".dashboard-tabs") &&
     styles.include?("@keyframes asteroid-card-sheen")
 end
@@ -126,9 +132,12 @@ end
 assert("portal should expose profile, referral crew, billing, and promo code account pages") do
   portal.include?(%(id="user-menu-button")) &&
     portal.include?(%(id="user-menu-logout")) &&
-    portal.include?(%(data-menu-tab="profile")) &&
-    portal.include?(%(data-menu-tab="billing")) &&
-    portal.include?(%(data-menu-tab="promo")) &&
+    portal.include?(%(href="/portal/profile")) &&
+    portal.include?(%(href="/portal/billing")) &&
+    portal.include?(%(href="/portal/promo")) &&
+    portal.include?(%(data-menu-page="profile")) &&
+    portal.include?(%(data-menu-page="billing")) &&
+    portal.include?(%(data-menu-page="promo")) &&
     portal.include?(%(id="space-user-name")) &&
     portal.include?(%(data-panel="account-settings")) &&
     portal.include?(%(id="referral-code")) &&
@@ -145,7 +154,10 @@ assert("portal should expose profile, referral crew, billing, and promo code acc
     auth_js.include?("httpsCallable(functions, isReferral ? \"redeemReferralCode\" : \"redeemPromoCode\")") &&
     auth_js.include?("function saveSpaceUserNameProfile()") &&
     auth_js.include?("function renderAccountStatus(status = activeAccountStatus)") &&
+    auth_js.include?("function dashboardTabFromLocation()") &&
+    auth_js.include?("function setDashboardRoute(tab, replace = false)") &&
     styles.include?(".user-menu-button") &&
+    styles.include?(".user-menu a") &&
     styles.include?(".account-settings-panel") &&
     styles.include?(".promo-row")
 end
@@ -662,8 +674,11 @@ end
 assert("dashboard styles should be responsive and stable across mobile and desktop") do
   styles.include?("@media (max-width: 980px)") &&
     styles.include?("@media (max-width: 700px)") &&
-    styles.include?("grid-template-columns: 340px minmax(0, 1fr)") &&
+    styles.include?("body[data-dashboard-view=\"account\"] .side-rail") &&
+    styles.include?("body[data-dashboard-view=\"account\"] .main-board") &&
+    styles.include?("body[data-dashboard-view=\"game\"] .main-board") &&
     styles.include?("grid-template-columns: repeat(4, minmax(0, 1fr))") &&
+    styles.include?("grid-template-columns: repeat(6, minmax(108px, 1fr))") &&
     styles.include?("grid-template-columns: repeat(auto-fit, minmax(118px, 1fr))") &&
     styles.include?(".topbar,\n.workspace-grid,\n.side-rail,\n.main-board") &&
     styles.include?("grid-template-columns: repeat(auto-fit, minmax(76px, 1fr))") &&

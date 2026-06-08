@@ -585,6 +585,8 @@ const linkedDevicesList = document.querySelector("#linked-devices-list");
 const companyNameInput = document.querySelector("#company-name");
 const claimedAsteroidName = document.querySelector("#claimed-asteroid-name");
 const portalInstallPrompt = document.querySelector("#portal-install-prompt");
+const quickStart = document.querySelector("#quick-start");
+const quickStartToggleLabel = document.querySelector("#quick-start-toggle-label");
 const dashboardTabButtons = Array.from(document.querySelectorAll(".dashboard-tab[data-dashboard-tab]"));
 const dashboardGroupedPanels = Array.from(document.querySelectorAll("[data-dashboard-group]"));
 const accountStatus = document.querySelector("#account-status");
@@ -619,6 +621,20 @@ const pendingReferralCode = normalizeReferralCodeParam(linkParams.get("ref") || 
 const pendingLogin = linkParams.has("login") || window.location.hash === "#login" || window.location.hash === "#account";
 const COMPANY_STORAGE_KEY = "mcp-miner-company-name";
 const LOGIN_REFERRAL_STORAGE_KEY = "mcp-miner-login-referral-code";
+const QUICK_START_STORAGE_KEY = "mcp-miner-quick-start-open";
+const ACCOUNT_PAGE_TABS = new Set(["profile", "billing", "promo", "devices"]);
+const VALID_DASHBOARD_TABS = ["overview", "orders", "inventory", "upgrades", "devices", "profile", "billing", "promo", "advanced"];
+const TAB_ROUTES = {
+  overview: "/portal",
+  orders: "/portal/orders",
+  inventory: "/portal/inventory",
+  upgrades: "/portal/upgrades",
+  devices: "/portal/devices",
+  profile: "/portal/profile",
+  billing: "/portal/billing",
+  promo: "/portal/promo",
+  advanced: "/portal/advanced"
+};
 const PORTAL_INSTALL_PROMPTS = {
   "mac-silicon": "Install MCP Miner on this Apple Silicon Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.",
   "mac-intel": "Install MCP Miner on this Intel Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.",
@@ -636,7 +652,7 @@ let activeDashboard = cloneEmptyCloud({
   }
 });
 let activeAccountStatus = null;
-let activeDashboardTab = "overview";
+let activeDashboardTab = dashboardTabFromLocation();
 let activeCosmeticPreview = null;
 let activeAsteroidVisual = ASTEROID_CLASSES[0];
 let activeAsteroidProgress = 0;
@@ -775,6 +791,28 @@ function setupPortalInstallSelector() {
   selectPortalInstallPrompt(guessedPortalOs());
 }
 
+function updateQuickStartToggleLabel() {
+  if (!quickStartToggleLabel || !quickStart) {
+    return;
+  }
+  quickStartToggleLabel.textContent = quickStart.open ? "Hide" : "Show";
+}
+
+function setupQuickStartToggle() {
+  if (!quickStart) {
+    return;
+  }
+  const saved = localStorage.getItem(QUICK_START_STORAGE_KEY);
+  if (saved === "closed") {
+    quickStart.open = false;
+  }
+  updateQuickStartToggleLabel();
+  quickStart.addEventListener("toggle", () => {
+    localStorage.setItem(QUICK_START_STORAGE_KEY, quickStart.open ? "open" : "closed");
+    updateQuickStartToggleLabel();
+  });
+}
+
 function setLoginReferralStatus(text, tone = "") {
   if (!loginReferralStatus) {
     return;
@@ -821,14 +859,45 @@ function setupLoginReferralCode() {
 }
 
 function validDashboardTab(tab) {
-  return ["overview", "orders", "inventory", "upgrades", "devices", "profile", "billing", "promo", "advanced"].includes(tab)
+  return VALID_DASHBOARD_TABS.includes(tab)
     ? tab
     : "overview";
 }
 
-function setDashboardTab(tab) {
+function dashboardTabFromLocation() {
+  const currentParams = new URLSearchParams(window.location.search);
+  const tabParam = currentParams.get("tab");
+  if (tabParam) {
+    return validDashboardTab(tabParam);
+  }
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  const portalIndex = parts.indexOf("portal");
+  const routePart = portalIndex >= 0 ? parts[portalIndex + 1] : "";
+  const routeTab = routePart === "account" ? "profile" : routePart;
+  return validDashboardTab(routeTab || "overview");
+}
+
+function routeForDashboardTab(tab) {
+  const clean = validDashboardTab(tab);
+  return TAB_ROUTES[clean] || TAB_ROUTES.overview;
+}
+
+function setDashboardRoute(tab, replace = false) {
+  const nextPath = routeForDashboardTab(tab);
+  if (window.location.pathname === nextPath && !window.location.search && !window.location.hash) {
+    return;
+  }
+  const action = replace ? "replaceState" : "pushState";
+  window.history[action]({}, "", nextPath);
+}
+
+function setDashboardTab(tab, options = {}) {
   activeDashboardTab = validDashboardTab(tab);
   document.body.dataset.dashboardTab = activeDashboardTab;
+  document.body.dataset.dashboardView = ACCOUNT_PAGE_TABS.has(activeDashboardTab) ? "account" : "game";
+  if (options.updateRoute) {
+    setDashboardRoute(activeDashboardTab, options.replaceRoute);
+  }
   dashboardTabButtons.forEach((button) => {
     const selected = button.dataset.dashboardTab === activeDashboardTab;
     button.setAttribute("aria-selected", selected ? "true" : "false");
@@ -846,11 +915,15 @@ function setDashboardTab(tab) {
 function setupDashboardTabs() {
   dashboardTabButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      setDashboardTab(button.dataset.dashboardTab);
+      setDashboardTab(button.dataset.dashboardTab, { updateRoute: true });
     });
   });
   setDashboardTab(activeDashboardTab);
 }
+
+window.addEventListener("popstate", () => {
+  setDashboardTab(dashboardTabFromLocation());
+});
 
 function closeUserMenu() {
   if (!userMenu || !userMenuButton) {
@@ -3149,9 +3222,10 @@ userMenuButton?.addEventListener("click", () => {
 });
 
 userMenu?.addEventListener("click", (event) => {
-  const menuTab = event.target.closest("[data-menu-tab]");
-  if (menuTab) {
-    setDashboardTab(menuTab.dataset.menuTab);
+  const menuPage = event.target.closest("[data-menu-page]");
+  if (menuPage) {
+    event.preventDefault();
+    setDashboardTab(menuPage.dataset.menuPage, { updateRoute: true });
     closeUserMenu();
     window.scrollTo({ top: 0, behavior: "smooth" });
     return;
@@ -3312,7 +3386,7 @@ onAuthStateChanged(auth, async (user) => {
         cloudSyncEnabled: false
       }
     }));
-    setDashboardTab("profile");
+    setDashboardTab(pendingLogin ? "profile" : dashboardTabFromLocation(), { replaceRoute: pendingLogin });
     return;
   }
 
@@ -3335,8 +3409,8 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   clearLoginRouteAfterSignIn();
-  if (!hasPendingLink()) {
-    setDashboardTab("overview");
+  if (!hasPendingLink() && pendingLogin) {
+    setDashboardTab("overview", { updateRoute: true, replaceRoute: true });
   }
 
   profileStatus.textContent = "Loading";
@@ -3365,6 +3439,7 @@ setupDashboardTabs();
 setupPromptCopyButtons();
 setupInputCopyButtons();
 setupCompanyClaim();
+setupQuickStartToggle();
 setupPortalInstallSelector();
 setupLoginReferralCode();
 handleGoogleRedirectResult();
