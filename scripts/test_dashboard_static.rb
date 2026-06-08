@@ -155,6 +155,8 @@ assert("login route should render only the login card with referral support") do
     auth_js.include?("const LOGIN_REFERRAL_STORAGE_KEY = \"mcp-miner-login-referral-code\"") &&
     auth_js.include?("function setupLoginReferralCode()") &&
     auth_js.include?("function redeemLoginReferralIfReady()") &&
+    auth_js.include?("function clearLoginRouteAfterSignIn()") &&
+    auth_js.include?("document.body.dataset.loginMode = \"none\"") &&
     auth_js.include?("await redeemLoginReferralIfReady();") &&
     styles.include?("body[data-login-mode=\"pending\"] .topbar") &&
     styles.include?("body[data-login-mode=\"pending\"] .main-board") &&
@@ -215,7 +217,8 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and empt
   %w[
     getAuth
     GoogleAuthProvider
-    signInWithPopup
+    getRedirectResult
+    signInWithRedirect
     signInWithEmailAndPassword
     createUserWithEmailAndPassword
     sendEmailVerification

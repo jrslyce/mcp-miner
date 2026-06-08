@@ -3,12 +3,13 @@ import {
   createUserWithEmailAndPassword,
   connectAuthEmulator,
   getAuth,
+  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   reload,
   sendEmailVerification,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   signOut
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 import {
@@ -1417,6 +1418,20 @@ function setLinkMode() {
   document.body.dataset.loginMode = pendingLogin ? "pending" : "none";
 }
 
+function clearLoginRouteAfterSignIn() {
+  if (!pendingLogin || hasPendingLink() || !currentUser || requiresEmailVerification(currentUser)) {
+    return;
+  }
+  document.body.dataset.loginMode = "none";
+  const nextParams = new URLSearchParams(window.location.search);
+  nextParams.delete("login");
+  const nextSearch = nextParams.toString();
+  const nextPath = window.location.pathname.endsWith("/portal.html") ? window.location.pathname : "/portal";
+  const nextHash = ["#account", "#login"].includes(window.location.hash) ? "" : window.location.hash;
+  const nextUrl = `${nextPath}${nextSearch ? `?${nextSearch}` : ""}${nextHash}`;
+  window.history.replaceState({}, "", nextUrl);
+}
+
 function linkModeLabel(user) {
   if (!hasPendingLink()) {
     return null;
@@ -1661,6 +1676,14 @@ async function handleAuth(fn) {
     setMessage(friendlyAuthMessage(error), true);
   } finally {
     password.value = "";
+  }
+}
+
+async function handleGoogleRedirectResult() {
+  try {
+    await getRedirectResult(auth);
+  } catch (error) {
+    setMessage(friendlyAuthMessage(error), true);
   }
 }
 
@@ -3110,7 +3133,7 @@ createAccount.addEventListener("click", () => {
 });
 
 googleSignInButton.addEventListener("click", () => {
-  handleAuth(() => signInWithPopup(auth, googleProvider));
+  handleAuth(() => signInWithRedirect(auth, googleProvider));
 });
 
 sendVerificationEmailButton.addEventListener("click", () => {
@@ -3311,6 +3334,11 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
+  clearLoginRouteAfterSignIn();
+  if (!hasPendingLink()) {
+    setDashboardTab("overview");
+  }
+
   profileStatus.textContent = "Loading";
   setMessage("Loading profile.");
   renderDashboard(cloneEmptyCloud({
@@ -3339,6 +3367,7 @@ setupInputCopyButtons();
 setupCompanyClaim();
 setupPortalInstallSelector();
 setupLoginReferralCode();
+handleGoogleRedirectResult();
 if (pendingReferralCode) {
   syncLoginReferralCode(pendingReferralCode, { quiet: true });
   setDashboardTab("profile");
