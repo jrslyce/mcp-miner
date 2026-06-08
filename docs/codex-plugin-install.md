@@ -38,7 +38,7 @@ source = "/absolute/path/to/mcp-miner"
 enabled = true
 ```
 
-It also removes old standalone MCP server entries and legacy `diamond-mcp` entries, then creates a timestamped backup before changing an existing config. To preview the config change, run:
+It also removes old standalone MCP server entries and older pre-rename plugin entries, then creates a timestamped backup before changing an existing config. To preview the config change, run:
 
 ```sh
 sh scripts/install_codex_plugin.sh --dry-run
@@ -63,6 +63,30 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1 -Uni
 ```
 
 The repository includes `.agents/plugins/marketplace.json`, which points Codex at `./plugins/mcp-miner`.
+
+## Update Flow
+
+MCP Miner status checks the configured Git remote for a newer plugin checkout. If an update is available, the status report includes a red update alert and asks whether to update.
+
+After an explicit yes, the `update_plugin` tool pulls the remote default branch, rebuilds `plugins/mcp-miner/bin/mcp-miner`, refreshes the Codex plugin entry, and tells the user to restart Codex. The updater pauses instead of changing files when the checkout has local changes or is not on the configured update branch.
+
+Manual update from the repository root:
+
+```sh
+git pull --ff-only
+go run ./cmd/mcp-miner build-plugin
+sh scripts/install_codex_plugin.sh
+```
+
+Windows PowerShell:
+
+```powershell
+git pull --ff-only
+go run ./cmd/mcp-miner build-plugin
+powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
+```
+
+Other agent IDEs that point at this checkout should be restarted after rebuilding the binary.
 
 ## If You Only See The MCP Server
 

@@ -23,6 +23,24 @@ func main() {
 				os.Exit(1)
 			}
 			return
+		case "update-plugin":
+			root, err := miner.LocateRoot()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "MCP Miner:", err)
+				os.Exit(1)
+			}
+			engine, err := miner.NewEngine(root)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "MCP Miner:", err)
+				os.Exit(1)
+			}
+			payload := engine.UpdatePluginPayload(miner.M{"confirm": true}, os.Stdout, os.Stderr)
+			if ok, _ := payload["ok"].(bool); !ok {
+				fmt.Fprintln(os.Stderr, "MCP Miner:", payload["message"])
+				os.Exit(1)
+			}
+			fmt.Println(payload["message"])
+			return
 		}
 	}
 

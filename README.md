@@ -37,7 +37,7 @@ cd mcp-miner
 powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
 ```
 
-The installer backs up `~/.codex/config.toml` or `%USERPROFILE%\.codex\config.toml`, rebuilds the Go plugin binary from source if needed, registers this repo as the `mcp-miner` marketplace, removes stale standalone MCP Miner server config and legacy `diamond-mcp` entries, and enables `mcp-miner@mcp-miner`. Restart Codex after running it.
+The installer backs up `~/.codex/config.toml` or `%USERPROFILE%\.codex\config.toml`, rebuilds the Go plugin binary from source if needed, registers this repo as the `mcp-miner` marketplace, removes stale standalone MCP Miner server config and older pre-rename plugin entries, and enables `mcp-miner@mcp-miner`. Restart Codex after running it.
 
 After restart, ask Codex:
 
@@ -57,6 +57,30 @@ After installing the Codex plugin, users must restart Codex and trust the 6 MCP 
 - `stop`
 
 Without hook trust, MCP Miner status tools can still load, but passive mining stays at zero because Codex never runs the local Go hook commands. See [docs/codex-plugin-install.md](docs/codex-plugin-install.md) for the full install check.
+
+## Updating MCP Miner
+
+The status tool checks the configured Git remote for a newer MCP Miner checkout. When an update is available, the status report ends with a red update alert and asks whether to update.
+
+If the player answers yes, the `update_plugin` tool pulls the remote default branch, rebuilds the local MCP binary, refreshes the Codex plugin install, and reports that Codex or any other agent IDE should be restarted. The updater refuses to run when the checkout has local changes or when the current branch is not the configured update branch.
+
+Manual update from a source checkout:
+
+```sh
+git pull --ff-only
+go run ./cmd/mcp-miner build-plugin
+sh scripts/install_codex_plugin.sh
+```
+
+Windows PowerShell:
+
+```powershell
+git pull --ff-only
+go run ./cmd/mcp-miner build-plugin
+powershell -ExecutionPolicy Bypass -File .\scripts\install_codex_plugin.ps1
+```
+
+For other agent IDEs that launch the MCP server from this checkout, restart the IDE after rebuilding so it reloads the updated binary.
 
 ## Account Linking
 

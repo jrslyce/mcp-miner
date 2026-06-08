@@ -75,7 +75,7 @@ Dir.mktmpdir("mcp-miner-codex-installer") do |dir|
   assert("installer should remove standalone MCP server config that is not the plugin") do
     !installed.include?('[mcp_servers."mcp-miner"]')
   end
-  assert("installer should remove legacy Diamond MCP config") do
+  assert("installer should remove legacy pre-rename plugin config") do
     !installed.include?("[marketplaces.diamond-mcp]") &&
       !installed.include?('[plugins."mcp-miner@diamond-mcp"]')
   end
