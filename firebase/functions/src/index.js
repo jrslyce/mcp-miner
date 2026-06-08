@@ -8,7 +8,8 @@ const { FieldValue } = require("firebase-admin/firestore");
 const {
   CURRENT_SYNC_SCHEMA_VERSION,
   prepareSyncBatch,
-  reduceCloudState
+  reduceCloudState,
+  sanitizeInitialStateImport
 } = require("./sync");
 const {
   DEVICE_TOKEN_PREFIX,
@@ -921,6 +922,150 @@ exports.syncRewardEvents = onCall({ region: "us-central1" }, async (request) => 
       throw error;
     }
     throw new HttpsError("invalid-argument", error.message || "Invalid MCP Miner sync payload.");
+  }
+});
+
+exports.importInitialState = onCall({ region: "us-central1" }, async (request) => {
+  const auth = await resolveSyncAuth(request, "sync:write");
+  const uid = auth.uid;
+  const receivedAt = new Date().toISOString();
+  await requireOperationCapacity("syncRewardEvents", rateLimitSubjectForAuth(auth), receivedAt);
+  const playerRef = db.doc(`players/${uid}`);
+  const stateRef = db.doc(`players/${uid}/gameState/current`);
+  const defaultSyncRef = db.doc(`players/${uid}/syncMetadata/default`);
+  const cursorRef = syncCursorRef(uid, auth);
+  const cursorId = syncCursorId(auth);
+  const entitlementNow = receivedAt;
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      const stateSnap = await transaction.get(stateRef);
+      const defaultSyncSnap = await transaction.get(defaultSyncRef);
+      const cursorSnap = cursorRef.path === defaultSyncRef.path ? defaultSyncSnap : await transaction.get(cursorRef);
+      const entitlement = await readEntitlementInTransaction(transaction, uid, entitlementNow);
+      const activeDevices = await readActiveDevicesInTransaction(transaction, uid, auth.deviceId);
+      enforceActiveDeviceAccess({ entitlement, activeDevices, auth, operation: "importInitialState" });
+
+      const existingState = stateSnap.exists ? stateSnap.data() : {};
+      if (existingState.snapshotImportedAt && request.data && request.data.force !== true) {
+        throw new HttpsError("already-exists", "MCP Miner cloud state already has an initial snapshot.", {
+          reason: "initial_state_already_imported",
+          snapshotImportedAt: existingState.snapshotImportedAt,
+          lastSequence: Number(existingState.lastSequence || 0)
+        });
+      }
+
+      const importedState = sanitizeInitialStateImport(request.data || {}, uid, receivedAt);
+      const cursorSync = cursorSnap.exists ? cursorSnap.data() : legacyCursorFromDefault(cursorId, defaultSyncSnap.exists ? defaultSyncSnap.data() : {});
+      const defaultSync = defaultSyncSnap.exists ? defaultSyncSnap.data() : {};
+      const nextCursorSequence = Math.max(Number(cursorSync.lastSequence || 0), Number(importedState.lastSequence || 0));
+      const stateImportId = `initial_${importedState.snapshotChecksum.slice(0, 16)}`;
+
+      transaction.set(playerRef, {
+        ownerUid: uid,
+        schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
+        privacyClass: "abstract",
+        cloudSyncEnabled: true,
+        updatedAt: receivedAt
+      }, { merge: true });
+      transaction.set(stateRef, {
+        ...existingState,
+        ...importedState,
+        ownerUid: uid,
+        schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
+        privacyClass: "abstract"
+      }, { merge: true });
+
+      const cursorUpdate = {
+        ownerUid: uid,
+        cursorId,
+        deviceId: auth.deviceId || null,
+        authType: auth.authType,
+        schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
+        privacyClass: "abstract",
+        updatedAt: receivedAt,
+        stateImportId,
+        stateHash: importedState.snapshotChecksum,
+        lastStateImportAt: receivedAt,
+        lastCloudEventId: importedState.lastEventId || cursorSync.lastCloudEventId || null,
+        lastSequence: nextCursorSequence,
+        snapshotImported: true,
+        migratedFromDefault: cursorId !== "default" && !cursorSnap.exists && defaultSyncSnap.exists ? true : cursorSync.migratedFromDefault || false
+      };
+      transaction.set(cursorRef, cursorUpdate, { merge: true });
+      if (cursorRef.path !== defaultSyncRef.path) {
+        transaction.set(defaultSyncRef, {
+          ownerUid: uid,
+          cursorId: "default",
+          schemaVersion: CURRENT_SYNC_SCHEMA_VERSION,
+          privacyClass: "abstract",
+          cursorMode: "per_device",
+          updatedAt: receivedAt,
+          stateImportId,
+          stateHash: importedState.snapshotChecksum,
+          lastStateImportAt: receivedAt,
+          lastCloudEventId: importedState.lastEventId || defaultSync.lastCloudEventId || null,
+          lastSequence: Math.max(Number(defaultSync.lastSequence || 0), Number(importedState.lastSequence || 0)),
+          lastStateImportAuthType: auth.authType,
+          lastStateImportDeviceId: auth.deviceId || null
+        }, { merge: true });
+      }
+      touchDeviceWrites(transaction, auth, receivedAt);
+
+      const cadence = syncCadenceStatus({
+        entitlement,
+        lastAcceptedBatchAt: cursorSync.lastAcceptedBatchAt,
+        now: receivedAt
+      });
+
+      return {
+        ok: true,
+        status: "initial_state_imported",
+        state: {
+          snapshotImportedAt: importedState.snapshotImportedAt,
+          snapshotChecksum: importedState.snapshotChecksum,
+          eventCount: importedState.eventCount,
+          workScoreTotal: importedState.workScoreTotal,
+          lastEventId: importedState.lastEventId,
+          lastSequence: importedState.lastSequence,
+          workEvents: importedState.workEvents
+        },
+        entitlement,
+        syncCursor: {
+          cursorId,
+          deviceId: auth.deviceId || null,
+          lastSequence: nextCursorSequence,
+          stateImportId
+        },
+        syncCadence: publicSyncCadence(cadence)
+      };
+    });
+
+    logger.info("mcp_miner_import_initial_state", {
+      privacyClass: "abstract",
+      uidPresent: true,
+      authType: auth.authType,
+      cursorId: result.syncCursor.cursorId,
+      lastSequence: result.syncCursor.lastSequence
+    });
+
+    return {
+      ...result,
+      entitlement: publicEntitlement(result.entitlement),
+      privacyClass: "abstract"
+    };
+  } catch (error) {
+    logger.warn("mcp_miner_import_initial_state_rejected", {
+      privacyClass: "abstract",
+      uidPresent: true,
+      authType: auth.authType,
+      code: error.code || "invalid-argument",
+      reason: error.details && error.details.reason ? error.details.reason : null
+    });
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    throw new HttpsError("invalid-argument", error.message || "Invalid MCP Miner initial state import.");
   }
 });
 

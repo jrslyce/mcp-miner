@@ -62,6 +62,18 @@ def start_sync_server(response_queue, requests)
   )
   server.mount_proc "/syncRewardEvents" do |request, response|
     requests << {
+      path: request.path,
+      headers: request.header,
+      body: JSON.parse(request.body)
+    }
+    next_response = response_queue.shift || {}
+    response.status = next_response.fetch(:status, 200)
+    response["Content-Type"] = "application/json"
+    response.body = JSON.generate(next_response.fetch(:body))
+  end
+  server.mount_proc "/importInitialState" do |request, response|
+    requests << {
+      path: request.path,
       headers: request.header,
       body: JSON.parse(request.body)
     }
@@ -107,11 +119,14 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
   assert("preview_sync_payload should show exact request body with redacted auth headers") do
     preview["ok"] == true &&
       preview["status"] == "preview" &&
+      preview["sync_type"] == "initial_state_import" &&
       preview.dig("request", "method") == "POST" &&
-      preview.dig("request", "url") == "https://example.invalid/functions/syncRewardEvents" &&
+      preview.dig("request", "url") == "https://example.invalid/functions/importInitialState" &&
       preview.dig("request", "headers", "X-MCP-Miner-Device-Token") == "<redacted:device-token>" &&
-      preview.dig("request", "body", "data", "events").length >= 2 &&
-      preview.dig("request", "body", "data", "events").all? { |event| event["schemaVersion"] == 2 }
+      preview.dig("request", "body", "data", "syncType") == "initial_state_import" &&
+      preview.dig("request", "body", "data", "privacyClass") == "abstract" &&
+      preview.dig("request", "body", "data", "checkpoint", "lastLocalSequence") >= 2 &&
+      preview.dig("request", "body", "data", "state", "inventory").is_a?(Hash)
   end
   assert("preview_sync_payload should not expose local auth tokens or private work data") do
     !preview_json.include?("mcpd_preview_secret") &&
@@ -127,6 +142,52 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
       body: {
         result: {
           ok: true,
+          status: "initial_state_imported",
+          state: {
+            snapshotImportedAt: Time.now.utc.iso8601,
+            snapshotChecksum: "a" * 64,
+            eventCount: 2,
+            workScoreTotal: 10.0,
+            lastEventId: "evt_import_checkpoint",
+            lastSequence: 2
+          },
+          syncCursor: {
+            cursorId: "default",
+            lastSequence: 2,
+            stateImportId: "initial_test"
+          }
+        }
+      }
+    }
+    import_response = tool_payload(run_mcp(state_path, [
+      { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin } } }
+    ]).last)
+    import_request = requests.last
+    assert("first sync_cloud should import the scrubbed current state with bearer auth") do
+      import_response["ok"] == true &&
+        import_response["status"] == "initial_state_imported" &&
+        import_request[:path] == "/importInitialState" &&
+        import_request.dig(:headers, "authorization").first == "Bearer fake-id-token" &&
+        import_request.dig(:body, "data", "syncType") == "initial_state_import" &&
+        import_request.dig(:body, "data", "checkpoint", "lastLocalSequence") >= 2 &&
+        import_request.dig(:body, "data", "state", "progress", "stats").is_a?(Hash) &&
+        import_response.dig("sync", "metadata", "last_pushed_sequence") == 2 &&
+        import_response.dig("sync", "metadata", "initial_state_imported_at")
+    end
+    assert("initial import request should not include private local data") do
+      serialized_request = JSON.generate(import_request)
+      !serialized_request.include?("avatar_concept_prompt") &&
+        !serialized_request.include?("please implement") &&
+        !serialized_request.include?(ROOT)
+    end
+
+    engine.with_state do |state|
+      state["cloud_sync_metadata"]["last_pushed_sequence"] = 0
+    end
+    response_queue << {
+      body: {
+        result: {
+          ok: true,
           accepted: [],
           duplicates: [],
           rejected: [],
@@ -138,15 +199,17 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
       }
     }
     first_response = tool_payload(run_mcp(state_path, [
-      { jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin } } }
+      { jsonrpc: "2.0", id: 51, method: "tools/call", params: { name: "sync_cloud", arguments: { id_token: "fake-id-token", functions_origin: origin, force: true } } }
     ]).last)
     first_request = requests.last
     first_events = first_request.dig(:body, "data", "events")
     accepted_ids = first_events.map { |event| event["eventId"] }
     max_sequence = first_events.map { |event| event["sequence"].to_i }.max
 
-    assert("sync_cloud should post abstract events with bearer auth") do
-      first_request.dig(:headers, "authorization").first == "Bearer fake-id-token" &&
+    assert("post-import sync_cloud should post abstract events with bearer auth") do
+      first_response["ok"] == true &&
+        first_request[:path] == "/syncRewardEvents" &&
+        first_request.dig(:headers, "authorization").first == "Bearer fake-id-token" &&
         first_events.length >= 2 &&
         first_events.all? do |event|
           event["schemaVersion"] == 2 &&
