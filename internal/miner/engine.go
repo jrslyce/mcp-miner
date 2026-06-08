@@ -418,6 +418,11 @@ func (e *Engine) LatestReportPayload(state M) M {
 
 func (e *Engine) PlayerStatus() M {
 	state, _ := e.State()
+	latestReport := asString(e.LatestReportPayload(state)["report"])
+	updateNotice := e.UpdateNoticePayload()
+	if asString(updateNotice["status"]) == "update_available" {
+		latestReport += "\n\n" + asString(updateNotice["message"])
+	}
 	return M{
 		"player":            M{"space_bucks": asInt(state["space_bucks"]), "report_mode": asString(state["report_mode"]), "cloud_sync": asBool(state["cloud_sync"]), "suit_condition": asInt(state["suit_condition"])},
 		"profile":           asMap(e.ProfilePayload(state)["profile"]),
@@ -430,7 +435,8 @@ func (e *Engine) PlayerStatus() M {
 		"stats":             asMap(state["stats"]),
 		"project_stats":     asMap(state["project_stats"]),
 		"agent_stats":       asMap(state["agent_stats"]),
-		"latest_report":     asString(e.LatestReportPayload(state)["report"]),
+		"latest_report":     latestReport,
+		"update_notice":     updateNotice,
 		"settings":          asMap(e.SettingsPayload(state)["settings"]),
 		"sync":              asMap(e.SyncProgressPayload(state)["sync"]),
 		"milestones":        asMap(e.MilestoneStatusPayload(state)["milestones"]),

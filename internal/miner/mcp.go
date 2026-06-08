@@ -82,6 +82,7 @@ func tools() []any {
 		"get_milestone_status", "get_catalog_summary", "update_settings", "sync_progress",
 		"get_sync_status", "sync_cloud", "preview_sync_payload", "get_backup_status",
 		"create_cloud_backup", "restore_cloud_backup", "claim_milestone", "open_dashboard", "open_store",
+		"check_for_update", "update_plugin",
 	}
 	out := []any{}
 	for _, name := range names {
@@ -98,6 +99,10 @@ func toolDescription(name string) string {
 		return "Return the latest compact MCP Miner report."
 	case "sync_cloud":
 		return "Push queued privacy-safe MCP Miner journal events to the configured Cloud Functions sync API."
+	case "check_for_update":
+		return "Check whether a newer MCP Miner plugin version is available from the configured Git remote."
+	case "update_plugin":
+		return "After explicit confirmation, pull, rebuild, and reinstall the local MCP Miner plugin."
 	default:
 		return "Run MCP Miner tool " + name + "."
 	}
@@ -161,6 +166,8 @@ func schemaFor(name string) M {
 		props["functions_origin"] = M{"type": "string"}
 	case "claim_milestone":
 		props["milestone_id"] = M{"type": "string"}
+	case "update_plugin":
+		props["confirm"] = M{"type": "boolean"}
 	}
 	return M{"type": "object", "properties": props, "additionalProperties": false}
 }
@@ -250,6 +257,10 @@ func callTool(engine *Engine, name string, args M) (M, error) {
 		return engine.OpenDashboard(), nil
 	case "open_store":
 		return engine.OpenStore(), nil
+	case "check_for_update":
+		return engine.UpdateNoticePayload(), nil
+	case "update_plugin":
+		return engine.UpdatePluginPayload(args, io.Discard, io.Discard), nil
 	default:
 		return nil, fmt.Errorf("Unknown tool: %s", name)
 	}

@@ -70,7 +70,7 @@ assert("landing page should document gameplay, install, privacy, and account lin
     index.include?("@mcp-miner status") &&
     index.include?("MCP Miner Control Center") &&
     index.include?("Create a recurring MCP Miner automation") &&
-    !index.include?("Diamond MCP marketplace") &&
+    !index.include?("legacy plugin marketplace") &&
     index.include?("Prompts stored") &&
     index.include?("Not collected for gameplay") &&
     index.include?("short-lived code") &&

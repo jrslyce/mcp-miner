@@ -71,3 +71,5 @@ When the user only says `@mcp-miner`, respond with:
 - `claim_milestone`: disabled local stub until milestone rewards are defined.
 - `open_dashboard`: return dashboard URL.
 - `open_store`: return in-game store URL.
+- `check_for_update`: check Git for a newer installed plugin version. If the status payload includes `update_notice.status == "update_available"`, show the red-light update message at the end of the status report and ask whether to update.
+- `update_plugin`: after the user explicitly answers yes, pull the Git checkout, rebuild the MCP binary, refresh the Codex plugin install, and tell the user to restart Codex or any other agent IDE that keeps MCP servers loaded.

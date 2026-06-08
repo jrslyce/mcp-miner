@@ -20,7 +20,8 @@ def run_mcp(state_path, calls)
   input = calls.map { |payload| JSON.generate(payload) }.join("\n")
   stdout, stderr, status = Open3.capture3({
     "PLUGIN_ROOT" => PLUGIN_ROOT,
-    "MCP_MINER_STATE_PATH" => state_path
+    "MCP_MINER_STATE_PATH" => state_path,
+    "MCP_MINER_SKIP_UPDATE_CHECK" => "1"
   }, McpMinerBinary.path, "mcp", chdir: PLUGIN_ROOT, stdin_data: "#{input}\n")
   raise "MCP test failed: #{stderr}" unless status.success?
 
@@ -86,7 +87,9 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     { jsonrpc: "2.0", id: 12, method: "tools/call", params: { name: "get_catalog_summary", arguments: {} } },
     { jsonrpc: "2.0", id: 13, method: "tools/call", params: { name: "get_reward_controls", arguments: {} } },
     { jsonrpc: "2.0", id: 14, method: "tools/call", params: { name: "open_dashboard", arguments: {} } },
-    { jsonrpc: "2.0", id: 15, method: "tools/call", params: { name: "open_store", arguments: {} } }
+    { jsonrpc: "2.0", id: 15, method: "tools/call", params: { name: "open_store", arguments: {} } },
+    { jsonrpc: "2.0", id: 16, method: "tools/call", params: { name: "check_for_update", arguments: {} } },
+    { jsonrpc: "2.0", id: 17, method: "tools/call", params: { name: "update_plugin", arguments: {} } }
   ])
 
   assert("initialize should advertise MCP tools capability") do
@@ -137,6 +140,8 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     claim_milestone
     open_dashboard
     open_store
+    check_for_update
+    update_plugin
   ]
   assert("tools/list should expose the full local utility surface") do
     (expected_tools - tool_names).empty?
@@ -158,6 +163,8 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
   reward_controls_payload = tool_payload(responses[12])
   dashboard_payload = tool_payload(responses[13])
   store_payload = tool_payload(responses[14])
+  update_check_payload = tool_payload(responses[15])
+  update_plugin_payload = tool_payload(responses[16])
 
   assert("update_settings should remain backward compatible") do
     update_payload["ok"] == true &&
@@ -174,7 +181,9 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
   assert("get_player_status should keep existing top-level status fields") do
     status_payload.dig("player", "space_bucks") == 44 &&
       status_payload.dig("inventory", "mat_chonks") == 125 &&
-      status_payload["latest_report"].start_with?("MCP Miner:")
+      status_payload["latest_report"].start_with?("MCP Miner:") &&
+      status_payload.dig("update_notice", "status") == "disabled" &&
+      status_payload.dig("update_notice", "update_tool") == "update_plugin"
   end
   assert("get_inventory should enrich inventory with material metadata") do
     quartz = inventory_payload.dig("inventory", "items").find { |item| item["material_id"] == "mat_gem_quartz" }
@@ -228,6 +237,12 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     store_payload["store_url"] == "https://mcpminer.net#store" &&
       store_payload["available"] == true
   end
+  assert("update tools should report availability and require explicit confirmation") do
+    update_check_payload["status"] == "disabled" &&
+      update_check_payload["update_tool"] == "update_plugin" &&
+      update_plugin_payload["ok"] == false &&
+      update_plugin_payload["status"] == "confirmation_required"
+  end
 
   serialized_payloads = JSON.generate([
     update_payload,
@@ -241,7 +256,9 @@ Dir.mktmpdir("mcp-miner-server") do |dir|
     claim_payload,
     reward_controls_payload,
     dashboard_payload,
-    store_payload
+    store_payload,
+    update_check_payload,
+    update_plugin_payload
   ])
   assert("MCP utility responses should not expose private local details") do
     !serialized_payloads.include?(ROOT) &&
