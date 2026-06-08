@@ -22,14 +22,24 @@
         </div>
         <div class="topbar-actions">
           <a class="button-secondary" href="/">Home</a>
-          <span id="connection-pill" class="pill">Demo mode</span>
-          <button id="theme-toggle" type="button" class="theme-toggle" aria-pressed="false" aria-label="Use dark mode">
-            <span id="theme-toggle-label">Dark</span>
-          </button>
+          <span id="connection-pill" class="pill">Signed out</span>
           <button id="refresh-dashboard" type="button" class="button-secondary">
             <span>Refresh</span>
           </button>
-          <button id="topbar-sign-out" type="button" class="button-secondary topbar-sign-out" disabled hidden>Log Out</button>
+          <div id="user-menu-wrapper" class="user-menu-wrapper" hidden>
+            <button id="user-menu-button" type="button" class="user-menu-button" aria-label="Open user menu" aria-haspopup="menu" aria-expanded="false">
+              <span class="profile-avatar" aria-hidden="true">
+                <span class="profile-avatar-head"></span>
+                <span class="profile-avatar-mark">?</span>
+              </span>
+            </button>
+            <div id="user-menu" class="user-menu" role="menu" hidden>
+              <button type="button" role="menuitem" data-menu-tab="profile">Profile</button>
+              <button type="button" role="menuitem" data-menu-tab="billing">Billing</button>
+              <button type="button" role="menuitem" data-menu-tab="promo">Promo code</button>
+              <button id="user-menu-logout" type="button" role="menuitem" class="user-menu-logout">Logout</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -100,7 +110,7 @@
             </div>
           </section>
 
-          <section class="panel auth-panel" data-panel="auth" data-dashboard-group="account" aria-labelledby="auth-title">
+          <section class="panel auth-panel" data-panel="auth" data-dashboard-group="profile" aria-labelledby="auth-title">
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">Account</p>
@@ -123,7 +133,6 @@
               <div class="actions">
                 <button id="sign-in" type="submit">Sign In</button>
                 <button id="create-account" type="button" class="button-secondary">Create Account</button>
-                <button id="sign-out" type="button" class="button-secondary" disabled>Sign Out</button>
               </div>
             </form>
             <button id="send-verification-email" type="button" class="button-secondary verification-action" disabled hidden>Resend Verification</button>
@@ -139,22 +148,54 @@
               </div>
               <div>
                 <dt>Profile</dt>
-                <dd id="profile-status">Demo preview</dd>
+                <dd id="profile-status">Sign in required</dd>
               </div>
               <div>
                 <dt>Source</dt>
-                <dd id="dashboard-source">Local demo snapshot</dd>
+                <dd id="dashboard-source">No account loaded</dd>
               </div>
             </dl>
 
             <p id="auth-message" class="message" role="status" aria-live="polite"></p>
           </section>
 
-          <section class="panel account-settings-panel" data-panel="account-settings" data-dashboard-group="account" aria-labelledby="account-settings-title">
+          <section class="panel profile-panel" data-panel="profile" data-dashboard-group="profile" aria-labelledby="profile-title">
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">Crew and codes</p>
-                <h2 id="account-settings-title">Account Settings</h2>
+                <p class="eyebrow">Profile</p>
+                <h2 id="profile-title">User Profile</h2>
+              </div>
+              <span id="profile-menu-status" class="pill">Signed out</span>
+            </div>
+            <dl class="compact-list">
+              <div>
+                <dt>Email</dt>
+                <dd id="profile-email">Sign in</dd>
+              </div>
+              <div>
+                <dt>Password</dt>
+                <dd id="profile-password">Managed by your sign-in provider</dd>
+              </div>
+              <div>
+                <dt>Venture start</dt>
+                <dd id="profile-start-date">Not started</dd>
+              </div>
+            </dl>
+            <form id="space-name-form" class="redeem-form profile-name-form">
+              <label for="space-user-name">Space User Name</label>
+              <div class="copy-row">
+                <input id="space-user-name" type="text" maxlength="80" autocomplete="nickname" placeholder="Quartz Runner">
+                <button id="save-space-user-name" type="submit">Save</button>
+              </div>
+            </form>
+            <p id="space-name-status" class="message" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="panel account-settings-panel" data-panel="account-settings" data-dashboard-group="profile" aria-labelledby="account-settings-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Crew</p>
+                <h2 id="account-settings-title">Referral Crew</h2>
               </div>
               <span id="account-status" class="pill">Sign in</span>
             </div>
@@ -187,26 +228,9 @@
               <p id="referral-status" class="message" role="status" aria-live="polite">Sign in to create your referral crew.</p>
             </div>
 
-            <div class="account-card promo-card">
-              <div class="account-card-heading">
-                <div>
-                  <h3>Promo Code</h3>
-                  <p>Redeem launch, event, or creator codes for account perks.</p>
-                </div>
-              </div>
-              <form id="promo-code-form" class="redeem-form">
-                <label for="promo-code">Code</label>
-                <div class="copy-row">
-                  <input id="promo-code" type="text" maxlength="24" autocomplete="off" placeholder="LAUNCHCREW">
-                  <button id="redeem-promo" type="submit">Apply</button>
-                </div>
-              </form>
-              <div id="promo-redemptions" class="promo-redemptions"></div>
-              <p id="promo-status" class="message" role="status" aria-live="polite"></p>
-            </div>
           </section>
 
-          <section class="panel billing-panel" data-panel="billing" data-dashboard-group="account" aria-labelledby="billing-title">
+          <section class="panel billing-panel" data-panel="billing" data-dashboard-group="billing" aria-labelledby="billing-title">
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">Pro sync</p>
@@ -239,6 +263,25 @@
               <button id="checkout-annual" type="button" class="button-secondary">Annual</button>
               <button id="manage-billing" type="button" class="button-secondary">Manage</button>
             </div>
+          </section>
+
+          <section class="panel promo-code-panel" data-panel="promo-code" data-dashboard-group="promo" aria-labelledby="promo-code-title">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Promo code</p>
+                <h2 id="promo-code-title">Redeem Code</h2>
+              </div>
+            </div>
+            <p class="message">Promo codes may grant free Pro periods, account perks, or approved cheat codes.</p>
+            <form id="promo-code-form" class="redeem-form">
+              <label for="promo-code">Code</label>
+              <div class="copy-row">
+                <input id="promo-code" type="text" maxlength="24" autocomplete="off" placeholder="LAUNCHCREW">
+                <button id="redeem-promo" type="submit">Apply</button>
+              </div>
+            </form>
+            <div id="promo-redemptions" class="promo-redemptions"></div>
+            <p id="promo-status" class="message" role="status" aria-live="polite"></p>
           </section>
 
           <section class="panel devices-panel" data-panel="linked-devices" data-dashboard-group="devices" aria-labelledby="linked-devices-title">
@@ -294,14 +337,13 @@
             <button type="button" class="dashboard-tab" data-dashboard-tab="inventory" aria-selected="false">Inventory</button>
             <button type="button" class="dashboard-tab" data-dashboard-tab="upgrades" aria-selected="false">Upgrades</button>
             <button type="button" class="dashboard-tab" data-dashboard-tab="devices" aria-selected="false">Devices &amp; Sync</button>
-            <button type="button" class="dashboard-tab" data-dashboard-tab="account" aria-selected="false">Account</button>
             <button type="button" class="dashboard-tab" data-dashboard-tab="advanced" aria-selected="false">Advanced</button>
           </nav>
 
           <section class="mode-strip" aria-label="Dashboard mode">
             <div>
               <p class="eyebrow">Mode</p>
-              <strong id="dashboard-mode">Signed-out demo</strong>
+              <strong id="dashboard-mode">Sign in</strong>
             </div>
             <div>
               <p class="eyebrow">Last updated</p>
@@ -344,7 +386,7 @@
             <p id="export-status" class="message" role="status" aria-live="polite"></p>
           </section>
 
-          <section class="panel panel-wide digest-panel" data-panel="weekly-digest" data-dashboard-group="account" aria-labelledby="weekly-digest-title">
+          <section class="panel panel-wide digest-panel" data-panel="weekly-digest" data-dashboard-group="advanced" aria-labelledby="weekly-digest-title">
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">Pro weekly digest</p>
@@ -367,7 +409,7 @@
             </div>
           </section>
 
-          <section class="panel panel-wide cosmetics-panel" data-panel="cosmetics" data-dashboard-group="account" aria-labelledby="cosmetics-title">
+          <section class="panel panel-wide cosmetics-panel" data-panel="cosmetics" data-dashboard-group="advanced" aria-labelledby="cosmetics-title">
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">Profile cosmetics</p>

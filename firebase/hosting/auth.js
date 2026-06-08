@@ -194,170 +194,14 @@ const DEMO_WEEKLY_DIGEST = {
   }
 };
 
-const DEMO_DASHBOARD = {
-  mode: "Signed-out demo",
-  source: "Local demo snapshot",
-  profile: {
-    displayName: "Local Prospector",
-    minerName: "Chonk Runner"
+const EMPTY_COSMETICS = {
+  ...DEMO_COSMETICS,
+  applied: {
+    requested: {},
+    active: {},
+    inactive: {}
   },
-  player: {
-    spaceBucks: 1240,
-    suitCondition: 96
-  },
-  settings: {
-    reportMode: "meaningful_turns_only",
-    cloudSyncEnabled: false,
-    weeklyDigestEnabled: true,
-    betaFeaturesEnabled: false
-  },
-  cloudState: {
-    eventCount: 18,
-    workScoreTotal: 842,
-    lastSequence: 18,
-    lastEventId: "evt_demo_018",
-    updatedAt: "Demo snapshot"
-  },
-  syncMetadata: {
-    lastSequence: 18,
-    conflictState: "none",
-    acceptedCount: 18,
-    lastAcceptedBatchAt: "Demo snapshot",
-    duplicateCount: 0,
-    rejectedCount: 0
-  },
-  syncCadence: {
-    cadenceSeconds: 60,
-    mode: "batch",
-    nextEligibleSyncAt: null,
-    retryAfterSeconds: 0,
-    canAcceptNow: true
-  },
-  syncDevices: [
-    {
-      deviceId: "device_demo",
-      deviceName: "Demo Codex",
-      status: "active",
-      createdAt: "Demo snapshot",
-      lastUsedAt: "Demo snapshot"
-    }
-  ],
-  inventory: [
-    { materialId: "mat_chonks", displayName: "Chonks", category: "core", quantity: 1840, totalSpaceBucks: 0 },
-    { materialId: "mat_iron", displayName: "Iron", category: "ore", quantity: 64, totalSpaceBucks: 128 },
-    { materialId: "mat_quartz", displayName: "Quartz", category: "gem", quantity: 9, totalSpaceBucks: 225 },
-    { materialId: "refined:mat_nickel", displayName: "Refined Nickel", category: "refined", quantity: 12, totalSpaceBucks: 180 }
-  ],
-  orders: [
-    { orderId: "order_demo_1", buyerName: "Noodle Rock Canteen", productName: "Quartz lens batch", rewardSpaceBucks: 320, canFulfill: true, missingMaterials: {} },
-    { orderId: "order_demo_2", buyerName: "Orbital Tool Shed", productName: "Refined nickel spool", rewardSpaceBucks: 210, canFulfill: false, missingMaterials: { "refined:mat_nickel": 4 } }
-  ],
-  asteroid: {
-    asteroidClassId: "asteroid_quartz_belt",
-    displayName: "A-17 Noodle Rock",
-    mined: 840,
-    depletionSize: 1200,
-    percentComplete: 70,
-    rareFindChance: "3.5%"
-  },
-  upgrades: [
-    { upgradeId: "upgrade_drill_power", displayName: "Drill Power", level: 2, maxLevel: 5, effect: "1.35x mining", nextEffect: "1.55x mining" },
-    { upgradeId: "upgrade_scanner_precision", displayName: "Scanner Precision", level: 1, maxLevel: 5, effect: "+2% rare find", nextEffect: "+3% rare find" },
-    { upgradeId: "upgrade_suit_plating", displayName: "Suit Plating", level: 1, maxLevel: 5, effect: "8% hazard reduction", nextEffect: "14% hazard reduction" }
-  ],
-  store: {
-    realMoney: false,
-    categories: {
-      upgrades: [
-        { storeItemId: "upgrade:upgrade_drill_power", kind: "upgrade", displayName: "Drill Power", purchaseState: "affordable", cost: { spaceBucks: 180, materials: { mat_iron: 4 } } },
-        { storeItemId: "upgrade:upgrade_drone_automation", kind: "upgrade", displayName: "Drone Automation", purchaseState: "unaffordable", cost: { spaceBucks: 1450, materials: { mat_quartz: 2 } } }
-      ],
-      machines: [
-        { storeItemId: "machine:machine_circuit_loom", kind: "machine", displayName: "Circuit Loom", purchaseState: "locked", cost: { spaceBucks: 750, materials: {} } }
-      ],
-      baseModules: [
-        { storeItemId: "base_module:base_workshop", kind: "base_module", displayName: "Workshop", purchaseState: "affordable", cost: { spaceBucks: 150, materials: { mat_chonks: 80 } } }
-      ],
-      cosmetics: [
-        { storeItemId: "cosmetic:cosmetic_suit_trim_teal", kind: "cosmetic", displayName: "Teal Suit Trim", purchaseState: "affordable", cost: { spaceBucks: 90, materials: {} } }
-      ]
-    }
-  },
-  reports: [
-    "Mined 64 Chonks and mapped a quartz pocket.",
-    "Order board has one fulfillable buyer request.",
-    "Cloud sync remains optional; shared state is abstract."
-  ],
-  rawSyncEvents: [
-    {
-      eventId: "evt_demo_018",
-      eventType: "work_apply_patch",
-      schemaVersion: 2,
-      receiptSchemaVersion: 2,
-      receiptType: "abstract_work",
-      sequence: 18,
-      observedFields: {
-        score: 8,
-        scoreHint: 8,
-        category: "implementation",
-        scoreSource: "server_receipt_v2",
-        serverCalculated: true
-      },
-      privacyClass: "abstract",
-      source: "codex_hook",
-      receivedAt: "Demo snapshot"
-    }
-  ],
-  base: {
-    moduleCount: 2,
-    droneLevel: 1,
-    storageBonus: "1.10x"
-  },
-  analytics: {
-    retention: {
-      days: 7,
-      limited: true,
-      returnedEvents: 18
-    },
-    trends: {
-      workScoreOverTime: [
-        { day: "Demo", score: 842, events: 18 }
-      ],
-      eventsByCategory: [
-        { category: "implementation", events: 9, score: 420 },
-        { category: "validation", events: 5, score: 260 }
-      ],
-      spaceBucksTrend: [
-        { day: "Demo", value: 1240 }
-      ],
-      materialValueTrend: [
-        { day: "Demo", value: 533 }
-      ],
-      orderEfficiency: [
-        { day: "Demo", value: 50 }
-      ]
-    },
-    syncHealth: {
-      acceptedCount: 18,
-      duplicateCount: 0,
-      rejectedCount: 0,
-      conflictState: "none",
-      activeDevices: 1
-    },
-    current: {
-      spaceBucks: 1240,
-      materialValue: 533,
-      orderEfficiency: {
-        readyPercent: 50,
-        activeOrders: 2,
-        fulfillableOrders: 1
-      }
-    },
-    history: []
-  },
-  cosmetics: DEMO_COSMETICS,
-  weeklyDigest: DEMO_WEEKLY_DIGEST,
-  entitlement: FREE_ENTITLEMENT
+  categories: {}
 };
 
 const EMPTY_CLOUD_DASHBOARD = {
@@ -459,7 +303,7 @@ const EMPTY_CLOUD_DASHBOARD = {
     },
     history: []
   },
-  cosmetics: DEMO_COSMETICS,
+  cosmetics: EMPTY_COSMETICS,
   weeklyDigest: {
     ...DEMO_WEEKLY_DIGEST,
     status: "locked",
@@ -659,7 +503,10 @@ const googleSignInButton = document.querySelector("#google-sign-in");
 const signInButton = document.querySelector("#sign-in");
 const createAccount = document.querySelector("#create-account");
 const signOutButton = document.querySelector("#sign-out");
-const topbarSignOutButton = document.querySelector("#topbar-sign-out");
+const userMenuWrapper = document.querySelector("#user-menu-wrapper");
+const userMenuButton = document.querySelector("#user-menu-button");
+const userMenu = document.querySelector("#user-menu");
+const userMenuLogout = document.querySelector("#user-menu-logout");
 const sendVerificationEmailButton = document.querySelector("#send-verification-email");
 const themeToggle = document.querySelector("#theme-toggle");
 const themeToggleLabel = document.querySelector("#theme-toggle-label");
@@ -752,12 +599,21 @@ const promoCodeInput = document.querySelector("#promo-code");
 const redeemPromoButton = document.querySelector("#redeem-promo");
 const promoRedemptions = document.querySelector("#promo-redemptions");
 const promoStatus = document.querySelector("#promo-status");
+const profileMenuStatus = document.querySelector("#profile-menu-status");
+const profileEmail = document.querySelector("#profile-email");
+const profilePassword = document.querySelector("#profile-password");
+const profileStartDate = document.querySelector("#profile-start-date");
+const spaceNameForm = document.querySelector("#space-name-form");
+const spaceUserName = document.querySelector("#space-user-name");
+const saveSpaceUserName = document.querySelector("#save-space-user-name");
+const spaceNameStatus = document.querySelector("#space-name-status");
 const linkParams = new URLSearchParams(window.location.search);
 const pendingLink = {
   sessionId: normalizeLinkSessionId(linkParams.get("sessionId")),
   code: normalizeLinkCodeParam(linkParams.get("linkCode") || linkParams.get("code"))
 };
 const pendingReferralCode = normalizeReferralCodeParam(linkParams.get("ref") || linkParams.get("referral"));
+const pendingLogin = linkParams.has("login") || window.location.hash === "#login" || window.location.hash === "#account";
 const COMPANY_STORAGE_KEY = "mcp-miner-company-name";
 const PORTAL_INSTALL_PROMPTS = {
   "mac-silicon": "Install MCP Miner on this Apple Silicon Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.",
@@ -767,7 +623,14 @@ const PORTAL_INSTALL_PROMPTS = {
 };
 
 let currentUser = null;
-let activeDashboard = cloneDemo();
+let activeDashboard = cloneEmptyCloud({
+  mode: "Sign in",
+  source: "No account loaded",
+  settings: {
+    ...EMPTY_CLOUD_DASHBOARD.settings,
+    cloudSyncEnabled: false
+  }
+});
 let activeAccountStatus = null;
 let activeDashboardTab = "overview";
 let activeCosmeticPreview = null;
@@ -802,7 +665,7 @@ async function loadPlanCatalog() {
       renderBilling(activeDashboard.entitlement);
     }
   } catch (error) {
-    // The dashboard still renders the signed-out demo if the public catalog cannot be fetched.
+    // Keep the current dashboard visible if the public billing catalog cannot be fetched.
   }
 }
 
@@ -817,9 +680,11 @@ function preferredTheme() {
 function applyTheme(theme) {
   const nextTheme = theme === "dark" ? "dark" : "light";
   document.documentElement.dataset.theme = nextTheme;
-  themeToggle.setAttribute("aria-pressed", nextTheme === "dark" ? "true" : "false");
-  themeToggle.setAttribute("aria-label", nextTheme === "dark" ? "Use light mode" : "Use dark mode");
-  themeToggleLabel.textContent = nextTheme === "dark" ? "Light" : "Dark";
+  if (themeToggle && themeToggleLabel) {
+    themeToggle.setAttribute("aria-pressed", nextTheme === "dark" ? "true" : "false");
+    themeToggle.setAttribute("aria-label", nextTheme === "dark" ? "Use light mode" : "Use dark mode");
+    themeToggleLabel.textContent = nextTheme === "dark" ? "Light" : "Dark";
+  }
   drawAsteroidCanvas(performance.now());
 }
 
@@ -907,7 +772,7 @@ function setupPortalInstallSelector() {
 }
 
 function validDashboardTab(tab) {
-  return ["overview", "orders", "inventory", "upgrades", "devices", "account", "advanced"].includes(tab)
+  return ["overview", "orders", "inventory", "upgrades", "devices", "profile", "billing", "promo", "advanced"].includes(tab)
     ? tab
     : "overview";
 }
@@ -938,8 +803,35 @@ function setupDashboardTabs() {
   setDashboardTab(activeDashboardTab);
 }
 
-function cloneDemo(overrides = {}) {
-  return JSON.parse(JSON.stringify({ ...DEMO_DASHBOARD, ...overrides }));
+function closeUserMenu() {
+  if (!userMenu || !userMenuButton) {
+    return;
+  }
+  userMenu.hidden = true;
+  userMenuButton.setAttribute("aria-expanded", "false");
+}
+
+function toggleUserMenu() {
+  if (!userMenu || !userMenuButton) {
+    return;
+  }
+  const open = userMenu.hidden;
+  userMenu.hidden = !open;
+  userMenuButton.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function focusLoginPanel() {
+  const authPanel = document.querySelector("[data-panel=\"auth\"]");
+  if (authPanel) {
+    authPanel.scrollIntoView({ block: "start" });
+  }
+  if (googleSignInButton && !googleSignInButton.disabled) {
+    googleSignInButton.focus();
+    return;
+  }
+  if (email && !email.disabled) {
+    email.focus();
+  }
 }
 
 function cloneEmptyCloud(overrides = {}) {
@@ -995,9 +887,15 @@ function updateAuthControls(user) {
   googleSignInButton.disabled = signedIn;
   signInButton.disabled = signedIn;
   createAccount.disabled = signedIn;
-  signOutButton.disabled = !signedIn;
-  topbarSignOutButton.hidden = !signedIn;
-  topbarSignOutButton.disabled = !signedIn;
+  if (signOutButton) {
+    signOutButton.disabled = !signedIn;
+  }
+  if (userMenuWrapper) {
+    userMenuWrapper.hidden = !signedIn;
+  }
+  if (!signedIn) {
+    closeUserMenu();
+  }
   updateVerificationControls(user);
 }
 
@@ -1251,6 +1149,42 @@ function renderLinkedDevices(devices = [], rawEntitlement = FREE_ENTITLEMENT) {
   }).join("");
 }
 
+function passwordStatusForUser(user) {
+  if (!user) {
+    return "Sign in";
+  }
+  if (isPasswordProviderUser(user)) {
+    return "Password managed by Firebase Auth";
+  }
+  const providers = Array.isArray(user.providerData)
+    ? user.providerData.map((provider) => provider.providerId).filter(Boolean)
+    : [];
+  return providers.length ? `Managed by ${providers.map(displayNameFromId).join(", ")}` : "Managed by sign-in provider";
+}
+
+function ventureStartDate(data = activeDashboard) {
+  const profile = data.profile || {};
+  const player = data.player || {};
+  return profile.accountLinkedAt ||
+    profile.createdAt ||
+    player.accountLinkedAt ||
+    player.createdAt ||
+    (currentUser && currentUser.metadata && currentUser.metadata.creationTime) ||
+    null;
+}
+
+function renderUserProfile(data = activeDashboard) {
+  const signedIn = Boolean(currentUser);
+  const profile = data.profile || {};
+  profileMenuStatus.textContent = signedIn ? "Signed in" : "Signed out";
+  profileEmail.textContent = signedIn ? currentUser.email || "No email on file" : "Sign in";
+  profilePassword.textContent = passwordStatusForUser(currentUser);
+  profileStartDate.textContent = signedIn ? timestampLabel(ventureStartDate(data)) : "Not started";
+  spaceUserName.value = signedIn ? profile.minerName || profile.displayName || currentUser.displayName || "" : "";
+  spaceUserName.disabled = !signedIn;
+  saveSpaceUserName.disabled = !signedIn;
+}
+
 function emptyAccountStatus() {
   return {
     referral: {
@@ -1406,6 +1340,7 @@ function hasPendingLink() {
 function setLinkMode() {
   document.body.dataset.linkMode = hasPendingLink() ? "pending" : "dashboard";
   document.body.dataset.referralMode = pendingReferralCode ? "pending" : "none";
+  document.body.dataset.loginMode = pendingLogin ? "pending" : "none";
 }
 
 function linkModeLabel(user) {
@@ -2219,9 +2154,9 @@ function renderDashboard(data) {
   const conflictState = syncMetadata.conflictState || syncMetadata.conflict_state || (numberValue(syncMetadata.rejectedCount || syncMetadata.rejected_count) > 0 ? "needs review" : "none");
 
   const linkLabel = linkModeLabel(currentUser);
-  connectionPill.textContent = linkLabel ? linkLabel.pill : (currentUser ? "Signed in" : "Demo mode");
-  dashboardMode.textContent = linkLabel ? linkLabel.mode : (data.mode || (currentUser ? "Cloud profile ready" : "Signed-out demo"));
-  dashboardSource.textContent = linkLabel ? linkLabel.source : (data.source || "Local demo snapshot");
+  connectionPill.textContent = linkLabel ? linkLabel.pill : (currentUser ? "Signed in" : "Signed out");
+  dashboardMode.textContent = linkLabel ? linkLabel.mode : (data.mode || (currentUser ? "Cloud profile ready" : "Sign in"));
+  dashboardSource.textContent = linkLabel ? linkLabel.source : (data.source || "No account loaded");
   lastUpdated.textContent = linkLabel ? linkLabel.updated : timestampLabel(cloudState.updatedAt || syncMetadata.updatedAt || new Date());
   metricSpaceBucks.textContent = formatNumber(data.player && data.player.spaceBucks);
   metricChonks.textContent = formatNumber(materialQuantity(inventory, "mat_chonks"));
@@ -2261,6 +2196,7 @@ function renderDashboard(data) {
   renderPrivacy(data);
   renderBilling(data.entitlement);
   renderLinkedDevices(data.syncDevices || [], data.entitlement);
+  renderUserProfile(data);
   renderAccountStatus(data.accountStatus || emptyAccountStatus());
   setDashboardTab(activeDashboardTab);
 }
@@ -2434,54 +2370,6 @@ function renderStore(data) {
       </div>
     `;
   }).join("");
-}
-
-function findStoreItem(data, storeItemId) {
-  const categories = normalizeStoreCategories(data.store);
-  return [
-    ...categories.upgrades,
-    ...categories.machines,
-    ...categories.baseModules,
-    ...categories.cosmetics
-  ].find((item) => (item.storeItemId || item.store_item_id) === storeItemId);
-}
-
-function applyDemoStorePurchase(storeItemId) {
-  const item = findStoreItem(activeDashboard, storeItemId);
-  if (!item) {
-    setMessage("Store item is unavailable.", true);
-    return;
-  }
-  const state = item.purchaseState || item.purchase_state;
-  if (state !== "affordable") {
-    setMessage(`${item.displayName || item.display_name} is ${state}.`, true);
-    return;
-  }
-
-  const cost = item.cost || {};
-  const materials = cost.materials || {};
-  activeDashboard.player.spaceBucks = numberValue(activeDashboard.player.spaceBucks) - numberValue(cost.spaceBucks ?? cost.space_bucks);
-  Object.entries(materials).forEach(([materialId, quantity]) => {
-    const inventoryItem = activeDashboard.inventory.find((candidate) => candidate.materialId === materialId);
-    if (inventoryItem) {
-      inventoryItem.quantity = Math.max(0, numberValue(inventoryItem.quantity) - numberValue(quantity));
-    }
-  });
-  if (item.kind === "upgrade") {
-    const upgradeId = String(item.storeItemId || item.store_item_id || "").replace(/^upgrade:/, "");
-    const upgrade = activeDashboard.upgrades.find((candidate) => candidate.upgradeId === upgradeId);
-    if (upgrade) {
-      upgrade.level = Math.min(numberValue(upgrade.level) + 1, numberValue(upgrade.maxLevel, 5));
-      upgrade.effect = upgrade.nextEffect || upgrade.effect;
-    }
-  }
-  if (item.kind === "base_module") {
-    activeDashboard.base.moduleCount = numberValue(activeDashboard.base.moduleCount || activeDashboard.base.module_count) + 1;
-  }
-  item.purchaseState = "purchased";
-  item.purchase_state = "purchased";
-  renderDashboard(activeDashboard);
-  setMessage(`${item.displayName || item.display_name} purchased with earned Space Bucks.`);
 }
 
 function renderReports(reports) {
@@ -2768,13 +2656,13 @@ function renderCosmetics(cosmetics) {
   `).join("");
 
   if (lockedCount > 0 && !currentUser) {
-    cosmeticsSummary.textContent = "Demo preview";
+    cosmeticsSummary.textContent = "Sign in";
   }
 }
 
 function renderPrivacy(data) {
   const privacyItems = [
-    ["Owner scope", currentUser ? "Private profile boundary" : "Local demo"],
+    ["Owner scope", currentUser ? "Private profile boundary" : "Signed out"],
     ["Data class", "Abstract progress only"],
     ["Report mode", reportModeLabel(data.settings && data.settings.reportMode)],
     ["Private details", "Not collected"]
@@ -2794,9 +2682,16 @@ async function refreshForCurrentUser(options = {}) {
   const quiet = options.quiet === true;
   try {
     if (!currentUser) {
-      renderDashboard(cloneDemo());
+      renderDashboard(cloneEmptyCloud({
+        mode: "Sign in",
+        source: "No account loaded",
+        settings: {
+          ...EMPTY_CLOUD_DASHBOARD.settings,
+          cloudSyncEnabled: false
+        }
+      }));
       if (!quiet) {
-        setMessage("Demo preview refreshed.");
+        setMessage("Sign in to view your cloud profile.");
       }
       return;
     }
@@ -2818,9 +2713,13 @@ async function refreshForCurrentUser(options = {}) {
       setMessage(DASHBOARD_REFRESH_SUCCESS);
     }
   } catch (error) {
-    renderDashboard(cloneDemo({
-      mode: "Demo fallback",
-      source: "Firebase read failed; showing local preview"
+    renderDashboard(cloneEmptyCloud({
+      mode: currentUser ? "Cloud profile unavailable" : "Sign in",
+      source: currentUser ? "Firebase read failed" : "No account loaded",
+      settings: {
+        ...EMPTY_CLOUD_DASHBOARD.settings,
+        cloudSyncEnabled: Boolean(currentUser)
+      }
     }));
     if (!quiet) {
       setMessage(error.message || "Dashboard refresh failed.", true);
@@ -3064,6 +2963,61 @@ async function updatePortalPreference(field, value) {
   }
 }
 
+function cleanSpaceUserName(value) {
+  return String(value || "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+async function saveSpaceUserNameProfile() {
+  if (!currentUser) {
+    spaceNameStatus.textContent = "Sign in before saving a space user name.";
+    spaceNameStatus.dataset.tone = "error";
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    spaceNameStatus.textContent = EMAIL_VERIFICATION_REQUIRED;
+    spaceNameStatus.dataset.tone = "error";
+    return;
+  }
+  const minerName = cleanSpaceUserName(spaceUserName.value);
+  if (!minerName) {
+    spaceNameStatus.textContent = "Enter a space user name.";
+    spaceNameStatus.dataset.tone = "error";
+    return;
+  }
+
+  saveSpaceUserName.disabled = true;
+  spaceNameStatus.textContent = "Saving space user name.";
+  spaceNameStatus.dataset.tone = "";
+  try {
+    await setDoc(doc(db, "players", currentUser.uid, "profile", "current"), {
+      ownerUid: currentUser.uid,
+      schemaVersion: 1,
+      updatedAt: serverTimestamp(),
+      privacyClass: "abstract",
+      minerName,
+      displayName: minerName
+    }, { merge: true });
+    activeDashboard.profile = {
+      ...(activeDashboard.profile || {}),
+      minerName,
+      displayName: minerName
+    };
+    renderUserProfile(activeDashboard);
+    renderCompanyClaim(activeDashboard.asteroid);
+    spaceNameStatus.textContent = "Space user name saved.";
+    spaceNameStatus.dataset.tone = "success";
+  } catch (error) {
+    spaceNameStatus.textContent = error.message || "Space user name update failed.";
+    spaceNameStatus.dataset.tone = "error";
+  } finally {
+    saveSpaceUserName.disabled = !currentUser;
+  }
+}
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   if (!validateAuthForm()) {
@@ -3089,15 +3043,42 @@ sendVerificationEmailButton.addEventListener("click", () => {
   handleAuth(() => sendVerificationEmailFor(currentUser));
 });
 
-signOutButton.addEventListener("click", () => {
+signOutButton?.addEventListener("click", () => {
   handleAuth(() => signOutCurrentUser());
 });
 
-topbarSignOutButton.addEventListener("click", () => {
-  handleAuth(() => signOutCurrentUser());
+userMenuButton?.addEventListener("click", () => {
+  toggleUserMenu();
 });
 
-themeToggle.addEventListener("click", () => {
+userMenu?.addEventListener("click", (event) => {
+  const menuTab = event.target.closest("[data-menu-tab]");
+  if (menuTab) {
+    setDashboardTab(menuTab.dataset.menuTab);
+    closeUserMenu();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  if (event.target.closest("#user-menu-logout")) {
+    closeUserMenu();
+    handleAuth(() => signOutCurrentUser());
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (!userMenuWrapper || userMenuWrapper.hidden || userMenuWrapper.contains(event.target)) {
+    return;
+  }
+  closeUserMenu();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeUserMenu();
+  }
+});
+
+themeToggle?.addEventListener("click", () => {
   toggleTheme();
 });
 
@@ -3157,6 +3138,11 @@ promoCodeForm.addEventListener("submit", (event) => {
   redeemAccountCode("promo", promoCodeInput.value);
 });
 
+spaceNameForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveSpaceUserNameProfile();
+});
+
 planCards.addEventListener("click", (event) => {
   const button = event.target.closest(".plan-action");
   if (!button || button.disabled) {
@@ -3199,7 +3185,7 @@ storeList.addEventListener("click", (event) => {
     setMessage("Store purchases are validated through the local MCP store flow.", true);
     return;
   }
-  applyDemoStorePurchase(button.dataset.storeItemId);
+  setMessage("Sign in and sync progress before using the store.", true);
 });
 
 onAuthStateChanged(auth, async (user) => {
@@ -3213,7 +3199,7 @@ onAuthStateChanged(auth, async (user) => {
     authStatus.textContent = "Signed out";
     authIdentity.textContent = "Not signed in";
     emailVerificationStatus.textContent = "Not signed in";
-    profileStatus.textContent = "Demo preview";
+    profileStatus.textContent = "Sign in required";
     if (previousUser) {
       email.value = "";
     }
@@ -3221,7 +3207,15 @@ onAuthStateChanged(auth, async (user) => {
     setMessage("");
     activeAccountStatus = emptyAccountStatus();
     renderAccountStatus(activeAccountStatus);
-    renderDashboard(cloneDemo());
+    renderDashboard(cloneEmptyCloud({
+      mode: "Sign in",
+      source: "No account loaded",
+      settings: {
+        ...EMPTY_CLOUD_DASHBOARD.settings,
+        cloudSyncEnabled: false
+      }
+    }));
+    setDashboardTab("profile");
     return;
   }
 
@@ -3271,11 +3265,22 @@ setupCompanyClaim();
 setupPortalInstallSelector();
 if (pendingReferralCode) {
   referralRedeemCode.value = pendingReferralCode;
-  setDashboardTab("account");
+  setDashboardTab("profile");
+}
+if (pendingLogin) {
+  setDashboardTab("profile");
+  window.setTimeout(focusLoginPanel, 0);
 }
 if (hasPendingLink()) {
   setDashboardTab("devices");
 }
 renderDeviceLink(currentUser);
-renderDashboard(cloneDemo());
+renderDashboard(cloneEmptyCloud({
+  mode: "Sign in",
+  source: "No account loaded",
+  settings: {
+    ...EMPTY_CLOUD_DASHBOARD.settings,
+    cloudSyncEnabled: false
+  }
+}));
 loadPlanCatalog();

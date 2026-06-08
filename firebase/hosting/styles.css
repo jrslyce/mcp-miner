@@ -970,7 +970,9 @@ body {
   color: var(--button-ink);
 }
 
+.profile-panel,
 .account-settings-panel,
+.promo-code-panel,
 .account-card,
 .redeem-form,
 .promo-redemptions {
@@ -1138,7 +1140,8 @@ body[data-link-mode="pending"] .link-panel {
 }
 
 body[data-link-mode="pending"] .portal-onboarding,
-body[data-referral-mode="pending"] .portal-onboarding {
+body[data-referral-mode="pending"] .portal-onboarding,
+body[data-login-mode="pending"] .portal-onboarding {
   display: none;
 }
 
@@ -1396,8 +1399,107 @@ button:disabled {
   background: var(--button-secondary-hover);
 }
 
-.topbar-sign-out {
-  min-width: 86px;
+.user-menu-wrapper {
+  position: relative;
+}
+
+.user-menu-button {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+  place-items: center;
+  border-color: var(--line);
+  padding: 0;
+  background: var(--button-secondary-bg);
+}
+
+.user-menu-button[aria-expanded="true"],
+.user-menu-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--button-secondary-hover);
+}
+
+.profile-avatar {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--pill-line);
+  border-radius: 6px;
+  background:
+    linear-gradient(180deg, rgba(88, 199, 155, 0.2), rgba(45, 91, 145, 0.14)),
+    var(--panel-raised);
+}
+
+.profile-avatar-head {
+  position: absolute;
+  top: 7px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--muted);
+}
+
+.profile-avatar-head::after {
+  position: absolute;
+  top: 13px;
+  left: 50%;
+  width: 22px;
+  height: 14px;
+  border-radius: 999px 999px 4px 4px;
+  background: var(--muted);
+  content: "";
+  transform: translateX(-50%);
+}
+
+.profile-avatar-mark {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  color: var(--accent-strong);
+  font-size: 0.88rem;
+  font-weight: 950;
+}
+
+.user-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  width: 210px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--panel);
+  box-shadow: 0 18px 46px var(--shadow);
+}
+
+.user-menu[hidden] {
+  display: none;
+}
+
+.user-menu button {
+  justify-content: start;
+  width: 100%;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.user-menu button:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--button-secondary-hover);
+}
+
+.user-menu-logout {
+  margin-top: 8px;
+  border-top: 1px solid var(--line) !important;
+  color: var(--warn) !important;
 }
 
 .pill,
@@ -2246,7 +2348,7 @@ dd {
   }
 
   .theme-toggle,
-  .topbar-sign-out {
+  .user-menu-button {
     min-width: 0;
   }
 
