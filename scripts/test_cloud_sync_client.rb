@@ -178,6 +178,21 @@ Dir.mktmpdir("mcp-miner-cloud-sync-client") do |dir|
       !preview_json.include?(ROOT)
   end
 
+  engine.with_state do |state|
+    state["cloud_sync_metadata"]["last_pushed_sequence"] = 1
+    state["cloud_sync_metadata"]["initial_state_imported_at"] = nil
+    state["cloud_sync_metadata"]["last_state_import_at"] = nil
+  end
+  late_preview = tool_payload(run_mcp(state_path, [
+    { jsonrpc: "2.0", id: 41, method: "tools/call", params: { name: "preview_sync_payload", arguments: { device_token: "mcpd_preview_secret", functions_origin: "https://example.invalid/functions" } } }
+  ]).last)
+  assert("preview_sync_payload should still import the initial snapshot if the local event cursor advanced first") do
+    late_preview["ok"] == true &&
+      late_preview["sync_type"] == "initial_state_import" &&
+      late_preview.dig("request", "url") == "https://example.invalid/functions/importInitialState" &&
+      late_preview.dig("request", "body", "data", "syncType") == "initial_state_import"
+  end
+
   requests = []
   response_queue = Queue.new
   server, thread, origin = start_sync_server(response_queue, requests)

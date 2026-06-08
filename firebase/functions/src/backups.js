@@ -57,6 +57,25 @@ const FORBIDDEN_VALUE_PATTERNS = [
   /git@github\.com/i
 ];
 
+function isSafeGameIdMapKey(path, key) {
+  if (path.endsWith(".work_events")) {
+    return /^work_[a-z_]+$/.test(key);
+  }
+  if (path.endsWith(".inventory") || path.endsWith(".missing_materials")) {
+    return /^(mat_[a-z0-9_]+|refined:[a-z0-9_]+)$/.test(key);
+  }
+  if (path.endsWith(".asteroid_progress_by_id")) {
+    return /^asteroid_[a-z0-9_]+$/.test(key);
+  }
+  if (path.endsWith(".upgrades")) {
+    return /^upgrade_[a-z0-9_]+$/.test(key);
+  }
+  if (path.endsWith(".base_modules")) {
+    return /^base_[a-z0-9_]+$/.test(key);
+  }
+  return false;
+}
+
 function stableJson(value) {
   if (Array.isArray(value)) {
     return `[${value.map((item) => stableJson(item)).join(",")}]`;
@@ -79,7 +98,8 @@ function assertNoForbiddenBackupData(value, path = "backup") {
   if (value && typeof value === "object") {
     Object.entries(value).forEach(([key, nested]) => {
       const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (FORBIDDEN_KEY_NAMES.has(key) || FORBIDDEN_KEY_TOKENS.some((token) => normalizedKey.includes(token))) {
+      const isSafeGameId = isSafeGameIdMapKey(path, key);
+      if (!isSafeGameId && (FORBIDDEN_KEY_NAMES.has(key) || FORBIDDEN_KEY_TOKENS.some((token) => normalizedKey.includes(token)))) {
         throw new Error(`Backup field ${path}.${key} is not allowed.`);
       }
       assertNoForbiddenBackupData(nested, `${path}.${key}`);

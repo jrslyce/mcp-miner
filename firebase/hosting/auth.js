@@ -2144,7 +2144,7 @@ function normalizeInventoryItem(item, bucket) {
   };
 }
 
-function normalizeOrderRows(snapshot) {
+function normalizeOrderRows(snapshot, state) {
   const rows = [];
   snapshot.forEach((entry) => {
     const data = entry.data();
@@ -2157,6 +2157,20 @@ function normalizeOrderRows(snapshot) {
       missingMaterials: data.missingMaterials || data.missing_materials || {}
     });
   });
+
+  const ordersState = state && state.orders && typeof state.orders === "object" ? state.orders : {};
+  if (!rows.length && Array.isArray(ordersState.orders)) {
+    ordersState.orders.forEach((order, index) => {
+      rows.push({
+        orderId: order.orderId || order.order_id || order.id || `snapshot-order-${index + 1}`,
+        buyerName: order.buyerName || order.buyer_name || order.buyer || order.customer || "Buyer",
+        productName: order.productName || order.product_name || order.recipeName || order.recipe_id || order.material_id || "Material order",
+        rewardSpaceBucks: numberValue(order.rewardSpaceBucks || order.reward_space_bucks || order.payout || order.payout_space_bucks || order.space_bucks),
+        canFulfill: Boolean(order.canFulfill || order.can_fulfill),
+        missingMaterials: order.missingMaterials || order.missing_materials || {}
+      });
+    });
+  }
   return rows.slice(0, 6);
 }
 
@@ -2232,6 +2246,11 @@ function normalizeUpgradeRows(data) {
   if (Array.isArray(data.upgrades)) {
     return data.upgrades.map(normalizeUpgradeItem);
   }
+  if (data.upgrades && typeof data.upgrades === "object") {
+    return Object.entries(data.upgrades)
+      .filter(([, value]) => typeof value === "number")
+      .map(([upgradeId, level]) => normalizeUpgradeItem({ upgradeId, level }));
+  }
   const levels = data.levels || data;
   return Object.entries(levels)
     .filter(([, value]) => typeof value === "number")
@@ -2269,6 +2288,31 @@ function normalizeAsteroid(state) {
     depletionSize,
     percentComplete,
     rareFindChance: state && state.rareFindChance
+  };
+}
+
+function snapshotSections(cloudState) {
+  return cloudState && cloudState.snapshot && typeof cloudState.snapshot === "object" && !Array.isArray(cloudState.snapshot)
+    ? cloudState.snapshot
+    : {};
+}
+
+function stateWithImportedSnapshot(cloudState) {
+  const snapshot = snapshotSections(cloudState);
+  const progress = snapshot.progress && typeof snapshot.progress === "object" ? snapshot.progress : {};
+  return {
+    ...cloudState,
+    spaceBucks: cloudState.spaceBucks ?? cloudState.space_bucks ?? progress.space_bucks,
+    suitCondition: cloudState.suitCondition ?? cloudState.suit_condition ?? progress.suit_condition,
+    currentAsteroidClassId: cloudState.currentAsteroidClassId ?? cloudState.current_asteroid_class_id ?? progress.current_asteroid_class_id,
+    asteroidProgress: cloudState.asteroidProgress ?? cloudState.asteroid_progress ?? progress.asteroid_progress,
+    asteroidProgressById: cloudState.asteroidProgressById ?? cloudState.asteroid_progress_by_id ?? progress.asteroid_progress_by_id,
+    rareFindChance: cloudState.rareFindChance ?? cloudState.rare_find_chance ?? progress.rare_find_pity_score,
+    inventory: cloudState.inventory ?? snapshot.inventory,
+    orders: cloudState.orders ?? snapshot.orders,
+    upgrades: cloudState.upgrades ?? snapshot.upgrades,
+    base: cloudState.base ?? snapshot.base,
+    settings: cloudState.settings ?? snapshot.settings
   };
 }
 
@@ -2343,14 +2387,14 @@ async function loadDashboardForUser(user) {
   const weeklyDigest = reads[13] && reads[13].status === "fulfilled" ? reads[13].value.data.weeklyDigest : null;
   const cosmetics = reads[14] && reads[14].status === "fulfilled" ? reads[14].value.data.cosmetics : null;
   const account = reads[15] && reads[15].status === "fulfilled" ? reads[15].value.data : null;
-  const cloudState = callable.state || directState;
+  const cloudState = stateWithImportedSnapshot(callable.state || directState);
   const syncMetadata = callable.syncMetadata || directSync;
   const inventory = normalizeInventoryRows(queryResult(reads, 7) || { forEach() {} }, cloudState);
-  const orders = normalizeOrderRows(queryResult(reads, 8) || { forEach() {} });
+  const orders = normalizeOrderRows(queryResult(reads, 8) || { forEach() {} }, cloudState);
   const syncDevices = normalizeDeviceRows(queryResult(reads, 9) || { forEach() {} });
   const rawSyncEvents = normalizeRawSyncRows(queryResult(reads, 10) || { forEach() {} });
   const upgrades = normalizeUpgradeRows(docsData(reads, 5));
-  const base = docsData(reads, 6) || {};
+  const base = { ...(cloudState.base || {}), ...(docsData(reads, 6) || {}) };
   const hasCloudState = directStateExists ||
     directSyncExists ||
     inventory.length > 0 ||

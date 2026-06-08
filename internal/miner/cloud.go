@@ -382,9 +382,6 @@ func (e *Engine) needsInitialStateImport(state M, meta M) bool {
 	if asString(meta["initial_state_imported_at"]) != "" || asString(meta["last_state_import_at"]) != "" {
 		return false
 	}
-	if asInt(meta["last_pushed_sequence"]) > 0 {
-		return false
-	}
 	if asString(asMap(state["cloud_auth"])["status"]) != "linked" && !asBool(state["cloud_sync"]) {
 		return false
 	}

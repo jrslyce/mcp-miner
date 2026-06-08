@@ -21,10 +21,26 @@ const safe = sanitizeBackupPayload({
   progress: {
     space_bucks: 45,
     suit_condition: 96,
-    current_asteroid_class_id: "asteroid_quartz_belt"
+    current_asteroid_class_id: "asteroid_quartz_belt",
+    stats: {
+      work_events: {
+        work_user_prompt: 2,
+        work_create_file: 1
+      }
+    }
   },
   inventory: {
     mat_chonks: 160
+  },
+  upgrades: {
+    upgrades: {
+      upgrade_storage: 2
+    }
+  },
+  base: {
+    base_modules: {
+      base_command_center: 1
+    }
   },
   syncMetadata: {
     last_pushed_sequence: 4
@@ -35,6 +51,8 @@ check("backup sanitizer should keep only supported public sections", () => {
   return safe.privacyClass === "abstract" &&
     safe.sections.profile.display_name === "Jared the Prospector" &&
     safe.sections.progress.space_bucks === 45 &&
+    safe.sections.progress.stats.work_events.work_user_prompt === 2 &&
+    safe.sections.base.base_modules.base_command_center === 1 &&
     safe.checksum.length === 64 &&
     safe.byteSize > 0;
 });

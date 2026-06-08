@@ -174,6 +174,17 @@ assert("space user name saves should survive dashboard refreshes") do
     auth_js.include?("setDoc(doc(db, \"players\", currentUser.uid, \"profile\", \"current\"),")
 end
 
+assert("portal should hydrate dashboard cards from imported cloud snapshots") do
+  auth_js.include?("function snapshotSections(cloudState)") &&
+    auth_js.include?("function stateWithImportedSnapshot(cloudState)") &&
+    auth_js.include?("spaceBucks: cloudState.spaceBucks ?? cloudState.space_bucks ?? progress.space_bucks") &&
+    auth_js.include?("inventory: cloudState.inventory ?? snapshot.inventory") &&
+    auth_js.include?("orders: cloudState.orders ?? snapshot.orders") &&
+    auth_js.include?("upgrades: cloudState.upgrades ?? snapshot.upgrades") &&
+    auth_js.include?("const cloudState = stateWithImportedSnapshot(callable.state || directState);") &&
+    auth_js.include?("const orders = normalizeOrderRows(queryResult(reads, 8) || { forEach() {} }, cloudState);")
+end
+
 assert("login route should render only the login card with referral support") do
   auth_js.include?("const pendingLogin = linkParams.has(\"login\")") &&
     auth_js.include?("const LOGIN_REFERRAL_STORAGE_KEY = \"mcp-miner-login-referral-code\"") &&

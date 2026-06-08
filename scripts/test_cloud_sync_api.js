@@ -257,6 +257,7 @@ check("initial state import should sanitize a backup-shaped snapshot", () => {
         stats: {
           work_score_total: 12.5,
           work_events: {
+            work_user_prompt: 1,
             work_search: 1,
             work_apply_patch: 1
           }
@@ -269,7 +270,7 @@ check("initial state import should sanitize a backup-shaped snapshot", () => {
   }, "firebase_uid_123", "2026-05-24T00:00:02Z");
   return imported.snapshot.progress.space_bucks === 42 &&
     imported.snapshotChecksum.length === 64 &&
-    imported.eventCount === 2 &&
+    imported.eventCount === 3 &&
     imported.workScoreTotal === 12.5 &&
     imported.lastSequence === 2 &&
     imported.privacyClass === "abstract";
