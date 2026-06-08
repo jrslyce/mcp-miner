@@ -49,6 +49,7 @@ assert("Firebase Hosting should include baseline browser security headers") do
   header_values["X-Content-Type-Options"] == "nosniff" &&
     header_values["Content-Security-Policy"].include?("default-src 'self'") &&
     header_values["Content-Security-Policy"].include?("script-src 'self' https://www.gstatic.com https://apis.google.com") &&
+    header_values["Content-Security-Policy"].include?("connect-src 'self' https://www.gstatic.com") &&
     header_values["Content-Security-Policy"].include?("object-src 'none'") &&
     header_values["Content-Security-Policy"].include?("frame-ancestors 'none'") &&
     header_values["Cross-Origin-Opener-Policy"] == "same-origin-allow-popups" &&
