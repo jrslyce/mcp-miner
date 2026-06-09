@@ -629,6 +629,8 @@ const LINK_SESSION_STORAGE_TTL_MS = 15 * 60 * 1000;
 const pendingLink = pendingLinkFromLocation();
 const pendingReferralCode = normalizeReferralCodeParam(linkParams.get("ref") || linkParams.get("referral"));
 let pendingLogin = linkParams.has("login") || window.location.hash === "#login" || window.location.hash === "#account";
+let googleRedirectSettled = false;
+let googleRedirectAuthenticatedAt = 0;
 const COMPANY_STORAGE_KEY = "mcp-miner-company-name";
 const LOGIN_REFERRAL_STORAGE_KEY = "mcp-miner-login-referral-code";
 const QUICK_START_STORAGE_KEY = "mcp-miner-quick-start-open";
@@ -1960,9 +1962,22 @@ async function handleAuth(fn) {
 
 async function handleGoogleRedirectResult() {
   try {
-    await getRedirectResult(auth);
+    const redirectResult = await getRedirectResult(auth);
+    if (redirectResult && redirectResult.user) {
+      currentUser = redirectResult.user;
+      googleRedirectAuthenticatedAt = Date.now();
+      updateAuthControls(redirectResult.user);
+      clearLoginRouteAfterSignIn();
+    }
   } catch (error) {
     setMessage(friendlyAuthMessage(error), true);
+  } finally {
+    googleRedirectSettled = true;
+    if (!currentUser && !auth.currentUser && pendingLogin) {
+      updateAuthControls(null);
+      renderDeviceLink(null);
+      renderSignedOutState();
+    }
   }
 }
 
@@ -3741,34 +3756,47 @@ storeList.addEventListener("click", (event) => {
   setMessage("Sign in and sync progress before using the store.", true);
 });
 
+function renderSignedOutState(previousUser = null) {
+  clearPortalRefreshTimer();
+  activeCosmeticPreview = null;
+  authStatus.textContent = "Signed out";
+  authIdentity.textContent = "Not signed in";
+  emailVerificationStatus.textContent = "Not signed in";
+  profileStatus.textContent = "Sign in required";
+  if (previousUser) {
+    email.value = "";
+  }
+  password.value = "";
+  setMessage("");
+  activeAccountStatus = emptyAccountStatus();
+  renderAccountStatus(activeAccountStatus);
+  renderDashboard(cloneEmptyCloud({
+    mode: "Sign in",
+    source: "No account loaded",
+    settings: {
+      ...EMPTY_CLOUD_DASHBOARD.settings,
+      cloudSyncEnabled: false
+    }
+  }));
+  setDashboardTab(hasPendingLink() ? "devices" : (pendingLogin ? "profile" : dashboardTabFromLocation()), { replaceRoute: pendingLogin });
+}
+
 onAuthStateChanged(auth, async (user) => {
   const previousUser = currentUser;
+  if (!user && pendingLogin && !googleRedirectSettled) {
+    authStatus.textContent = "Completing sign in";
+    profileStatus.textContent = "Checking Google sign-in";
+    setMessage("Completing Google sign-in.");
+    return;
+  }
+  if (!user && currentUser && googleRedirectAuthenticatedAt && Date.now() - googleRedirectAuthenticatedAt < 5000) {
+    return;
+  }
   currentUser = user;
   updateAuthControls(user);
   renderDeviceLink(user);
   if (!user) {
-    clearPortalRefreshTimer();
-    activeCosmeticPreview = null;
-    authStatus.textContent = "Signed out";
-    authIdentity.textContent = "Not signed in";
-    emailVerificationStatus.textContent = "Not signed in";
-    profileStatus.textContent = "Sign in required";
-    if (previousUser) {
-      email.value = "";
-    }
-    password.value = "";
-    setMessage("");
-    activeAccountStatus = emptyAccountStatus();
-    renderAccountStatus(activeAccountStatus);
-    renderDashboard(cloneEmptyCloud({
-      mode: "Sign in",
-      source: "No account loaded",
-      settings: {
-        ...EMPTY_CLOUD_DASHBOARD.settings,
-        cloudSyncEnabled: false
-      }
-    }));
-    setDashboardTab(hasPendingLink() ? "devices" : (pendingLogin ? "profile" : dashboardTabFromLocation()), { replaceRoute: pendingLogin });
+    renderSignedOutState(previousUser);
     return;
   }
 
