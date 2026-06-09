@@ -261,8 +261,14 @@ assert("space user name saves should survive dashboard refreshes") do
     auth_js.include?("Enter exactly two words for the space charter name") &&
     auth_js.include?("miningCompanyName") &&
     auth_js.include?("await Promise.all([") &&
-    auth_js.include?("setDoc(doc(db, \"players\", currentUser.uid),") &&
-    auth_js.include?("setDoc(doc(db, \"players\", currentUser.uid, \"profile\", \"current\"),")
+    auth_js.include?("const playerSnap = await getDoc(playerRef);") &&
+    auth_js.include?("if (!playerSnap.exists())") &&
+    auth_js.include?("playerPatch.schemaVersion = 1;") &&
+    auth_js.include?("playerPatch.createdAt = serverTimestamp();") &&
+    auth_js.include?("const playerRef = doc(db, \"players\", currentUser.uid);") &&
+    auth_js.include?("const profileRef = doc(db, \"players\", currentUser.uid, \"profile\", \"current\");") &&
+    auth_js.include?("setDoc(playerRef, playerPatch, { merge: true })") &&
+    auth_js.include?("setDoc(profileRef,")
 end
 
 assert("referral crew status should include public recruit names") do
