@@ -97,6 +97,7 @@ service cloud.firestore {
           "privacyClass",
           "displayName",
           "minerName",
+          "miningCompanyName",
           "cloudSyncEnabled",
           "accountLinkedAt"
         ]) &&
@@ -107,6 +108,7 @@ service cloud.firestore {
         timestampLike(data, "accountLinkedAt") &&
         optionalStringAtMost(data, "displayName", 80) &&
         optionalStringAtMost(data, "minerName", 80) &&
+        optionalStringAtMost(data, "miningCompanyName", 72) &&
         optionalBool(data, "cloudSyncEnabled");
     }
 
@@ -119,8 +121,12 @@ service cloud.firestore {
           "privacyClass",
           "displayName",
           "minerName",
+          "miningCompanyName",
           "pronouns",
           "suitStyle",
+          "avatarDataUrl",
+          "avatarMimeType",
+          "avatarUpdatedAt",
           "avatarConceptPrompt",
           "customizationUnlocks",
           "generatedAssetRefs"
@@ -130,8 +136,12 @@ service cloud.firestore {
         timestampLike(data, "updatedAt") &&
         optionalStringAtMost(data, "displayName", 80) &&
         optionalStringAtMost(data, "minerName", 80) &&
+        optionalStringAtMost(data, "miningCompanyName", 72) &&
         optionalStringAtMost(data, "pronouns", 40) &&
         optionalStringAtMost(data, "suitStyle", 160) &&
+        optionalStringAtMost(data, "avatarDataUrl", 360000) &&
+        optionalStringAtMost(data, "avatarMimeType", 32) &&
+        timestampLike(data, "avatarUpdatedAt") &&
         optionalStringAtMost(data, "avatarConceptPrompt", 1000) &&
         optionalListAtMost(data, "customizationUnlocks", 50) &&
         optionalListAtMost(data, "generatedAssetRefs", 20);

@@ -103,7 +103,7 @@ Input:
       },
       "privacyClass": "abstract",
       "source": "codex_hook",
-      "signature": "v2.local-placeholder",
+      "signature": "v2.local.<uid-event-signature>",
       "checksum": "sha256-of-canonical-abstract-payload"
     }
   ]
@@ -132,7 +132,7 @@ Validation:
 - `sequence` must be monotonic for new event IDs.
 - `eventId` dedupes repeated submissions.
 - `checksum` must match the canonical abstract payload.
-- `signature` must use the V2 placeholder format until plugin signing is finalized.
+- `signature` must use the V2 local format and match the authenticated UID plus event ID until full device-key signing is finalized.
 - private field names such as prompts, code, terminal output, commands, paths, repo names, browser/app content, and transcripts are rejected recursively.
 
 Reducer writes:
@@ -141,6 +141,17 @@ Reducer writes:
 - `/players/{uid}/gameState/current` stores the imported abstract snapshot plus aggregate abstract state such as event counts, score totals, work-event counters, last event ID, and last sequence.
 - `/players/{uid}/syncMetadata/default` stores aggregate sequence/counter metadata for the account and the legacy Firebase Auth cursor.
 - `/players/{uid}/syncMetadata/{deviceId}` stores the per-device cursor for linked Codex instances. Reward event IDs remain globally idempotent under `/players/{uid}/rewardEvents/{eventId}`.
+
+## Cheater Blockers
+
+The sync API treats local game state as untrusted once it crosses into cloud sync. Current guardrails:
+
+- v2 local receipts must carry a deterministic local signature bound to the authenticated Firebase UID and event ID.
+- v2 receipts may provide bounded score hints, but not final score fields; absurd score hints are rejected rather than silently capped.
+- The first cloud snapshot import validates abstract-only backup data and rejects imported work-score or economy totals that exceed generous plausibility limits from the imported work-event counts.
+- Cloud reward events remain append-only and idempotent by event ID, while per-device cursors reject stale sequence submissions.
+
+Future hardening should replace deterministic local signatures with real device-held signing keys and add anomaly detection for event mix, event cadence, and suspicious first-import economy totals.
 
 ### `getSyncState`
 

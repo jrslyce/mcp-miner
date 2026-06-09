@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MCP Miner Instructions</title>
+    <meta name="description" content="A complete guide to MCP Miner gameplay, portal sync, privacy, account setup, referrals, and common commands.">
+    <link rel="icon" type="image/png" href="/assets/logo.png">
+    <link rel="apple-touch-icon" href="/assets/logo.png">
+    <script src="/theme.js"></script>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="landing-shell instructions-shell">
+      <nav class="landing-nav" aria-label="MCP Miner instructions">
+        <a class="landing-brand" href="/" aria-label="MCP Miner home">
+          <img class="landing-brand-wordmark" src="/assets/mcpminer-words.png" alt="MCP Miner">
+        </a>
+        <div class="landing-nav-links">
+          <a href="#quickstart">Start</a>
+          <a href="#gameplay">Gameplay</a>
+          <a href="#portal-sync">Sync</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#commands">Commands</a>
+        </div>
+        <div class="landing-nav-actions">
+          <a class="nav-button" href="/portal">Portal</a>
+          <a class="nav-button secondary" href="/">Home</a>
+        </div>
+      </nav>
+
+      <section class="instructions-hero" aria-labelledby="instructions-title">
+        <div class="generated-topic-art" data-topic="charter"></div>
+        <div>
+          <p class="eyebrow">Player guide</p>
+          <h1 id="instructions-title">MCP Miner Instructions</h1>
+          <p>MCP Miner is a local-first idle mining game for Codex. You work normally, MCP Miner converts only privacy-safe abstract work events into game progress, and the portal shows your synced progress when you choose to link an account.</p>
+        </div>
+      </section>
+
+      <section id="quickstart" class="landing-section instruction-section" aria-labelledby="quickstart-title">
+        <div class="section-heading">
+          <p class="eyebrow">First run</p>
+          <h2 id="quickstart-title">Set up your charter before you mine in the cloud.</h2>
+        </div>
+        <div class="instruction-grid">
+          <article>
+            <div class="generated-topic-art" data-topic="profile"></div>
+            <h3>1. Create or sign into an account</h3>
+            <p>The portal account lets you approve Codex devices, view synced progress, manage billing, and use referral crew features. Password accounts must verify email before sync or device approval.</p>
+          </article>
+          <article>
+            <div class="generated-topic-art" data-topic="company"></div>
+          <h3>2. Name your Space charter</h3>
+            <p>Your space charter name is a two-word first-and-last style name, such as Buck Manwood. It is intentionally locked after setup so the game can treat it like a persistent captain identity.</p>
+          </article>
+          <article>
+            <div class="generated-topic-art" data-topic="company"></div>
+            <h3>3. Name your mining LSLC</h3>
+            <p>Your mining outfit is a Limited Space Liability Company. If you leave off LSLC, the portal adds it. The company name is used for claim labels and profile identity.</p>
+          </article>
+          <article>
+            <div class="generated-topic-art" data-topic="install"></div>
+            <h3>4. Install and link Codex</h3>
+            <p>Copy the OS install prompt, restart Codex, trust the MCP Miner hooks, start an account link from Codex, approve the short-lived code in the portal, then complete cloud sync from Codex.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="gameplay" class="landing-section instruction-section" aria-labelledby="gameplay-title">
+        <div class="section-heading">
+          <p class="eyebrow">Gameplay</p>
+          <h2 id="gameplay-title">What all the numbers mean.</h2>
+        </div>
+        <div class="instruction-columns">
+          <article>
+            <h3>Suit %</h3>
+            <p>Suit percentage is your miner's condition. Normal work can expose you to asteroid hazards, and hazards can lower suit condition. Keep an eye on it as harder asteroid classes become available.</p>
+          </article>
+          <article>
+            <h3>Chonks</h3>
+            <p>Chonks are the starter material bucket mined from supported work events. They can be refined, sold, or used to fulfill orders depending on the current economy and recipes.</p>
+          </article>
+          <article>
+            <h3>Space Bucks</h3>
+            <p>Space Bucks are earned by fulfilling orders, selling materials, completing contracts, or receiving approved rewards. They buy upgrades, store items, base modules, and future unlocks.</p>
+          </article>
+          <article>
+            <h3>Asteroid progress</h3>
+            <p>Each asteroid claim has a depletion size. Synced progress shows mined amount, percent complete, the current rock class, rare-find chance, work score, last event number, and linked devices.</p>
+          </article>
+          <article>
+            <h3>Materials and inventory</h3>
+            <p>Inventory tracks raw, refined, fabricated, and special materials. The portal only shows game inventory, not private work artifacts. Material values are used by orders, store decisions, and summaries.</p>
+          </article>
+          <article>
+            <h3>Orders and upgrades</h3>
+            <p>Orders consume materials and pay Space Bucks. Upgrades improve mining, rewards, protection, or automation paths. A good loop is status, refine useful materials, fulfill ready orders, then buy the best affordable upgrade.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="portal-sync" class="landing-section instruction-section" aria-labelledby="sync-title">
+        <div class="section-heading">
+          <p class="eyebrow">Portal and sync</p>
+          <h2 id="sync-title">Cloud sync mirrors abstract game state.</h2>
+        </div>
+        <div class="instruction-grid">
+          <article>
+            <div class="generated-topic-art" data-topic="sync"></div>
+            <h3>What sync sends</h3>
+            <p>Sync sends abstract reward events, sequence numbers, checksums, totals, inventory, orders, upgrades, asteroid progress, reports, and device metadata needed to render the portal.</p>
+          </article>
+          <article>
+            <div class="generated-topic-art" data-topic="privacy"></div>
+            <h3>What sync never sends</h3>
+            <p>MCP Miner does not sync prompts, chat transcripts, source code, file paths, repo names, terminal output, browser content, app content, OpenAI account data, or raw private work artifacts.</p>
+          </article>
+          <article>
+            <div class="generated-topic-art" data-topic="devices"></div>
+            <h3>Devices</h3>
+            <p>Each Codex device gets a revocable local token after you approve a short-lived link code. Free accounts support one Codex device; Pro supports more devices and faster sync cadence.</p>
+          </article>
+          <article>
+            <div class="generated-topic-art" data-topic="reports"></div>
+            <h3>Reports</h3>
+            <p>Reports are compact game summaries generated from abstract state. They are designed to be safe to show in Codex without leaking private project content.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="privacy" class="landing-section instruction-section" aria-labelledby="privacy-title">
+        <div class="section-heading">
+          <p class="eyebrow">Privacy model</p>
+          <h2 id="privacy-title">The game rewards work shape, not work contents.</h2>
+        </div>
+        <div class="privacy-columns">
+          <article>
+            <h3>Allowed game data</h3>
+            <ul>
+              <li>Abstract event type, category, score, checksum, and sequence</li>
+              <li>Aggregated totals such as Chonks, Space Bucks, suit condition, and event counts</li>
+              <li>Inventory, orders, upgrades, base modules, asteroid class, and claim progress</li>
+              <li>Portal account settings, referral code state, and revocable device records</li>
+            </ul>
+          </article>
+          <article>
+            <h3>Excluded private data</h3>
+            <ul>
+              <li>Prompts, assistant replies, transcripts, source code, and diffs</li>
+              <li>File paths, repo names, command output, terminal output, and browser contents</li>
+              <li>OpenAI credentials, passwords, API keys, raw tokens, or personal documents</li>
+              <li>Anything not needed to compute or display game progress</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="referrals" class="landing-section instruction-section" aria-labelledby="referrals-title">
+        <div class="section-heading">
+          <p class="eyebrow">Referral crew</p>
+          <h2 id="referrals-title">Invite other miners into your crew.</h2>
+        </div>
+        <p>Your referral code and invite link live on the Profile page. When another player signs up or redeems your code, the Referral Crew area shows your crew count and the public space charter names that joined through you. Referral rewards are currently recorded as account events; future settings can use those records for configurable Space Bucks sharing.</p>
+      </section>
+
+      <section id="commands" class="landing-section instruction-section" aria-labelledby="commands-title">
+        <div class="section-heading">
+          <p class="eyebrow">Common commands</p>
+          <h2 id="commands-title">Useful things to ask Codex.</h2>
+        </div>
+        <div class="command-grid">
+          <article class="command-card">
+            <h3>Status</h3>
+            <ul class="command-list">
+              <li><code>@mcp-miner status</code></li>
+              <li><code>@mcp-miner show asteroid status</code></li>
+              <li><code>@mcp-miner show inventory and orders</code></li>
+            </ul>
+          </article>
+          <article class="command-card">
+            <h3>Progress</h3>
+            <ul class="command-list">
+              <li><code>@mcp-miner refine useful materials</code></li>
+              <li><code>@mcp-miner fulfill ready orders</code></li>
+              <li><code>@mcp-miner buy the best affordable upgrades</code></li>
+            </ul>
+          </article>
+          <article class="command-card">
+            <h3>Sync</h3>
+            <ul class="command-list">
+              <li><code>@mcp-miner start account link</code></li>
+              <li><code>@mcp-miner complete account link</code></li>
+              <li><code>@mcp-miner sync cloud</code></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+    <script src="/instructions.js"></script>
+  </body>
+</html>

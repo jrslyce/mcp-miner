@@ -19,9 +19,12 @@ end
 
 landing = read("firebase/hosting/index.html")
 portal = read("firebase/hosting/portal.html")
-index = "#{landing}\n#{portal}"
+instructions = read("firebase/hosting/instructions.html")
+index = "#{landing}\n#{portal}\n#{instructions}"
 auth_js = read("firebase/hosting/auth.js")
 landing_js = read("firebase/hosting/landing.js")
+instructions_js = read("firebase/hosting/instructions.js")
+functions_js = read("firebase/functions/src/index.js")
 subscription_catalog = JSON.parse(read("firebase/hosting/subscription-plans.json"))
 subscription_config = YAML.load_file(File.join(ROOT, "data/subscription_plans.yaml"))
 styles = read("firebase/hosting/styles.css")
@@ -44,6 +47,7 @@ assert("landing page should explain MCP Miner before the dashboard") do
     landing.include?("Turn Your Work Into an Asteroid-Mining Adventure") &&
     index.include?("Install the plugin") &&
     index.include?("Open portal") &&
+    landing.include?(%(href="/instructions">Instructions</a>)) &&
     index.include?(%(href="https://github.com/jrslyce/mcp-miner")) &&
     index.include?(%(src="/assets/mcpminer-words.png")) &&
     index.include?(%(src="/assets/mcpminer-hero.png")) &&
@@ -81,6 +85,27 @@ assert("landing page should document gameplay, install, privacy, and account lin
     landing.include?(%(href="/portal")) &&
     landing_js.include?("new URL(\"/link\", window.location.origin)") &&
     landing_js.include?("window.location.replace(nextUrl.toString())")
+end
+
+assert("instructions page should thoroughly explain MCP Miner gameplay and sync") do
+  instructions.include?(%(<main class="landing-shell instructions-shell">)) &&
+    instructions.include?("MCP Miner Instructions") &&
+    instructions.include?("Suit %") &&
+    instructions.include?("Chonks") &&
+    instructions.include?("Space Bucks") &&
+    instructions.include?("Asteroid progress") &&
+    instructions.include?("What sync sends") &&
+    instructions.include?("What sync never sends") &&
+    instructions.include?("Referral crew") &&
+    instructions.include?("Space charter") &&
+    instructions.include?(%(class="generated-topic-art")) &&
+    instructions.include?(%(<script src="/instructions.js"></script>)) &&
+    instructions_js.include?("function generatedTopicSvg(topic, index)") &&
+    instructions_js.include?("TOPIC_PALETTES") &&
+    styles.include?(".instructions-hero") &&
+    styles.include?(".instruction-grid") &&
+    styles.include?(".generated-topic-art") &&
+    read("firebase.json").include?(%("source": "/instructions"))
 end
 
 assert("landing page should use responsive production styles") do
@@ -129,19 +154,30 @@ assert("portal should include collapsible Quick Start before the stats dashboard
     styles.include?("@keyframes asteroid-card-sheen")
 end
 
-assert("portal should expose profile, referral crew, billing, and promo code account pages") do
+assert("portal should expose profile, devices, referral crew, billing, and promo code account pages") do
   portal.include?(%(id="user-menu-button")) &&
     portal.include?(%(id="user-menu-logout")) &&
     portal.include?(%(href="/portal/profile")) &&
+    portal.include?(%(href="/portal/devices")) &&
     portal.include?(%(href="/portal/billing")) &&
     portal.include?(%(href="/portal/promo")) &&
     portal.include?(%(data-menu-page="profile")) &&
+    portal.include?(%(data-menu-page="devices")) &&
     portal.include?(%(data-menu-page="billing")) &&
     portal.include?(%(data-menu-page="promo")) &&
+    !portal.include?(%(data-dashboard-tab="devices")) &&
+    portal.include?(%(href="/instructions")) &&
+    portal.include?(%(id="user-avatar-image")) &&
+    portal.include?(%(id="profile-avatar-input")) &&
+    portal.include?(%(accept="image/png,image/jpeg,image/webp")) &&
     portal.include?(%(id="space-user-name")) &&
+    portal.include?(%(id="profile-company-input")) &&
+    portal.include?(%(id="profile-space-name")) &&
+    portal.include?(%(id="profile-company-name")) &&
     portal.include?(%(data-panel="account-settings")) &&
     portal.include?(%(id="referral-code")) &&
     portal.include?(%(id="referral-link")) &&
+    portal.include?(%(id="referral-recruits-list")) &&
     portal.include?(%(id="referral-redeem-form")) &&
     portal.include?(%(id="login-referral-code")) &&
     portal.include?(%(id="login-referral-status")) &&
@@ -149,16 +185,25 @@ assert("portal should expose profile, referral crew, billing, and promo code acc
     portal.include?(%(id="promo-code-form")) &&
     portal.include?("Referral Crew") &&
     portal.include?("Promo code") &&
-    portal.include?("Space User Name") &&
+    portal.include?("Space charter name") &&
+    portal.include?("Mining LSLC") &&
     auth_js.include?("httpsCallable(functions, \"getAccountStatus\")") &&
     auth_js.include?("httpsCallable(functions, isReferral ? \"redeemReferralCode\" : \"redeemPromoCode\")") &&
     auth_js.include?("function saveSpaceUserNameProfile()") &&
     auth_js.include?("function renderAccountStatus(status = activeAccountStatus)") &&
+    auth_js.include?("referralRecruitsList.innerHTML") &&
     auth_js.include?("function dashboardTabFromLocation()") &&
     auth_js.include?("function setDashboardRoute(tab, replace = false)") &&
+    auth_js.include?("function saveProfileAvatar(file)") &&
+    auth_js.include?("dimensions.width !== dimensions.height") &&
+    auth_js.include?("avatarDataUrl") &&
     styles.include?(".user-menu-button") &&
     styles.include?(".user-menu a") &&
+    styles.include?(".profile-avatar-editor") &&
+    styles.include?(".profile-avatar-image") &&
     styles.include?(".account-settings-panel") &&
+    styles.include?(".profile-setup") &&
+    styles.include?(".referral-recruit-row") &&
     styles.include?(".promo-row")
 end
 
@@ -169,9 +214,25 @@ assert("space user name saves should survive dashboard refreshes") do
     auth_js.include?("const profileNamePatch = {};") &&
     auth_js.include?("...profileNamePatch") &&
     auth_js.include?("fallback.profile = { ...fallback.profile, ...player, ...profile };") &&
+    auth_js.include?("const SPACE_CHARTER_NAME_PATTERN") &&
+    auth_js.include?("function cleanMiningCompanyName(value)") &&
+    auth_js.include?("function profileSetupComplete(data = activeDashboard)") &&
+    auth_js.include?("profileSetup.hidden = hasLockedProfile") &&
+    auth_js.include?("Enter exactly two words for the space charter name") &&
+    auth_js.include?("miningCompanyName") &&
     auth_js.include?("await Promise.all([") &&
     auth_js.include?("setDoc(doc(db, \"players\", currentUser.uid),") &&
     auth_js.include?("setDoc(doc(db, \"players\", currentUser.uid, \"profile\", \"current\"),")
+end
+
+assert("referral crew status should include public recruit names") do
+  functions_js.include?("function publicPlayerName(data = {}, fallback = \"Space charter pending\")") &&
+    functions_js.include?("db.collection(`players/${uid}/referralRecruits`).limit(50).get()") &&
+    functions_js.include?("const recruitProfileRefs = recruitsSnap.docs.map") &&
+    functions_js.include?("displayName: publicPlayerName(data, publicPlayerName(profile))") &&
+    functions_js.include?("recruitDisplayName: publicPlayerName") &&
+    auth_js.include?("recruit.displayName || \"Space charter pending\"") &&
+    auth_js.include?("No referred players yet.")
 end
 
 assert("portal should hydrate dashboard cards from imported cloud snapshots") do
@@ -318,6 +379,7 @@ end
 
 assert("dashboard should render cosmetic preview, apply, locked, and mobile-safe states") do
   index.include?(%(data-panel="cosmetics")) &&
+    index.include?("In Planning") &&
     auth_js.include?("Cosmetics are visual only and do not affect mining rewards, Space Bucks, or orders.") &&
     auth_js.include?("data-state=\"${escapeHtml(activeCosmeticPreview === item.id ? \"preview\"") &&
     auth_js.include?("data-locked=\"${item.locked ? \"true\" : \"false\"}") &&
@@ -326,6 +388,8 @@ assert("dashboard should render cosmetic preview, apply, locked, and mobile-safe
     auth_js.include?("${itemName} applied") &&
     auth_js.include?("${itemName} locked: ${displayNameFromId(item.lockedReason || item.availability || \"locked\")}") &&
     styles.include?(".cosmetics-list") &&
+    styles.include?(".planning-overlay") &&
+    styles.include?("filter: grayscale(1)") &&
     styles.include?(".cosmetic-row") &&
     styles.include?(":root[data-cosmetic-theme=\"nebula\"]") &&
     styles.include?("@media (max-width: 700px)") &&
@@ -704,9 +768,11 @@ assert("dashboard styles should be responsive and stable across mobile and deskt
     styles.include?("@media (max-width: 700px)") &&
     styles.include?("body[data-dashboard-view=\"account\"] .side-rail") &&
     styles.include?("body[data-dashboard-view=\"account\"] .main-board") &&
+    styles.include?("body[data-dashboard-view=\"account\"] .portal-onboarding") &&
+    styles.include?("body[data-dashboard-view=\"account\"][data-auth-state=\"signed-in\"] [data-panel=\"auth\"]") &&
     styles.include?("body[data-dashboard-view=\"game\"] .main-board") &&
     styles.include?("grid-template-columns: repeat(4, minmax(0, 1fr))") &&
-    styles.include?("grid-template-columns: repeat(6, minmax(108px, 1fr))") &&
+    styles.include?("grid-template-columns: repeat(5, minmax(108px, 1fr))") &&
     styles.include?("grid-template-columns: repeat(auto-fit, minmax(118px, 1fr))") &&
     styles.include?(".topbar,\n.workspace-grid,\n.side-rail,\n.main-board") &&
     styles.include?("grid-template-columns: repeat(auto-fit, minmax(76px, 1fr))") &&

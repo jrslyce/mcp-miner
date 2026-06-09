@@ -158,7 +158,17 @@ async function main() {
     updatedAt: stringField(now),
     privacyClass: stringField("abstract"),
     displayName: stringField("Integration Prospector"),
-    minerName: stringField("Smoke Miner")
+    minerName: stringField("Smoke Miner"),
+    miningCompanyName: stringField("Smoke Belt LSLC")
+  });
+  await patchDoc(`players/${other.localId}/profile/current`, other.idToken, {
+    ownerUid: stringField(other.localId),
+    schemaVersion: intField(1),
+    updatedAt: stringField(now),
+    privacyClass: stringField("abstract"),
+    displayName: stringField("Nova Recruit"),
+    minerName: stringField("Nova Recruit"),
+    miningCompanyName: stringField("Recruit Rock LSLC")
   });
   await patchDoc(`players/${owner.localId}/settings/current`, owner.idToken, {
     ownerUid: stringField(owner.localId),
@@ -215,6 +225,9 @@ async function main() {
   const analytics = await callFunction("getDashboardAnalytics", owner.idToken, {});
   const digest = await callFunction("getWeeklyDigest", owner.idToken, {});
   const cosmetics = await callFunction("getCosmeticCatalog", owner.idToken, {});
+  const ownerAccount = await callFunction("getAccountStatus", owner.idToken, {});
+  const referralJoin = await callFunction("redeemReferralCode", other.idToken, { code: ownerAccount.result.referral.code });
+  const ownerAccountAfterReferral = await callFunction("getAccountStatus", owner.idToken, {});
   await getDoc(`players/${owner.localId}/gameState/current`, owner.idToken);
 
   const indexHtml = await requestText(`http://${HOSTING_HOST}/`);
@@ -259,6 +272,13 @@ async function main() {
   if (!cosmetics.result || !cosmetics.result.cosmetics || !cosmetics.result.cosmetics.noProgressionEffects) {
     throw new Error("cosmetic catalog did not return visual-only cosmetics");
   }
+  if (!referralJoin.result || referralJoin.result.referral.referredByCode !== ownerAccount.result.referral.code) {
+    throw new Error("referral code redeem did not mark referred account");
+  }
+  const ownerRecruits = ownerAccountAfterReferral.result.referral.recruits || [];
+  if (!ownerRecruits.some((recruit) => recruit.displayName === "Nova Recruit")) {
+    throw new Error("referral crew owner status did not include recruit display name");
+  }
 
   console.log(JSON.stringify({
     ok: true,
@@ -281,6 +301,8 @@ async function main() {
       "dashboard_analytics_read",
       "weekly_digest_read",
       "cosmetic_catalog_read",
+      "referral_code_redeemed",
+      "referral_recruit_name_listed",
       "hosting_dashboard_served"
     ],
     accepted: sync.result.accepted.length + deviceSync.result.accepted.length,

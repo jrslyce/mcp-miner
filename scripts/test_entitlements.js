@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("assert");
+const crypto = require("crypto");
 const {
   buildEntitlementProjection,
   deviceLimitDecision,
@@ -50,9 +51,11 @@ function doc(overrides = {}) {
 }
 
 function receipt(overrides = {}) {
+  const uid = overrides.ownerUid || "firebase_uid_123";
+  const eventId = overrides.eventId || "evt_entitlement_1";
   const base = {
-    ownerUid: "firebase_uid_123",
-    eventId: "evt_entitlement_1",
+    ownerUid: uid,
+    eventId,
     eventType: "work_apply_patch",
     schemaVersion: CURRENT_RECEIPT_SCHEMA_VERSION,
     receiptType: "abstract_work",
@@ -66,7 +69,7 @@ function receipt(overrides = {}) {
     },
     privacyClass: "abstract",
     source: "codex_hook",
-    signature: "v2.local-placeholder"
+    signature: `v2.local.${crypto.createHash("sha256").update(`${uid}:${eventId}`).digest("hex").slice(0, 16)}`
   };
   const next = {
     ...base,

@@ -508,6 +508,8 @@ const userMenuWrapper = document.querySelector("#user-menu-wrapper");
 const userMenuButton = document.querySelector("#user-menu-button");
 const userMenu = document.querySelector("#user-menu");
 const userMenuLogout = document.querySelector("#user-menu-logout");
+const userAvatarImage = document.querySelector("#user-avatar-image");
+const userAvatarFallback = document.querySelector("#user-avatar-fallback");
 const sendVerificationEmailButton = document.querySelector("#send-verification-email");
 const themeToggle = document.querySelector("#theme-toggle");
 const themeToggleLabel = document.querySelector("#theme-toggle-label");
@@ -593,6 +595,7 @@ const accountStatus = document.querySelector("#account-status");
 const referralCodeInput = document.querySelector("#referral-code");
 const referralLinkInput = document.querySelector("#referral-link");
 const referralCrewSize = document.querySelector("#referral-crew-size");
+const referralRecruitsList = document.querySelector("#referral-recruits-list");
 const referralRedeemForm = document.querySelector("#referral-redeem-form");
 const referralRedeemCode = document.querySelector("#referral-redeem-code");
 const redeemReferralButton = document.querySelector("#redeem-referral");
@@ -608,10 +611,18 @@ const profileMenuStatus = document.querySelector("#profile-menu-status");
 const profileEmail = document.querySelector("#profile-email");
 const profilePassword = document.querySelector("#profile-password");
 const profileStartDate = document.querySelector("#profile-start-date");
+const profileSpaceName = document.querySelector("#profile-space-name");
+const profileCompanyName = document.querySelector("#profile-company-name");
+const profileSetup = document.querySelector("#profile-setup");
 const spaceNameForm = document.querySelector("#space-name-form");
 const spaceUserName = document.querySelector("#space-user-name");
+const profileCompanyInput = document.querySelector("#profile-company-input");
 const saveSpaceUserName = document.querySelector("#save-space-user-name");
 const spaceNameStatus = document.querySelector("#space-name-status");
+const profileAvatarInput = document.querySelector("#profile-avatar-input");
+const profileAvatarStatus = document.querySelector("#profile-avatar-status");
+const profileAvatarPreviewImage = document.querySelector("#profile-avatar-preview-image");
+const profileAvatarPreviewFallback = document.querySelector("#profile-avatar-preview-fallback");
 const linkParams = new URLSearchParams(window.location.search);
 const LINK_SESSION_STORAGE_KEY = "mcp-miner-pending-link";
 const LINK_SESSION_STORAGE_TTL_MS = 15 * 60 * 1000;
@@ -621,6 +632,10 @@ const pendingLogin = linkParams.has("login") || window.location.hash === "#login
 const COMPANY_STORAGE_KEY = "mcp-miner-company-name";
 const LOGIN_REFERRAL_STORAGE_KEY = "mcp-miner-login-referral-code";
 const QUICK_START_STORAGE_KEY = "mcp-miner-quick-start-open";
+const SPACE_CHARTER_NAME_PATTERN = /^[A-Za-z][A-Za-z'-]{1,31} [A-Za-z][A-Za-z'-]{1,31}$/;
+const LSLC_SUFFIX_PATTERN = /\bLSLC\b\.?$/i;
+const AVATAR_MAX_BYTES = 256 * 1024;
+const AVATAR_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const ACCOUNT_PAGE_TABS = new Set(["profile", "billing", "promo", "devices"]);
 const VALID_DASHBOARD_TABS = ["overview", "orders", "inventory", "upgrades", "devices", "profile", "billing", "promo", "advanced"];
 const TAB_ROUTES = {
@@ -714,11 +729,39 @@ function toggleTheme() {
 }
 
 function cleanCompanyName(value) {
-  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 48);
+  return String(value || "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 72);
+}
+
+function cleanMiningCompanyName(value) {
+  const clean = cleanCompanyName(value).replace(/[.,\s]+$/g, "");
+  if (!clean) {
+    return "";
+  }
+  return LSLC_SUFFIX_PATTERN.test(clean) ? clean : `${clean} LSLC`;
+}
+
+function savedMiningCompanyName(data = activeDashboard) {
+  const profile = data && data.profile ? data.profile : {};
+  return cleanCompanyName(profile.miningCompanyName || profile.mining_company_name || profile.companyName || profile.company_name);
+}
+
+function isDefaultSpaceName(value) {
+  const clean = cleanSpaceUserName(value).toLowerCase();
+  return clean === "local prospector" || clean === "prospector";
+}
+
+function savedSpaceCharterName(data = activeDashboard) {
+  const profile = data && data.profile ? data.profile : {};
+  const clean = cleanSpaceUserName(profile.minerName || profile.displayName);
+  return clean && !isDefaultSpaceName(clean) ? clean : "";
 }
 
 function currentCompanyName() {
-  return cleanCompanyName(companyNameInput && companyNameInput.value);
+  return savedMiningCompanyName() || cleanCompanyName(companyNameInput && companyNameInput.value);
 }
 
 function asteroidClaimName(asteroid) {
@@ -747,7 +790,7 @@ function setupCompanyClaim() {
   if (!companyNameInput) {
     return;
   }
-  companyNameInput.value = cleanCompanyName(localStorage.getItem(COMPANY_STORAGE_KEY));
+  companyNameInput.value = savedMiningCompanyName() || cleanCompanyName(localStorage.getItem(COMPANY_STORAGE_KEY));
   companyNameInput.addEventListener("input", () => {
     localStorage.setItem(COMPANY_STORAGE_KEY, currentCompanyName());
     renderCompanyClaim(activeDashboard.asteroid);
@@ -1061,6 +1104,7 @@ function updateVerificationControls(user) {
 
 function updateAuthControls(user) {
   const signedIn = Boolean(user);
+  document.body.dataset.authState = signedIn ? "signed-in" : "signed-out";
   email.disabled = signedIn;
   password.disabled = signedIn;
   googleSignInButton.disabled = signedIn;
@@ -1352,16 +1396,81 @@ function ventureStartDate(data = activeDashboard) {
     null;
 }
 
+function profileSetupComplete(data = activeDashboard) {
+  const spaceName = savedSpaceCharterName(data);
+  const companyName = savedMiningCompanyName(data);
+  return Boolean(spaceName && companyName);
+}
+
+function safeAvatarDataUrl(value) {
+  const text = String(value || "");
+  return /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(text) && text.length <= 360000
+    ? text
+    : "";
+}
+
+function profileAvatarUrl(data = activeDashboard) {
+  const profile = data.profile || {};
+  const player = data.player || {};
+  return safeAvatarDataUrl(profile.avatarDataUrl || player.avatarDataUrl);
+}
+
+function renderAvatarImage(targetImage, targetFallback, avatarUrl) {
+  if (!targetImage || !targetFallback) {
+    return;
+  }
+  if (avatarUrl) {
+    targetImage.src = avatarUrl;
+    targetImage.hidden = false;
+    targetFallback.hidden = true;
+    return;
+  }
+  targetImage.removeAttribute("src");
+  targetImage.hidden = true;
+  targetFallback.hidden = false;
+}
+
+function renderProfileAvatar(data = activeDashboard) {
+  const avatarUrl = profileAvatarUrl(data);
+  renderAvatarImage(userAvatarImage, userAvatarFallback, avatarUrl);
+  renderAvatarImage(profileAvatarPreviewImage, profileAvatarPreviewFallback, avatarUrl);
+}
+
 function renderUserProfile(data = activeDashboard) {
   const signedIn = Boolean(currentUser);
-  const profile = data.profile || {};
+  const spaceName = savedSpaceCharterName(data);
+  const draftSpaceName = spaceName || (isDefaultSpaceName(currentUser?.displayName) ? "" : cleanSpaceUserName(currentUser?.displayName || ""));
+  const companyName = savedMiningCompanyName(data);
+  const hasLockedProfile = signedIn && profileSetupComplete(data);
+  renderProfileAvatar(data);
   profileMenuStatus.textContent = signedIn ? "Signed in" : "Signed out";
   profileEmail.textContent = signedIn ? currentUser.email || "No email on file" : "Sign in";
   profilePassword.textContent = passwordStatusForUser(currentUser);
   profileStartDate.textContent = signedIn ? timestampLabel(ventureStartDate(data)) : "Not started";
-  spaceUserName.value = signedIn ? profile.minerName || profile.displayName || currentUser.displayName || "" : "";
-  spaceUserName.disabled = !signedIn;
-  saveSpaceUserName.disabled = !signedIn;
+  profileSpaceName.textContent = signedIn ? spaceName || "Name required" : "Sign in";
+  profileCompanyName.textContent = signedIn ? companyName || "Company required" : "Sign in";
+  if (profileSetup) {
+    profileSetup.hidden = hasLockedProfile;
+  }
+  if (spaceUserName && !spaceUserName.value) {
+    spaceUserName.value = signedIn ? draftSpaceName : "";
+  }
+  if (profileCompanyInput && !profileCompanyInput.value) {
+    profileCompanyInput.value = signedIn ? companyName : "";
+  }
+  if (companyNameInput && companyName) {
+    companyNameInput.value = companyName;
+  }
+  spaceUserName.disabled = !signedIn || Boolean(spaceName);
+  profileCompanyInput.disabled = !signedIn || hasLockedProfile;
+  saveSpaceUserName.disabled = !signedIn || hasLockedProfile;
+  if (profileAvatarInput) {
+    profileAvatarInput.disabled = !signedIn;
+  }
+  if (profileAvatarStatus && !signedIn) {
+    profileAvatarStatus.textContent = "";
+    profileAvatarStatus.dataset.tone = "";
+  }
 }
 
 function emptyAccountStatus() {
@@ -1399,6 +1508,15 @@ function renderAccountStatus(status = activeAccountStatus) {
   referralStatus.dataset.tone = signedIn ? "success" : "";
 
   const promos = Array.isArray(account.promos) ? account.promos : [];
+  const recruits = Array.isArray(referral.recruits) ? referral.recruits : [];
+  referralRecruitsList.innerHTML = recruits.length
+    ? recruits.map((recruit) => `
+      <div class="referral-recruit-row">
+        <strong>${escapeHtml(recruit.displayName || "Space charter pending")}</strong>
+        <span>${escapeHtml(recruit.joinedAt ? timestampLabel(recruit.joinedAt) : "Joined crew")}</span>
+      </div>
+    `).join("")
+    : "<p class=\"empty-state\">No referred players yet.</p>";
   promoRedemptions.innerHTML = promos.length
     ? promos.map((promo) => `
       <div class="promo-row">
@@ -1774,6 +1892,8 @@ async function ensureLinkedProfile(user) {
   const existingProfileData = existingProfile.exists() ? existingProfile.data() : {};
   const defaultDisplayName = user.displayName || "Local Prospector";
   const defaultMinerName = user.displayName || "Prospector";
+  const existingCompanyName = cleanMiningCompanyName(existingProfileData.miningCompanyName || existingProfileData.mining_company_name) ||
+    cleanMiningCompanyName(existingPlayerData.miningCompanyName || existingPlayerData.mining_company_name);
   const existingDisplayName = cleanSpaceUserName(existingProfileData.displayName) ||
     cleanSpaceUserName(existingProfileData.minerName) ||
     cleanSpaceUserName(existingPlayerData.displayName) ||
@@ -1788,6 +1908,9 @@ async function ensureLinkedProfile(user) {
   }
   if (!cleanSpaceUserName(existingProfileData.minerName)) {
     profileNamePatch.minerName = existingMinerName || defaultMinerName;
+  }
+  if (!cleanMiningCompanyName(existingProfileData.miningCompanyName || existingProfileData.mining_company_name) && existingCompanyName) {
+    profileNamePatch.miningCompanyName = existingCompanyName;
   }
 
   if (!existing.exists()) {
@@ -2494,7 +2617,11 @@ function renderDashboard(data) {
   renderLinkedDevices(data.syncDevices || [], data.entitlement);
   renderUserProfile(data);
   renderAccountStatus(data.accountStatus || emptyAccountStatus());
-  setDashboardTab(activeDashboardTab);
+  if (currentUser && !hasPendingLink() && !profileSetupComplete(data) && activeDashboardTab !== "profile") {
+    setDashboardTab("profile", { updateRoute: true, replaceRoute: true });
+  } else {
+    setDashboardTab(activeDashboardTab);
+  }
 }
 
 function renderAsteroidArt(asteroid, progress) {
@@ -3278,15 +3405,29 @@ async function saveSpaceUserNameProfile() {
     spaceNameStatus.dataset.tone = "error";
     return;
   }
-  const minerName = cleanSpaceUserName(spaceUserName.value);
-  if (!minerName) {
-    spaceNameStatus.textContent = "Enter a space user name.";
+  const lockedName = savedSpaceCharterName(activeDashboard);
+  const minerName = lockedName || cleanSpaceUserName(spaceUserName.value);
+  const miningCompanyName = cleanMiningCompanyName(profileCompanyInput.value);
+  if (!lockedName && !SPACE_CHARTER_NAME_PATTERN.test(minerName)) {
+    spaceNameStatus.textContent = "Enter exactly two words for the space charter name, like Buck Manwood.";
     spaceNameStatus.dataset.tone = "error";
+    return;
+  }
+  if (!miningCompanyName) {
+    spaceNameStatus.textContent = "Enter a mining company name. LSLC will be added if you leave it off.";
+    spaceNameStatus.dataset.tone = "error";
+    return;
+  }
+  const existingCompany = savedMiningCompanyName(activeDashboard);
+  if (lockedName && existingCompany) {
+    spaceNameStatus.textContent = "Space charter names are locked after setup.";
+    spaceNameStatus.dataset.tone = "error";
+    renderUserProfile(activeDashboard);
     return;
   }
 
   saveSpaceUserName.disabled = true;
-  spaceNameStatus.textContent = "Saving space user name.";
+  spaceNameStatus.textContent = "Saving space charter.";
   spaceNameStatus.dataset.tone = "";
   try {
     await Promise.all([
@@ -3295,7 +3436,8 @@ async function saveSpaceUserNameProfile() {
         updatedAt: serverTimestamp(),
         privacyClass: "abstract",
         minerName,
-        displayName: minerName
+        displayName: minerName,
+        miningCompanyName
       }, { merge: true }),
       setDoc(doc(db, "players", currentUser.uid, "profile", "current"), {
         ownerUid: currentUser.uid,
@@ -3303,23 +3445,123 @@ async function saveSpaceUserNameProfile() {
         updatedAt: serverTimestamp(),
         privacyClass: "abstract",
         minerName,
-        displayName: minerName
+        displayName: minerName,
+        miningCompanyName
       }, { merge: true })
     ]);
     activeDashboard.profile = {
       ...(activeDashboard.profile || {}),
       minerName,
-      displayName: minerName
+      displayName: minerName,
+      miningCompanyName
     };
+    if (companyNameInput) {
+      companyNameInput.value = miningCompanyName;
+      localStorage.setItem(COMPANY_STORAGE_KEY, miningCompanyName);
+    }
     renderUserProfile(activeDashboard);
     renderCompanyClaim(activeDashboard.asteroid);
-    spaceNameStatus.textContent = "Space user name saved.";
+    spaceNameStatus.textContent = "Space charter saved.";
     spaceNameStatus.dataset.tone = "success";
   } catch (error) {
-    spaceNameStatus.textContent = error.message || "Space user name update failed.";
+    spaceNameStatus.textContent = error.message || "Space charter update failed.";
     spaceNameStatus.dataset.tone = "error";
   } finally {
-    saveSpaceUserName.disabled = !currentUser;
+    saveSpaceUserName.disabled = !currentUser || profileSetupComplete(activeDashboard);
+  }
+}
+
+function avatarDimensions(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const dimensions = { width: image.naturalWidth, height: image.naturalHeight };
+      URL.revokeObjectURL(objectUrl);
+      resolve(dimensions);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not read that image."));
+    };
+    image.src = objectUrl;
+  });
+}
+
+function readAvatarDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not load that image."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function setAvatarStatus(text, tone = "") {
+  if (!profileAvatarStatus) {
+    return;
+  }
+  profileAvatarStatus.textContent = text;
+  profileAvatarStatus.dataset.tone = tone;
+}
+
+async function saveProfileAvatar(file) {
+  if (!currentUser) {
+    setAvatarStatus("Sign in before uploading a profile image.", "error");
+    return;
+  }
+  if (requiresEmailVerification(currentUser)) {
+    setAvatarStatus(EMAIL_VERIFICATION_REQUIRED, "error");
+    return;
+  }
+  if (!file) {
+    return;
+  }
+  if (!AVATAR_TYPES.has(file.type)) {
+    setAvatarStatus("Use a PNG, JPEG, or WebP image.", "error");
+    return;
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    setAvatarStatus("Use an image under 256 KB.", "error");
+    return;
+  }
+
+  profileAvatarInput.disabled = true;
+  setAvatarStatus("Checking image.");
+  try {
+    const dimensions = await avatarDimensions(file);
+    if (dimensions.width !== dimensions.height) {
+      setAvatarStatus("Profile image must be perfectly square.", "error");
+      return;
+    }
+    const avatarDataUrl = safeAvatarDataUrl(await readAvatarDataUrl(file));
+    if (!avatarDataUrl) {
+      setAvatarStatus("Use a smaller square PNG, JPEG, or WebP image.", "error");
+      return;
+    }
+    const avatarPatch = {
+      ownerUid: currentUser.uid,
+      schemaVersion: 1,
+      updatedAt: serverTimestamp(),
+      avatarUpdatedAt: serverTimestamp(),
+      privacyClass: "abstract",
+      avatarDataUrl,
+      avatarMimeType: file.type
+    };
+    await setDoc(doc(db, "players", currentUser.uid, "profile", "current"), avatarPatch, { merge: true });
+    activeDashboard.profile = {
+      ...(activeDashboard.profile || {}),
+      avatarDataUrl,
+      avatarMimeType: file.type,
+      avatarUpdatedAt: new Date().toISOString()
+    };
+    renderProfileAvatar(activeDashboard);
+    setAvatarStatus("Profile image saved.", "success");
+  } catch (error) {
+    setAvatarStatus(error.message || "Profile image upload failed.", "error");
+  } finally {
+    profileAvatarInput.disabled = !currentUser;
+    profileAvatarInput.value = "";
   }
 }
 
@@ -3447,6 +3689,10 @@ promoCodeForm.addEventListener("submit", (event) => {
 spaceNameForm.addEventListener("submit", (event) => {
   event.preventDefault();
   saveSpaceUserNameProfile();
+});
+
+profileAvatarInput?.addEventListener("change", () => {
+  saveProfileAvatar(profileAvatarInput.files && profileAvatarInput.files[0]);
 });
 
 planCards.addEventListener("click", (event) => {
