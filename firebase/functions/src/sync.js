@@ -61,6 +61,12 @@ const WORK_SCORE_RULES = {
   work_commit_or_pr: { baseScore: 18 },
   work_fabrication_artifact: { baseScore: 10 }
 };
+const MAX_SCORE_HINT_MULTIPLIER = 4;
+const INITIAL_IMPORT_ECONOMY_LIMITS = Object.freeze({
+  baseAllowance: 10000,
+  materialUnitsPerScore: 20,
+  spaceBucksPerScore: 5
+});
 
 function hasPrivateKeys(value) {
   if (!value || typeof value !== "object") {
@@ -124,8 +130,18 @@ function scoreForReceipt(receipt) {
   const baseScore = Number(rule.baseScore || 0);
   const maxScore = Number(rule.maxScore || baseScore);
   const scoreHint = typeof observed.scoreHint === "number" ? observed.scoreHint : null;
+  if (scoreHint !== null && (!Number.isFinite(scoreHint) || scoreHint < 0)) {
+    fail("score_hint", "scoreHint must be a finite non-negative number");
+  }
+  if (scoreHint !== null && scoreHint > maxScore * MAX_SCORE_HINT_MULTIPLIER) {
+    fail("score_hint", "scoreHint is outside the accepted range for this work event");
+  }
   const score = scoreHint === null ? baseScore : Math.max(0, Math.min(scoreHint, maxScore));
   return roundScore(score);
+}
+
+function expectedLocalReceiptSignature(receipt, uid) {
+  return `v2.local.${crypto.createHash("sha256").update(`${uid}:${receipt.eventId}`).digest("hex").slice(0, 16)}`;
 }
 
 function fail(code, message) {
@@ -221,8 +237,11 @@ function validateSyncReceipt(receipt, uid) {
   if (Object.prototype.hasOwnProperty.call(receipt.observedFields, "score") && typeof receipt.observedFields.score === "number") {
     fail("client_score", "schema v2 receipts must not provide final score");
   }
-  if (typeof receipt.signature !== "string" || !receipt.signature.startsWith("v2.")) {
-    fail("signature", "signature must use the v2 receipt placeholder format");
+  if (typeof receipt.signature !== "string" || !receipt.signature.startsWith("v2.local.")) {
+    fail("signature", "signature must use the v2 local receipt format");
+  }
+  if (receipt.signature !== expectedLocalReceiptSignature(receipt, uid)) {
+    fail("signature", "local receipt signature does not match the authenticated user and event");
   }
   if (receipt.checksum !== eventChecksum(receipt)) {
     fail("checksum", "checksum does not match receipt payload");
@@ -334,16 +353,60 @@ function sanitizedInitialStats(sections) {
   const normalizedWorkEvents = {};
   Object.entries(workEvents).forEach(([eventType, count]) => {
     const numeric = Number(count || 0);
-    if (/^work_[a-z_]+$/.test(eventType) && Number.isFinite(numeric) && numeric > 0) {
+    if (scoreRuleFor(eventType) && Number.isFinite(numeric) && numeric > 0) {
       normalizedWorkEvents[eventType] = Math.floor(numeric);
     }
   });
   const workScoreTotal = Number(stats.work_score_total || 0);
   const eventCount = Object.values(normalizedWorkEvents).reduce((sum, count) => sum + Number(count || 0), 0);
+  const maxPlausibleScore = Object.entries(normalizedWorkEvents).reduce((sum, [eventType, count]) => {
+    const rule = scoreRuleFor(eventType);
+    const maxScore = Number(rule.maxScore || rule.baseScore || 0);
+    return sum + (Number(count || 0) * maxScore);
+  }, 0);
+  if (Number.isFinite(workScoreTotal) && workScoreTotal > maxPlausibleScore) {
+    fail("initial_score_plausibility", "initial imported work score exceeds the event-count maximum");
+  }
   return {
     eventCount,
     workScoreTotal: Number.isFinite(workScoreTotal) ? roundScore(workScoreTotal) : 0,
-    workEvents: normalizedWorkEvents
+    workEvents: normalizedWorkEvents,
+    maxPlausibleScore: roundScore(maxPlausibleScore)
+  };
+}
+
+function finiteNonNegativeNumber(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+function sumNumericMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return 0;
+  }
+  return Object.values(value).reduce((sum, item) => sum + finiteNonNegativeNumber(item), 0);
+}
+
+function validateInitialEconomy(sections, stats) {
+  const progress = sections && sections.progress && typeof sections.progress === "object" ? sections.progress : {};
+  const inventory = sections && sections.inventory && typeof sections.inventory === "object" ? sections.inventory : {};
+  const workScore = finiteNonNegativeNumber(stats.workScoreTotal);
+  const materialLimit = INITIAL_IMPORT_ECONOMY_LIMITS.baseAllowance + (workScore * INITIAL_IMPORT_ECONOMY_LIMITS.materialUnitsPerScore);
+  const spaceBucksLimit = INITIAL_IMPORT_ECONOMY_LIMITS.baseAllowance + (workScore * INITIAL_IMPORT_ECONOMY_LIMITS.spaceBucksPerScore);
+  const materialTotal = sumNumericMap(inventory);
+  const chonksMined = finiteNonNegativeNumber(progress.stats && progress.stats.chonks_mined_total);
+  const materialsFound = finiteNonNegativeNumber(progress.stats && progress.stats.materials_found_total);
+  const spaceBucks = finiteNonNegativeNumber(progress.space_bucks);
+
+  if (materialTotal > materialLimit || chonksMined > materialLimit || materialsFound > materialLimit || spaceBucks > spaceBucksLimit) {
+    fail("initial_economy_plausibility", "initial imported economy totals exceed the work-score allowance");
+  }
+
+  return {
+    materialLimit: roundScore(materialLimit),
+    materialTotal: roundScore(materialTotal),
+    spaceBucksLimit: roundScore(spaceBucksLimit),
+    spaceBucks: roundScore(spaceBucks)
   };
 }
 
@@ -376,6 +439,7 @@ function sanitizeInitialStateImport(input, uid, receivedAt = new Date().toISOStr
     : String(checkpoint.lastLocalEventId || "").slice(0, 160);
   const backup = sanitizeBackupPayload(input.state || input.snapshot || {});
   const stats = sanitizedInitialStats(backup.sections);
+  const economy = validateInitialEconomy(backup.sections, stats);
 
   return {
     ownerUid: uid,
@@ -398,6 +462,12 @@ function sanitizeInitialStateImport(input, uid, receivedAt = new Date().toISOStr
     eventCount: stats.eventCount,
     workScoreTotal: stats.workScoreTotal,
     workEvents: stats.workEvents,
+    antiCheat: {
+      initialImportCheckedAt: receivedAt,
+      economy,
+      maxPlausibleWorkScore: stats.maxPlausibleScore,
+      policyVersion: 1
+    },
     lastEventId: lastLocalEventId,
     lastSequence: lastLocalSequence,
     updatedAt: receivedAt

@@ -1,6 +1,7 @@
 "use strict";
 
 const assert = require("assert");
+const crypto = require("crypto");
 const {
   CURRENT_SYNC_SCHEMA_VERSION,
   CURRENT_RECEIPT_SCHEMA_VERSION,
@@ -49,10 +50,16 @@ function event(overrides = {}) {
   return next;
 }
 
+function localReceiptSignature(uid, eventId) {
+  return `v2.local.${crypto.createHash("sha256").update(`${uid}:${eventId}`).digest("hex").slice(0, 16)}`;
+}
+
 function receipt(overrides = {}) {
+  const uid = overrides.ownerUid || "firebase_uid_123";
+  const eventId = overrides.eventId || "evt_receipt_1";
   const base = {
-    ownerUid: "firebase_uid_123",
-    eventId: "evt_receipt_1",
+    ownerUid: uid,
+    eventId,
     eventType: "work_apply_patch",
     schemaVersion: CURRENT_RECEIPT_SCHEMA_VERSION,
     receiptType: "abstract_work",
@@ -66,7 +73,7 @@ function receipt(overrides = {}) {
     },
     privacyClass: "abstract",
     source: "codex_hook",
-    signature: "v2.local-placeholder"
+    signature: localReceiptSignature(uid, eventId)
   };
   const next = {
     ...base,
@@ -96,9 +103,56 @@ check("valid v2 sync receipts should pass privacy and checksum validation", () =
 check("v2 receipt score should be calculated server-side from bounded hints", () => {
   const inflated = receipt({
     eventId: "evt_receipt_inflated",
-    observedFields: { scoreHint: 999 }
+    observedFields: { scoreHint: 50 }
   });
   return scoreForReceipt(inflated) === 30;
+});
+
+check("v2 receipts should reject absurd score hints instead of silently capping forged payloads", () => {
+  const inflated = receipt({
+    eventId: "evt_receipt_absurd_score",
+    sequence: 2,
+    observedFields: { scoreHint: 999 }
+  });
+  const batch = prepareSyncBatch({
+    uid: "firebase_uid_123",
+    events: [inflated],
+    lastSequence: 1
+  });
+  return batch.accepted.length === 0 &&
+    batch.rejected[0].reason === "score_hint";
+});
+
+check("v2 local receipt signatures should be bound to the authenticated uid and event", () => {
+  const badSignature = receipt({
+    eventId: "evt_receipt_bad_signature",
+    sequence: 2,
+    signature: "v2.local.badbadbadbadbadb"
+  });
+  badSignature.checksum = eventChecksum(badSignature);
+  const batch = prepareSyncBatch({
+    uid: "firebase_uid_123",
+    events: [badSignature],
+    lastSequence: 1
+  });
+  return batch.accepted.length === 0 &&
+    batch.rejected[0].reason === "signature";
+});
+
+check("v2 receipts should reject non-local signature prefixes until device-key signing exists", () => {
+  const badPrefix = receipt({
+    eventId: "evt_receipt_bad_prefix",
+    sequence: 2,
+    signature: "v2.remote.not-yet-supported"
+  });
+  badPrefix.checksum = eventChecksum(badPrefix);
+  const batch = prepareSyncBatch({
+    uid: "firebase_uid_123",
+    events: [badPrefix],
+    lastSequence: 1
+  });
+  return batch.accepted.length === 0 &&
+    batch.rejected[0].reason === "signature";
 });
 
 check("private fields should be detected recursively", () => {
@@ -272,8 +326,68 @@ check("initial state import should sanitize a backup-shaped snapshot", () => {
     imported.snapshotChecksum.length === 64 &&
     imported.eventCount === 3 &&
     imported.workScoreTotal === 12.5 &&
+    imported.antiCheat.economy.spaceBucks === 42 &&
+    imported.antiCheat.economy.spaceBucksLimit === 10062.5 &&
+    imported.antiCheat.maxPlausibleWorkScore === 33 &&
     imported.lastSequence === 2 &&
     imported.privacyClass === "abstract";
+});
+
+check("initial state import should reject implausible inflated work score", () => {
+  try {
+    sanitizeInitialStateImport({
+      syncType: "initial_state_import",
+      privacyClass: "abstract",
+      checkpoint: {
+        lastLocalSequence: 2
+      },
+      state: {
+        progress: {
+          stats: {
+            work_score_total: 9999,
+            work_events: {
+              work_user_prompt: 1,
+              work_search: 1
+            }
+          }
+        }
+      }
+    }, "firebase_uid_123");
+  } catch (error) {
+    return error.code === "initial_score_plausibility";
+  }
+  return false;
+});
+
+check("initial state import should reject implausible inflated economy totals", () => {
+  try {
+    sanitizeInitialStateImport({
+      syncType: "initial_state_import",
+      privacyClass: "abstract",
+      checkpoint: {
+        lastLocalSequence: 2
+      },
+      state: {
+        progress: {
+          space_bucks: 100000000,
+          stats: {
+            work_score_total: 10,
+            chonks_mined_total: 100000000,
+            materials_found_total: 100000000,
+            work_events: {
+              work_apply_patch: 1
+            }
+          }
+        },
+        inventory: {
+          mat_chonks: 100000000
+        }
+      }
+    }, "firebase_uid_123");
+  } catch (error) {
+    return error.code === "initial_economy_plausibility";
+  }
+  return false;
 });
 
 check("initial state import should reject private local data", () => {
