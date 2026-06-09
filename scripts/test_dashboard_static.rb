@@ -252,6 +252,10 @@ assert("login route should render only the login card with referral support") do
     auth_js.include?("function setupLoginReferralCode()") &&
     auth_js.include?("function redeemLoginReferralIfReady()") &&
     auth_js.include?("function clearLoginRouteAfterSignIn()") &&
+    auth_js.include?("let googleRedirectSettled = false;") &&
+    auth_js.include?("renderSignedOutState(previousUser);") &&
+    auth_js.include?("Completing Google sign-in.") &&
+    auth_js.include?("if (!currentUser && !auth.currentUser && pendingLogin)") &&
     auth_js.include?("pendingLogin = false;") &&
     auth_js.include?("document.body.dataset.loginMode = \"none\"") &&
     auth_js.include?("await redeemLoginReferralIfReady();") &&
@@ -676,7 +680,8 @@ end
 
 assert("sign-out should clear account-specific auth form values") do
   auth_js.include?("const previousUser = currentUser;") &&
-    auth_js.include?("if (previousUser) {\n      email.value = \"\";\n    }") &&
+    auth_js.include?("function renderSignedOutState(previousUser = null)") &&
+    auth_js.include?("if (previousUser) {\n    email.value = \"\";\n  }") &&
     auth_js.include?("password.value = \"\";")
 end
 
