@@ -588,6 +588,12 @@ const linkedDevicesSummary = document.querySelector("#linked-devices-summary");
 const linkedDevicesList = document.querySelector("#linked-devices-list");
 const companyNameInput = document.querySelector("#company-name");
 const claimedAsteroidName = document.querySelector("#claimed-asteroid-name");
+const quickSpaceUserName = document.querySelector("#quick-space-user-name");
+const quickSaveCharter = document.querySelector("#quick-save-charter");
+const quickCharterStatus = document.querySelector("#quick-charter-status");
+const quickReferralCode = document.querySelector("#quick-referral-code");
+const quickRedeemReferral = document.querySelector("#quick-redeem-referral");
+const quickReferralStatus = document.querySelector("#quick-referral-status");
 const portalInstallPrompt = document.querySelector("#portal-install-prompt");
 const quickStart = document.querySelector("#quick-start");
 const quickStartToggleLabel = document.querySelector("#quick-start-toggle-label");
@@ -892,6 +898,12 @@ function setupCompanyClaim() {
   renderCompanyClaim(activeDashboard.asteroid);
 }
 
+function referralAcceptanceMessage(referral = {}) {
+  const ownCompany = savedMiningCompanyName(activeDashboard) || "Your Company LSLC";
+  const referringCompany = cleanCompanyName(referral.referredByCompanyName) || referral.referredByCode || "referring team";
+  return `${ownCompany} contracted by ${referringCompany}.`;
+}
+
 function selectPortalInstallPrompt(os) {
   if (portalInstallPrompt && PORTAL_INSTALL_PROMPTS[os]) {
     portalInstallPrompt.textContent = PORTAL_INSTALL_PROMPTS[os];
@@ -944,21 +956,28 @@ function setupQuickStartToggle() {
 }
 
 function setLoginReferralStatus(text, tone = "") {
-  if (!loginReferralStatus) {
-    return;
+  if (loginReferralStatus) {
+    loginReferralStatus.textContent = text;
+    loginReferralStatus.dataset.tone = tone;
   }
-  loginReferralStatus.textContent = text;
-  loginReferralStatus.dataset.tone = tone;
+  if (quickReferralStatus) {
+    quickReferralStatus.textContent = text;
+    quickReferralStatus.dataset.tone = tone;
+  }
 }
 
 function currentLoginReferralCode() {
-  return normalizeReferralCodeParam(loginReferralCode && loginReferralCode.value);
+  return normalizeReferralCodeParam(loginReferralCode && loginReferralCode.value) ||
+    normalizeReferralCodeParam(quickReferralCode && quickReferralCode.value);
 }
 
 function syncLoginReferralCode(code, options = {}) {
   const clean = normalizeReferralCodeParam(code);
   if (loginReferralCode) {
     loginReferralCode.value = clean;
+  }
+  if (quickReferralCode) {
+    quickReferralCode.value = clean;
   }
   if (referralRedeemCode && clean) {
     referralRedeemCode.value = clean;
@@ -978,14 +997,21 @@ function syncLoginReferralCode(code, options = {}) {
 }
 
 function setupLoginReferralCode() {
-  if (!loginReferralCode) {
+  if (!loginReferralCode && !quickReferralCode) {
     return;
   }
   const stored = normalizeReferralCodeParam(localStorage.getItem(LOGIN_REFERRAL_STORAGE_KEY));
   syncLoginReferralCode(pendingReferralCode || stored, { quiet: true });
-  loginReferralCode.addEventListener("input", () => {
-    syncLoginReferralCode(loginReferralCode.value);
-  });
+  if (loginReferralCode) {
+    loginReferralCode.addEventListener("input", () => {
+      syncLoginReferralCode(loginReferralCode.value);
+    });
+  }
+  if (quickReferralCode) {
+    quickReferralCode.addEventListener("input", () => {
+      syncLoginReferralCode(quickReferralCode.value);
+    });
+  }
 }
 
 function storedPendingLink() {
@@ -1547,12 +1573,27 @@ function renderUserProfile(data = activeDashboard) {
   if (profileCompanyInput && !hasLockedProfile) {
     profileCompanyInput.value = signedIn ? draftCompanyName : "";
   }
+  if (quickSpaceUserName && !hasLockedProfile) {
+    quickSpaceUserName.value = signedIn ? draftSpaceName : "";
+  }
+  if (companyNameInput && !hasLockedProfile) {
+    companyNameInput.value = signedIn ? draftCompanyName : "";
+  }
   if (companyNameInput && companyName) {
     companyNameInput.value = companyName;
   }
   spaceUserName.disabled = !signedIn || Boolean(spaceName);
   profileCompanyInput.disabled = !signedIn || hasLockedProfile;
   saveSpaceUserName.disabled = !signedIn || hasLockedProfile;
+  if (quickSpaceUserName) {
+    quickSpaceUserName.disabled = !signedIn || Boolean(spaceName);
+  }
+  if (companyNameInput) {
+    companyNameInput.disabled = !signedIn || hasLockedProfile;
+  }
+  if (quickSaveCharter) {
+    quickSaveCharter.disabled = !signedIn || hasLockedProfile;
+  }
   if (profileAvatarInput) {
     profileAvatarInput.disabled = !signedIn;
   }
@@ -1587,14 +1628,24 @@ function renderAccountStatus(status = activeAccountStatus) {
   referralCrewSize.textContent = `${formatNumber(referral.crewSize || referral.recruitedCount || 0)} crew`;
   referralRedeemCode.disabled = !signedIn;
   redeemReferralButton.disabled = !signedIn;
+  if (quickRedeemReferral) {
+    quickRedeemReferral.disabled = !signedIn;
+  }
   promoCodeInput.disabled = !signedIn;
   redeemPromoButton.disabled = !signedIn;
 
-  const referred = referral.referredByCode ? ` Joined through ${referral.referredByCode}.` : "";
+  const referred = referral.referredByCode ? ` ${referralAcceptanceMessage(referral)}` : "";
   referralStatus.textContent = signedIn
     ? `Share your code to recruit crew members.${referred}`
     : "Sign in to create your referral crew.";
   referralStatus.dataset.tone = signedIn ? "success" : "";
+  if (quickReferralStatus && signedIn && referral.referredByCode) {
+    quickReferralStatus.textContent = referralAcceptanceMessage(referral);
+    quickReferralStatus.dataset.tone = "success";
+  } else if (quickReferralStatus && signedIn) {
+    quickReferralStatus.textContent = "Optional team code.";
+    quickReferralStatus.dataset.tone = "";
+  }
 
   const promos = Array.isArray(account.promos) ? account.promos : [];
   const recruits = Array.isArray(referral.recruits) ? referral.recruits : [];
@@ -1629,8 +1680,15 @@ async function redeemAccountCode(kind, code) {
   const button = isReferral ? redeemReferralButton : redeemPromoButton;
   const status = isReferral ? referralStatus : promoStatus;
   button.disabled = true;
+  if (isReferral && quickRedeemReferral) {
+    quickRedeemReferral.disabled = true;
+  }
   status.textContent = isReferral ? "Joining crew." : "Applying promo code.";
   status.dataset.tone = "";
+  if (isReferral && quickReferralStatus) {
+    quickReferralStatus.textContent = "Joining crew.";
+    quickReferralStatus.dataset.tone = "";
+  }
   try {
     const callable = httpsCallable(functions, isReferral ? "redeemReferralCode" : "redeemPromoCode");
     const result = await callable({ code });
@@ -1638,8 +1696,16 @@ async function redeemAccountCode(kind, code) {
     renderAccountStatus(activeAccountStatus);
     if (isReferral) {
       referralRedeemCode.value = "";
-      referralStatus.textContent = "Referral crew joined.";
+      if (quickReferralCode) {
+        quickReferralCode.value = "";
+      }
+      const referral = activeAccountStatus && activeAccountStatus.referral ? activeAccountStatus.referral : {};
+      referralStatus.textContent = referral.referredByCode ? referralAcceptanceMessage(referral) : "Referral crew joined.";
       referralStatus.dataset.tone = "success";
+      if (quickReferralStatus) {
+        quickReferralStatus.textContent = referral.referredByCode ? referralAcceptanceMessage(referral) : "Referral crew joined.";
+        quickReferralStatus.dataset.tone = "success";
+      }
     } else {
       promoCodeInput.value = "";
       promoStatus.textContent = "Promo code applied.";
@@ -1648,8 +1714,15 @@ async function redeemAccountCode(kind, code) {
   } catch (error) {
     status.textContent = error.message || "Code redemption failed.";
     status.dataset.tone = "error";
+    if (isReferral && quickReferralStatus) {
+      quickReferralStatus.textContent = error.message || "Code redemption failed.";
+      quickReferralStatus.dataset.tone = "error";
+    }
   } finally {
     button.disabled = !currentUser;
+    if (isReferral && quickRedeemReferral) {
+      quickRedeemReferral.disabled = !currentUser;
+    }
   }
 }
 
@@ -1669,7 +1742,8 @@ async function redeemLoginReferralIfReady() {
     activeAccountStatus = result && result.data ? result.data : activeAccountStatus;
     renderAccountStatus(activeAccountStatus);
     syncLoginReferralCode("", { quiet: true });
-    setLoginReferralStatus("Referral code applied.", "success");
+    const referral = activeAccountStatus && activeAccountStatus.referral ? activeAccountStatus.referral : {};
+    setLoginReferralStatus(referral.referredByCode ? referralAcceptanceMessage(referral) : "Referral code applied.", "success");
   } catch (error) {
     setLoginReferralStatus(error.message || "Referral code could not be applied.", "error");
   } finally {
@@ -2745,11 +2819,7 @@ function renderDashboard(data) {
   renderLinkedDevices(data.syncDevices || [], data.entitlement);
   renderUserProfile(data);
   renderAccountStatus(data.accountStatus || emptyAccountStatus());
-  if (currentUser && !hasPendingLink() && !profileSetupComplete(data) && activeDashboardTab !== "profile") {
-    setDashboardTab("profile", { updateRoute: true, replaceRoute: true });
-  } else {
-    setDashboardTab(activeDashboardTab);
-  }
+  setDashboardTab(activeDashboardTab);
 }
 
 function renderAsteroidArt(asteroid, progress) {
@@ -3522,41 +3592,45 @@ function cleanSpaceUserName(value) {
     .slice(0, 80);
 }
 
-async function saveSpaceUserNameProfile() {
+async function saveSpaceUserNameProfile(options = {}) {
+  const nameInput = options.nameInput || spaceUserName;
+  const companyInput = options.companyInput || profileCompanyInput;
+  const status = options.status || spaceNameStatus;
+  const saveButton = options.saveButton || saveSpaceUserName;
   if (!currentUser) {
-    spaceNameStatus.textContent = "Sign in before saving a space user name.";
-    spaceNameStatus.dataset.tone = "error";
+    status.textContent = "Sign in before saving a space charter.";
+    status.dataset.tone = "error";
     return;
   }
   if (requiresEmailVerification(currentUser)) {
-    spaceNameStatus.textContent = EMAIL_VERIFICATION_REQUIRED;
-    spaceNameStatus.dataset.tone = "error";
+    status.textContent = EMAIL_VERIFICATION_REQUIRED;
+    status.dataset.tone = "error";
     return;
   }
   const lockedName = savedSpaceCharterName(activeDashboard);
-  const minerName = lockedName || cleanSpaceUserName(spaceUserName.value);
-  const miningCompanyName = cleanMiningCompanyName(profileCompanyInput.value);
+  const minerName = lockedName || cleanSpaceUserName(nameInput && nameInput.value);
+  const miningCompanyName = cleanMiningCompanyName(companyInput && companyInput.value);
   if (!lockedName && !SPACE_CHARTER_NAME_PATTERN.test(minerName)) {
-    spaceNameStatus.textContent = "Enter exactly two words for the space charter name, like Buck Manwood.";
-    spaceNameStatus.dataset.tone = "error";
+    status.textContent = "Enter exactly two words for the space charter name, like Buck Manwood.";
+    status.dataset.tone = "error";
     return;
   }
   if (!miningCompanyName) {
-    spaceNameStatus.textContent = "Enter a mining company name. LSLC will be added if you leave it off.";
-    spaceNameStatus.dataset.tone = "error";
+    status.textContent = "Enter a mining company name. LSLC will be added if you leave it off.";
+    status.dataset.tone = "error";
     return;
   }
   const existingCompany = savedMiningCompanyName(activeDashboard);
   if (lockedName && existingCompany) {
-    spaceNameStatus.textContent = "Space charter names are locked after setup.";
-    spaceNameStatus.dataset.tone = "error";
+    status.textContent = "Space charter names are locked after setup.";
+    status.dataset.tone = "error";
     renderUserProfile(activeDashboard);
     return;
   }
 
-  saveSpaceUserName.disabled = true;
-  spaceNameStatus.textContent = "Saving space charter.";
-  spaceNameStatus.dataset.tone = "";
+  saveButton.disabled = true;
+  status.textContent = "Saving space charter.";
+  status.dataset.tone = "";
   try {
     await Promise.all([
       setDoc(doc(db, "players", currentUser.uid), {
@@ -3583,19 +3657,29 @@ async function saveSpaceUserNameProfile() {
       displayName: minerName,
       miningCompanyName
     };
+    activeDashboard.player = {
+      ...(activeDashboard.player || {}),
+      minerName,
+      displayName: minerName,
+      miningCompanyName
+    };
     if (companyNameInput) {
       companyNameInput.value = miningCompanyName;
       localStorage.setItem(COMPANY_STORAGE_KEY, miningCompanyName);
     }
     renderUserProfile(activeDashboard);
     renderCompanyClaim(activeDashboard.asteroid);
-    spaceNameStatus.textContent = "Space charter saved.";
-    spaceNameStatus.dataset.tone = "success";
+    status.textContent = "Space charter saved.";
+    status.dataset.tone = "success";
+    if (status !== spaceNameStatus && spaceNameStatus) {
+      spaceNameStatus.textContent = "Space charter saved.";
+      spaceNameStatus.dataset.tone = "success";
+    }
   } catch (error) {
-    spaceNameStatus.textContent = error.message || "Space charter update failed.";
-    spaceNameStatus.dataset.tone = "error";
+    status.textContent = error.message || "Space charter update failed.";
+    status.dataset.tone = "error";
   } finally {
-    saveSpaceUserName.disabled = !currentUser || profileSetupComplete(activeDashboard);
+    saveButton.disabled = !currentUser || profileSetupComplete(activeDashboard);
   }
 }
 
@@ -3819,6 +3903,19 @@ spaceNameForm.addEventListener("submit", (event) => {
   saveSpaceUserNameProfile();
 });
 
+quickSaveCharter?.addEventListener("click", () => {
+  saveSpaceUserNameProfile({
+    nameInput: quickSpaceUserName,
+    companyInput: companyNameInput,
+    status: quickCharterStatus,
+    saveButton: quickSaveCharter
+  });
+});
+
+quickRedeemReferral?.addEventListener("click", () => {
+  redeemAccountCode("referral", quickReferralCode && quickReferralCode.value);
+});
+
 profileAvatarInput?.addEventListener("change", () => {
   saveProfileAvatar(profileAvatarInput.files && profileAvatarInput.files[0]);
 });
@@ -3969,7 +4066,7 @@ setupLoginReferralCode();
 handleGoogleRedirectResult();
 if (pendingReferralCode) {
   syncLoginReferralCode(pendingReferralCode, { quiet: true });
-  setDashboardTab("profile");
+  setDashboardTab("overview");
 }
 if (pendingLogin) {
   setDashboardTab("profile");

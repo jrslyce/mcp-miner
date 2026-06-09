@@ -133,6 +133,15 @@ assert("portal should include collapsible Quick Start before the stats dashboard
     portal.include?(%(class="portal-onboarding quick-start")) &&
     portal.include?(%(id="quick-start")) &&
     portal.include?("Quick Start") &&
+    portal.include?("Launch your mining outfit in five steps.") &&
+    portal.include?("Name your character") &&
+    portal.include?(%(id="quick-space-user-name")) &&
+    portal.include?("Name your LSLC") &&
+    portal.include?(%(id="quick-save-charter")) &&
+    portal.include?("Join a team") &&
+    portal.include?(%(id="quick-referral-code")) &&
+    portal.include?(%(id="quick-redeem-referral")) &&
+    portal.include?(%(id="quick-referral-status")) &&
     portal.include?(%(id="quick-start-toggle-label")) &&
     portal.include?(%(class="dashboard-tabs")) &&
     portal.include?(%(data-dashboard-tab="overview")) &&
@@ -142,6 +151,12 @@ assert("portal should include collapsible Quick Start before the stats dashboard
     portal.include?(%(id="portal-install-prompt")) &&
     portal.include?(%(id="portal-link-prompt")) &&
     auth_js.include?("const COMPANY_STORAGE_KEY = \"mcp-miner-company-name\"") &&
+    auth_js.include?("const quickSpaceUserName = document.querySelector(\"#quick-space-user-name\")") &&
+    auth_js.include?("function referralAcceptanceMessage(referral = {})") &&
+    auth_js.include?("quickSaveCharter?.addEventListener(\"click\"") &&
+    auth_js.include?("quickRedeemReferral?.addEventListener(\"click\"") &&
+    auth_js.include?("setDashboardTab(activeDashboardTab);") &&
+    !auth_js.include?("setDashboardTab(\"profile\", { updateRoute: true, replaceRoute: true });") &&
     auth_js.include?("function asteroidClaimName(asteroid)") &&
     auth_js.include?("function setupPortalInstallSelector()") &&
     auth_js.include?("function setupQuickStartToggle()") &&
@@ -149,6 +164,8 @@ assert("portal should include collapsible Quick Start before the stats dashboard
     auth_js.include?("function setDashboardTab(tab, options = {})") &&
     auth_js.include?("const QUICK_START_STORAGE_KEY = \"mcp-miner-quick-start-open\"") &&
     styles.include?(".portal-onboarding-grid") &&
+    styles.include?("grid-template-columns: repeat(5, minmax(0, 1fr))") &&
+    styles.include?(".quick-referral-card") &&
     styles.include?(".quick-start-summary") &&
     styles.include?(".dashboard-tabs") &&
     styles.include?("@keyframes asteroid-card-sheen")
@@ -189,7 +206,8 @@ assert("portal should expose profile, devices, referral crew, billing, and promo
     portal.include?("Mining LSLC") &&
     auth_js.include?("httpsCallable(functions, \"getAccountStatus\")") &&
     auth_js.include?("httpsCallable(functions, isReferral ? \"redeemReferralCode\" : \"redeemPromoCode\")") &&
-    auth_js.include?("function saveSpaceUserNameProfile()") &&
+    auth_js.include?("function saveSpaceUserNameProfile(options = {})") &&
+    auth_js.include?("nameInput: quickSpaceUserName") &&
     auth_js.include?("function renderAccountStatus(status = activeAccountStatus)") &&
     auth_js.include?("referralRecruitsList.innerHTML") &&
     auth_js.include?("function dashboardTabFromLocation()") &&
@@ -238,6 +256,9 @@ end
 
 assert("referral crew status should include public recruit names") do
   functions_js.include?("function publicPlayerName(data = {}, fallback = \"Space charter pending\")") &&
+    functions_js.include?("function publicCompanyName(data = {}, fallback = \"\")") &&
+    functions_js.include?("async function publicPlayerCompanyName(uid)") &&
+    functions_js.include?("referredByCompanyName") &&
     functions_js.include?("const savedCode = referral.code ? cleanReferralCode(referral.code) : null") &&
     functions_js.include?("let ensuredCode = generatedReferralCode(uid)") &&
     functions_js.include?("return ensuredCode") &&

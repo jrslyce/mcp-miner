@@ -275,6 +275,9 @@ async function main() {
   if (!referralJoin.result || referralJoin.result.referral.referredByCode !== ownerAccount.result.referral.code) {
     throw new Error("referral code redeem did not mark referred account");
   }
+  if (referralJoin.result.referral.referredByCompanyName !== "Smoke Belt LSLC") {
+    throw new Error("referral code redeem did not expose inviter company name");
+  }
   const ownerRecruits = ownerAccountAfterReferral.result.referral.recruits || [];
   if (!ownerRecruits.some((recruit) => recruit.displayName === "Nova Recruit")) {
     throw new Error("referral crew owner status did not include recruit display name");

@@ -985,7 +985,7 @@ body {
 
 .portal-onboarding-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1016,18 +1016,35 @@ body {
   line-height: 1.48;
 }
 
-.company-claim-card label {
+.company-claim-card label,
+.quick-charter-card label,
+.quick-referral-card label {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 850;
 }
 
-.company-claim-card input {
+.company-claim-card input,
+.quick-charter-card input,
+.quick-referral-card input {
   width: 100%;
 }
 
 .company-claim-card strong {
   color: var(--accent-strong);
+}
+
+.quick-company-card,
+.quick-referral-card {
+  gap: 9px;
+}
+
+.quick-referral-card .copy-row {
+  grid-template-columns: minmax(0, 1fr) minmax(68px, auto);
+}
+
+.quick-referral-card .copy-row button {
+  min-width: 68px;
 }
 
 .portal-onboarding .portal-os-selector {
@@ -1041,7 +1058,7 @@ body {
 
 .portal-install-card .copy-code,
 .portal-link-card .copy-code {
-  max-height: 90px;
+  max-height: 78px;
 }
 
 .dashboard-tabs {
