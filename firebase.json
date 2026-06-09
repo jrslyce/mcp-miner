@@ -85,6 +85,14 @@
         "destination": "/portal.html"
       },
       {
+        "source": "/instructions",
+        "destination": "/instructions.html"
+      },
+      {
+        "source": "/instructions/**",
+        "destination": "/instructions.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

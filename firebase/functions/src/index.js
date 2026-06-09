@@ -270,6 +270,12 @@ function cleanPromoCode(value) {
   return code;
 }
 
+function publicPlayerName(data = {}, fallback = "Space charter pending") {
+  const raw = data.recruitDisplayName || data.recruit_display_name || data.minerName || data.displayName || data.spaceUserName || data.space_user_name;
+  const clean = String(raw || "").replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  return clean || fallback;
+}
+
 async function ensureReferralCode(uid, now = new Date().toISOString()) {
   const referralRef = db.doc(`players/${uid}/referral/current`);
   const code = generatedReferralCode(uid);
@@ -316,11 +322,15 @@ async function publicAccountStatus(uid, now = new Date().toISOString()) {
     db.collection(`players/${uid}/referralRecruits`).limit(50).get(),
     db.collection(`players/${uid}/promoRedemptions`).orderBy("redeemedAt", "desc").limit(8).get()
   ]);
+  const recruitProfileRefs = recruitsSnap.docs.map((docSnap) => db.doc(`players/${docSnap.id}/profile/current`));
+  const recruitProfileSnaps = recruitProfileRefs.length ? await db.getAll(...recruitProfileRefs) : [];
   const referral = referralSnap.exists ? referralSnap.data() : {};
-  const recruits = recruitsSnap.docs.map((docSnap) => {
+  const recruits = recruitsSnap.docs.map((docSnap, index) => {
     const data = docSnap.data() || {};
+    const profile = recruitProfileSnaps[index] && recruitProfileSnaps[index].exists ? recruitProfileSnaps[index].data() : {};
     return {
       recruitId: docSnap.id,
+      displayName: publicPlayerName(data, publicPlayerName(profile)),
       joinedAt: data.joinedAt || null,
       rewardLabel: data.rewardLabel || "Crew recruit bonus"
     };
@@ -1332,6 +1342,14 @@ exports.redeemReferralCode = onCall({ region: "us-central1" }, async (request) =
     }, { merge: true });
     return { inviterUid };
   });
+  const [inviteeProfileSnap, inviteePlayerSnap] = await Promise.all([
+    db.doc(`players/${uid}/profile/current`).get(),
+    db.doc(`players/${uid}`).get()
+  ]);
+  await db.doc(`players/${result.inviterUid}/referralRecruits/${uid}`).set({
+    recruitDisplayName: publicPlayerName(inviteeProfileSnap.exists ? inviteeProfileSnap.data() : {}, publicPlayerName(inviteePlayerSnap.exists ? inviteePlayerSnap.data() : {})),
+    updatedAt: now
+  }, { merge: true });
 
   logger.info("mcp_miner_referral_redeemed", {
     privacyClass: "abstract",

@@ -10,7 +10,7 @@
     <script src="/theme.js"></script>
     <link rel="stylesheet" href="/styles.css">
   </head>
-  <body data-dashboard-tab="overview">
+  <body data-dashboard-tab="overview" data-auth-state="signed-out">
     <section id="dashboard" class="dashboard-shell" aria-label="MCP Miner dashboard">
       <header class="topbar">
         <div class="brand-lockup">
@@ -22,6 +22,7 @@
         </div>
         <div class="topbar-actions">
           <a class="button-secondary" href="/">Home</a>
+          <a class="button-secondary" href="/instructions">Instructions</a>
           <span id="connection-pill" class="pill">Signed out</span>
           <button id="refresh-dashboard" type="button" class="button-secondary">
             <span>Refresh</span>
@@ -29,13 +30,18 @@
           <div id="user-menu-wrapper" class="user-menu-wrapper" hidden>
             <button id="user-menu-button" type="button" class="user-menu-button" aria-label="Open user menu" aria-haspopup="menu" aria-expanded="false">
               <span class="profile-avatar" aria-hidden="true">
-                <span class="profile-avatar-head"></span>
-                <span class="profile-avatar-mark">?</span>
+                <img id="user-avatar-image" class="profile-avatar-image" alt="" hidden>
+                <span id="user-avatar-fallback" class="profile-avatar-fallback">
+                  <span class="profile-avatar-head"></span>
+                  <span class="profile-avatar-mark">?</span>
+                </span>
               </span>
             </button>
             <div id="user-menu" class="user-menu" role="menu" hidden>
               <a role="menuitem" href="/portal" data-menu-page="overview">Dashboard</a>
+              <a role="menuitem" href="/instructions">Instructions</a>
               <a role="menuitem" href="/portal/profile" data-menu-page="profile">Profile</a>
+              <a role="menuitem" href="/portal/devices" data-menu-page="devices">Devices &amp; Sync</a>
               <a role="menuitem" href="/portal/billing" data-menu-page="billing">Billing</a>
               <a role="menuitem" href="/portal/promo" data-menu-page="promo">Promo code</a>
               <button id="user-menu-logout" type="button" role="menuitem" class="user-menu-logout">Logout</button>
@@ -60,9 +66,10 @@
           </article>
           <article class="portal-step-card company-claim-card">
             <span class="step-number">02</span>
-            <h3>Claim asteroids</h3>
-            <label for="company-name">Asteroid mining company</label>
-            <input id="company-name" name="company-name" type="text" maxlength="48" autocomplete="organization" placeholder="Quartz & Circuit Mining Co.">
+            <h3>Name your charter</h3>
+            <p>Pick a creative two-word space charter name, then choose a Limited Space Liability Company for your mining outfit.</p>
+            <label for="company-name">Mining LSLC preview</label>
+            <input id="company-name" name="company-name" type="text" maxlength="72" autocomplete="organization" placeholder="Quartz & Circuit LSLC">
             <p>Your current claim: <strong id="claimed-asteroid-name">Unclaimed Starter Rubble</strong></p>
           </article>
           <article class="portal-step-card portal-install-card">
@@ -92,7 +99,6 @@
         <button type="button" class="dashboard-tab" data-dashboard-tab="orders" aria-selected="false">Orders</button>
         <button type="button" class="dashboard-tab" data-dashboard-tab="inventory" aria-selected="false">Inventory</button>
         <button type="button" class="dashboard-tab" data-dashboard-tab="upgrades" aria-selected="false">Upgrades</button>
-        <button type="button" class="dashboard-tab" data-dashboard-tab="devices" aria-selected="false">Devices &amp; Sync</button>
         <button type="button" class="dashboard-tab" data-dashboard-tab="advanced" aria-selected="false">Advanced</button>
       </nav>
 
@@ -189,6 +195,21 @@
               </div>
               <span id="profile-menu-status" class="pill">Signed out</span>
             </div>
+            <section class="profile-avatar-editor" aria-labelledby="profile-avatar-title">
+              <div class="profile-avatar-large" aria-hidden="true">
+                <img id="profile-avatar-preview-image" class="profile-avatar-preview-image" alt="" hidden>
+                <span id="profile-avatar-preview-fallback" class="profile-avatar-preview-fallback">
+                  <span class="profile-avatar-head"></span>
+                  <span class="profile-avatar-mark">?</span>
+                </span>
+              </div>
+              <div class="profile-avatar-controls">
+                <h3 id="profile-avatar-title">Profile image</h3>
+                <label class="file-button" for="profile-avatar-input">Upload square image</label>
+                <input id="profile-avatar-input" class="profile-avatar-input" type="file" accept="image/png,image/jpeg,image/webp">
+                <p id="profile-avatar-status" class="message" role="status" aria-live="polite"></p>
+              </div>
+            </section>
             <dl class="compact-list">
               <div>
                 <dt>Email</dt>
@@ -202,14 +223,29 @@
                 <dt>Venture start</dt>
                 <dd id="profile-start-date">Not started</dd>
               </div>
-            </dl>
-            <form id="space-name-form" class="redeem-form profile-name-form">
-              <label for="space-user-name">Space User Name</label>
-              <div class="copy-row">
-                <input id="space-user-name" type="text" maxlength="80" autocomplete="nickname" placeholder="Quartz Runner">
-                <button id="save-space-user-name" type="submit">Save</button>
+              <div>
+                <dt>Space charter</dt>
+                <dd id="profile-space-name">Name required</dd>
               </div>
-            </form>
+              <div>
+                <dt>Mining LSLC</dt>
+                <dd id="profile-company-name">Company required</dd>
+              </div>
+            </dl>
+            <section id="profile-setup" class="profile-setup" aria-labelledby="profile-setup-title">
+              <div>
+                <p class="eyebrow">First setup</p>
+                <h3 id="profile-setup-title">Name your space charter.</h3>
+                <p>Use exactly two words, like a first and last name. Try to make it sound like a person who belongs in a strange little mining belt.</p>
+              </div>
+              <form id="space-name-form" class="redeem-form profile-name-form">
+                <label for="space-user-name">Space charter name</label>
+                <input id="space-user-name" type="text" maxlength="80" autocomplete="nickname" placeholder="Buck Manwood">
+                <label for="profile-company-input">Mining LSLC</label>
+                <input id="profile-company-input" type="text" maxlength="72" autocomplete="organization" placeholder="Manwood Prospecting LSLC">
+                <button id="save-space-user-name" type="submit">Save charter</button>
+              </form>
+            </section>
             <p id="space-name-status" class="message" role="status" aria-live="polite"></p>
           </section>
 
@@ -247,6 +283,10 @@
                   <button id="redeem-referral" type="submit">Redeem</button>
                 </div>
               </form>
+              <div class="referral-recruits" aria-labelledby="referral-recruits-title">
+                <h4 id="referral-recruits-title">Referred players</h4>
+                <div id="referral-recruits-list" class="referral-recruits-list"></div>
+              </div>
               <p id="referral-status" class="message" role="status" aria-live="polite">Sign in to create your referral crew.</p>
             </div>
 
@@ -432,6 +472,7 @@
             </div>
             <div id="cosmetics-list" class="cosmetics-list"></div>
             <p id="cosmetics-status" class="message" role="status" aria-live="polite"></p>
+            <div class="planning-overlay" aria-hidden="true">In Planning</div>
           </section>
 
           <section class="dashboard-grid">

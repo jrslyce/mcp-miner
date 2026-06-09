@@ -20,7 +20,9 @@ function staticPath(urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?", 1)[0]);
   const clean = decoded === "/"
     ? "/index.html"
-    : (decoded === "/portal" || decoded.startsWith("/portal/") || decoded === "/link" || decoded.startsWith("/link/") ? "/portal.html" : decoded);
+    : (decoded === "/portal" || decoded.startsWith("/portal/") || decoded === "/link" || decoded.startsWith("/link/")
+        ? "/portal.html"
+        : (decoded === "/instructions" || decoded.startsWith("/instructions/") ? "/instructions.html" : decoded));
   const target = path.normalize(path.join(HOSTING_ROOT, clean));
   if (!target.startsWith(HOSTING_ROOT)) {
     return null;
@@ -103,6 +105,8 @@ async function assertPortalLayoutRoutes(page, baseUrl) {
     view: document.body.dataset.dashboardView,
     tab: document.body.dataset.dashboardTab,
     quickStartLabel: document.querySelector("#quick-start-toggle-label")?.textContent?.trim(),
+    hasDevicesMainTab: Boolean(document.querySelector("[data-dashboard-tab='devices']")),
+    hasDevicesMenuLink: Boolean(document.querySelector("[data-menu-page='devices']")),
     mainHidden: getComputedStyle(document.querySelector(".main-board")).display === "none",
     railHidden: getComputedStyle(document.querySelector(".side-rail")).display === "none",
     modeHidden: document.querySelector(".mode-strip")?.hidden,
@@ -125,13 +129,18 @@ async function assertPortalLayoutRoutes(page, baseUrl) {
     tab: document.body.dataset.dashboardTab,
     mainHidden: getComputedStyle(document.querySelector(".main-board")).display === "none",
     railHidden: getComputedStyle(document.querySelector(".side-rail")).display === "none",
+    quickStartHidden: getComputedStyle(document.querySelector("#quick-start")).display === "none",
+    tabsHidden: getComputedStyle(document.querySelector(".dashboard-tabs")).display === "none",
     authHidden: document.querySelector("[data-panel='auth']")?.hidden,
     billingHidden: document.querySelector("[data-panel='billing']")?.hidden,
+    avatarAccept: document.querySelector("#profile-avatar-input")?.getAttribute("accept"),
+    hasAvatarPreview: Boolean(document.querySelector("#profile-avatar-preview-image")),
     bodyWidth: document.body.scrollWidth,
     viewportWidth: window.innerWidth
   }));
   const failures = [];
   if (overview.view !== "game" || overview.tab !== "overview") failures.push(`overview route ${overview.view}/${overview.tab}`);
+  if (overview.hasDevicesMainTab || !overview.hasDevicesMenuLink) failures.push("devices should be in the user menu, not the main tabs");
   if (overview.mainHidden || !overview.railHidden) failures.push("overview should show full-width main board only");
   if (overview.modeHidden) failures.push("overview mode strip should be visible");
   if (overview.shellWidth && overview.mainWidth && overview.mainWidth < overview.shellWidth * 0.9) failures.push(`main board too narrow ${overview.mainWidth}/${overview.shellWidth}`);
@@ -139,12 +148,39 @@ async function assertPortalLayoutRoutes(page, baseUrl) {
   if (orders.path !== "/portal/orders" || orders.tab !== "orders") failures.push(`orders route ${orders.path}/${orders.tab}`);
   if (!orders.modeHidden || orders.ordersHidden) failures.push("orders should hide overview summary and show orders");
   if (profile.path !== "/portal/profile" || profile.view !== "account" || profile.tab !== "profile") failures.push(`profile route ${profile.path}/${profile.view}/${profile.tab}`);
+  if (!profile.quickStartHidden || !profile.tabsHidden) failures.push("profile route should hide quick start and secondary portal nav");
   if (!profile.mainHidden || profile.railHidden || profile.authHidden || !profile.billingHidden) failures.push("profile route should show account page full width");
+  if (profile.avatarAccept !== "image/png,image/jpeg,image/webp" || !profile.hasAvatarPreview) failures.push("profile avatar upload controls missing");
   if (profile.bodyWidth > profile.viewportWidth + 2) failures.push(`profile horizontal overflow ${profile.bodyWidth}/${profile.viewportWidth}`);
   if (failures.length) {
     throw new Error(`portal route layout failed: ${failures.join("; ")}`);
   }
   return { overview, orders, profile };
+}
+
+async function assertInstructionsRoute(page, baseUrl) {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`${baseUrl}/instructions`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(500);
+  const state = await page.evaluate(() => ({
+    path: window.location.pathname,
+    title: document.querySelector("h1")?.textContent?.trim(),
+    hasSuit: document.body.innerText.includes("Suit %"),
+    hasSync: document.body.innerText.includes("What sync sends"),
+    artCount: document.querySelectorAll(".generated-topic-art svg").length,
+    bodyWidth: document.body.scrollWidth,
+    viewportWidth: window.innerWidth
+  }));
+  const failures = [];
+  if (state.path !== "/instructions") failures.push(`instructions path=${state.path}`);
+  if (state.title !== "MCP Miner Instructions") failures.push(`instructions title=${state.title}`);
+  if (!state.hasSuit || !state.hasSync) failures.push("instructions content missing core gameplay/sync sections");
+  if (state.artCount < 4) failures.push(`instructions generated art count=${state.artCount}`);
+  if (state.bodyWidth > state.viewportWidth + 2) failures.push(`instructions horizontal overflow ${state.bodyWidth}/${state.viewportWidth}`);
+  if (failures.length) {
+    throw new Error(`instructions route failed: ${failures.join("; ")}`);
+  }
+  return state;
 }
 
 async function assertDeviceLinkRoutes(page, baseUrl) {
@@ -204,9 +240,10 @@ async function main() {
     const mobile = await assertPortalState(page, url, { width: 390, height: 844 });
     const routes = await assertPortalLayoutRoutes(page, url);
     const deviceRoutes = await assertDeviceLinkRoutes(page, url);
+    const instructions = await assertInstructionsRoute(page, url);
     console.log(JSON.stringify({
       ok: true,
-      checks: 4,
+      checks: 5,
       desktop: {
         connection: desktop.connection,
         source: desktop.source
@@ -220,7 +257,8 @@ async function main() {
         ordersPath: routes.orders.path,
         profileView: routes.profile.view,
         devicesLinkHidden: deviceRoutes.devices.linkHidden,
-        recoveredLinkCode: deviceRoutes.recovered.code
+        recoveredLinkCode: deviceRoutes.recovered.code,
+        instructionsArt: instructions.artCount
       }
     }, null, 2));
   } finally {

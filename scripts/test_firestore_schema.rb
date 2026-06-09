@@ -71,6 +71,10 @@ assert("client-writeable profile and settings fields should be bounded") do
   rules.include?("function optionalStringAtMost(data, field, maxSize)") &&
     rules.include?("function optionalListAtMost(data, field, maxSize)") &&
     rules.include?('optionalStringAtMost(data, "displayName", 80)') &&
+    rules.include?('optionalStringAtMost(data, "miningCompanyName", 72)') &&
+    rules.include?('optionalStringAtMost(data, "avatarDataUrl", 360000)') &&
+    rules.include?('optionalStringAtMost(data, "avatarMimeType", 32)') &&
+    rules.include?('timestampLike(data, "avatarUpdatedAt")') &&
     rules.include?('optionalStringAtMost(data, "avatarConceptPrompt", 1000)') &&
     rules.include?('optionalListAtMost(data, "customizationUnlocks", 50)') &&
     rules.include?('optionalStringAtMost(data, "clientId", 120)')
