@@ -640,6 +640,44 @@ const SPACE_CHARTER_NAME_PATTERN = /^[A-Za-z][A-Za-z'-]{1,31} [A-Za-z][A-Za-z'-]
 const LSLC_SUFFIX_PATTERN = /\bLSLC\b\.?$/i;
 const AVATAR_MAX_BYTES = 256 * 1024;
 const AVATAR_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const SPACE_CHARTER_FIRST_NAMES = [
+  "Nova",
+  "Orion",
+  "Vega",
+  "Astra",
+  "Comet",
+  "Rocket",
+  "Lunar",
+  "Cosmo",
+  "Atlas",
+  "Stella",
+  "Sol",
+  "Nebula"
+];
+const SPACE_CHARTER_LAST_NAMES = [
+  "Quarry",
+  "Starling",
+  "Crater",
+  "Drift",
+  "Spark",
+  "Ridge",
+  "Copper",
+  "Flux",
+  "Stone",
+  "Hollow",
+  "Kepler",
+  "Orbit"
+];
+const MINING_COMPANY_NOUNS = [
+  "Prospecting",
+  "Driftworks",
+  "Beltworks",
+  "Starforge",
+  "Rockworks",
+  "Claimworks",
+  "Orbitworks",
+  "Moonworks"
+];
 const ACCOUNT_PAGE_TABS = new Set(["profile", "billing", "promo", "devices"]);
 const VALID_DASHBOARD_TABS = ["overview", "orders", "inventory", "upgrades", "devices", "profile", "billing", "promo", "advanced"];
 const TAB_ROUTES = {
@@ -753,6 +791,25 @@ function savedMiningCompanyName(data = activeDashboard) {
   return cleanCompanyName(profile.miningCompanyName || profile.mining_company_name || profile.companyName || profile.company_name);
 }
 
+function stableUserNumber(user = currentUser) {
+  const seed = String((user && (user.uid || user.email || user.displayName)) || "mcp-miner");
+  return Array.from(seed).reduce((total, char) => ((total * 31) + char.charCodeAt(0)) >>> 0, 7);
+}
+
+function suggestedSpaceCharterName(user = currentUser) {
+  const seed = stableUserNumber(user);
+  const first = SPACE_CHARTER_FIRST_NAMES[seed % SPACE_CHARTER_FIRST_NAMES.length];
+  const last = SPACE_CHARTER_LAST_NAMES[Math.floor(seed / SPACE_CHARTER_FIRST_NAMES.length) % SPACE_CHARTER_LAST_NAMES.length];
+  return `${first} ${last}`;
+}
+
+function suggestedMiningCompanyName(user = currentUser) {
+  const seed = stableUserNumber(user);
+  const last = SPACE_CHARTER_LAST_NAMES[Math.floor(seed / 17) % SPACE_CHARTER_LAST_NAMES.length];
+  const noun = MINING_COMPANY_NOUNS[Math.floor(seed / 31) % MINING_COMPANY_NOUNS.length];
+  return `${last} ${noun} LSLC`;
+}
+
 function isDefaultSpaceName(value) {
   const clean = cleanSpaceUserName(value).toLowerCase();
   return clean === "local prospector" || clean === "prospector";
@@ -761,7 +818,14 @@ function isDefaultSpaceName(value) {
 function savedSpaceCharterName(data = activeDashboard) {
   const profile = data && data.profile ? data.profile : {};
   const clean = cleanSpaceUserName(profile.minerName || profile.displayName);
-  return clean && !isDefaultSpaceName(clean) ? clean : "";
+  const providerName = cleanSpaceUserName(currentUser && currentUser.displayName);
+  if (!clean || isDefaultSpaceName(clean)) {
+    return "";
+  }
+  if (!savedMiningCompanyName(data) && providerName && clean.toLowerCase() === providerName.toLowerCase()) {
+    return "";
+  }
+  return clean;
 }
 
 function currentCompanyName() {
@@ -1443,8 +1507,9 @@ function renderProfileAvatar(data = activeDashboard) {
 function renderUserProfile(data = activeDashboard) {
   const signedIn = Boolean(currentUser);
   const spaceName = savedSpaceCharterName(data);
-  const draftSpaceName = spaceName || (isDefaultSpaceName(currentUser?.displayName) ? "" : cleanSpaceUserName(currentUser?.displayName || ""));
+  const draftSpaceName = spaceName || suggestedSpaceCharterName(currentUser);
   const companyName = savedMiningCompanyName(data);
+  const draftCompanyName = companyName || suggestedMiningCompanyName(currentUser);
   const hasLockedProfile = signedIn && profileSetupComplete(data);
   renderProfileAvatar(data);
   profileMenuStatus.textContent = signedIn ? "Signed in" : "Signed out";
@@ -1460,7 +1525,7 @@ function renderUserProfile(data = activeDashboard) {
     spaceUserName.value = signedIn ? draftSpaceName : "";
   }
   if (profileCompanyInput && !profileCompanyInput.value) {
-    profileCompanyInput.value = signedIn ? companyName : "";
+    profileCompanyInput.value = signedIn ? draftCompanyName : "";
   }
   if (companyNameInput && companyName) {
     companyNameInput.value = companyName;
@@ -1871,15 +1936,14 @@ async function signOutCurrentUser() {
 }
 
 function profilePayload(user) {
-  const displayName = user.displayName || "Local Prospector";
   return {
     ownerUid: user.uid,
     schemaVersion: 1,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     privacyClass: "abstract",
-    displayName,
-    minerName: displayName,
+    displayName: "Local Prospector",
+    minerName: "Prospector",
     cloudSyncEnabled: true,
     accountLinkedAt: serverTimestamp()
   };
@@ -1895,8 +1959,8 @@ async function ensureLinkedProfile(user) {
   ]);
   const existingPlayerData = existing.exists() ? existing.data() : {};
   const existingProfileData = existingProfile.exists() ? existingProfile.data() : {};
-  const defaultDisplayName = user.displayName || "Local Prospector";
-  const defaultMinerName = user.displayName || "Prospector";
+  const defaultDisplayName = "Local Prospector";
+  const defaultMinerName = "Prospector";
   const existingCompanyName = cleanMiningCompanyName(existingProfileData.miningCompanyName || existingProfileData.mining_company_name) ||
     cleanMiningCompanyName(existingPlayerData.miningCompanyName || existingPlayerData.mining_company_name);
   const existingDisplayName = cleanSpaceUserName(existingProfileData.displayName) ||
