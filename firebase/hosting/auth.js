@@ -3754,16 +3754,26 @@ async function saveSpaceUserNameProfile(options = {}) {
   status.textContent = "Saving space charter.";
   status.dataset.tone = "";
   try {
+    const playerRef = doc(db, "players", currentUser.uid);
+    const profileRef = doc(db, "players", currentUser.uid, "profile", "current");
+    const playerSnap = await getDoc(playerRef);
+    const playerPatch = {
+      ownerUid: currentUser.uid,
+      updatedAt: serverTimestamp(),
+      privacyClass: "abstract",
+      minerName,
+      displayName: minerName,
+      miningCompanyName
+    };
+    if (!playerSnap.exists()) {
+      playerPatch.schemaVersion = 1;
+      playerPatch.createdAt = serverTimestamp();
+      playerPatch.accountLinkedAt = serverTimestamp();
+      playerPatch.cloudSyncEnabled = true;
+    }
     await Promise.all([
-      setDoc(doc(db, "players", currentUser.uid), {
-        ownerUid: currentUser.uid,
-        updatedAt: serverTimestamp(),
-        privacyClass: "abstract",
-        minerName,
-        displayName: minerName,
-        miningCompanyName
-      }, { merge: true }),
-      setDoc(doc(db, "players", currentUser.uid, "profile", "current"), {
+      setDoc(playerRef, playerPatch, { merge: true }),
+      setDoc(profileRef, {
         ownerUid: currentUser.uid,
         schemaVersion: 1,
         updatedAt: serverTimestamp(),
