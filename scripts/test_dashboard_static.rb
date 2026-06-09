@@ -219,12 +219,16 @@ assert("space user name saves should survive dashboard refreshes") do
     auth_js.include?("const SPACE_CHARTER_FIRST_NAMES") &&
     auth_js.include?("function suggestedSpaceCharterName(user = currentUser)") &&
     auth_js.include?("function suggestedMiningCompanyName(user = currentUser)") &&
+    auth_js.include?("player.miningCompanyName") &&
+    auth_js.include?("player.spaceUserName") &&
     auth_js.include?("providerName && clean.toLowerCase() === providerName.toLowerCase()") &&
     auth_js.include?("displayName: \"Local Prospector\"") &&
     auth_js.include?("minerName: \"Prospector\"") &&
     auth_js.include?("const defaultDisplayName = \"Local Prospector\"") &&
     auth_js.include?("function profileSetupComplete(data = activeDashboard)") &&
     auth_js.include?("profileSetup.hidden = hasLockedProfile") &&
+    auth_js.include?("spaceUserName && !hasLockedProfile") &&
+    auth_js.include?("profileCompanyInput && !hasLockedProfile") &&
     auth_js.include?("Enter exactly two words for the space charter name") &&
     auth_js.include?("miningCompanyName") &&
     auth_js.include?("await Promise.all([") &&

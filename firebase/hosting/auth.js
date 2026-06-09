@@ -788,7 +788,17 @@ function cleanMiningCompanyName(value) {
 
 function savedMiningCompanyName(data = activeDashboard) {
   const profile = data && data.profile ? data.profile : {};
-  return cleanCompanyName(profile.miningCompanyName || profile.mining_company_name || profile.companyName || profile.company_name);
+  const player = data && data.player ? data.player : {};
+  return cleanCompanyName(
+    profile.miningCompanyName ||
+      profile.mining_company_name ||
+      profile.companyName ||
+      profile.company_name ||
+      player.miningCompanyName ||
+      player.mining_company_name ||
+      player.companyName ||
+      player.company_name
+  );
 }
 
 function stableUserNumber(user = currentUser) {
@@ -817,7 +827,17 @@ function isDefaultSpaceName(value) {
 
 function savedSpaceCharterName(data = activeDashboard) {
   const profile = data && data.profile ? data.profile : {};
-  const clean = cleanSpaceUserName(profile.minerName || profile.displayName);
+  const player = data && data.player ? data.player : {};
+  const clean = cleanSpaceUserName(
+    profile.minerName ||
+      profile.displayName ||
+      profile.spaceUserName ||
+      profile.space_user_name ||
+      player.minerName ||
+      player.displayName ||
+      player.spaceUserName ||
+      player.space_user_name
+  );
   const providerName = cleanSpaceUserName(currentUser && currentUser.displayName);
   if (!clean || isDefaultSpaceName(clean)) {
     return "";
@@ -1521,10 +1541,10 @@ function renderUserProfile(data = activeDashboard) {
   if (profileSetup) {
     profileSetup.hidden = hasLockedProfile;
   }
-  if (spaceUserName && !spaceUserName.value) {
+  if (spaceUserName && !hasLockedProfile) {
     spaceUserName.value = signedIn ? draftSpaceName : "";
   }
-  if (profileCompanyInput && !profileCompanyInput.value) {
+  if (profileCompanyInput && !hasLockedProfile) {
     profileCompanyInput.value = signedIn ? draftCompanyName : "";
   }
   if (companyNameInput && companyName) {
