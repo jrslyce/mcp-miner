@@ -282,6 +282,12 @@ function publicCompanyName(data = {}, fallback = "") {
   return clean || fallback;
 }
 
+function publicAvatarDataUrl(data = {}) {
+  const raw = String(data.avatarDataUrl || data.avatar_data_url || "");
+  const validImage = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(raw);
+  return validImage && raw.length <= 360000 ? raw : "";
+}
+
 async function publicPlayerCompanyName(uid) {
   if (!uid) {
     return "";
@@ -1284,6 +1290,41 @@ exports.getAccountStatus = onCall({ region: "us-central1" }, async (request) => 
   const uid = requireSignedInOwner(request, "loading account settings");
   const now = new Date().toISOString();
   return publicAccountStatus(uid, now);
+});
+
+exports.getReferralInvite = onCall({ region: "us-central1" }, async (request) => {
+  const code = cleanReferralCode(request.data && request.data.code);
+  await requireOperationCapacity("getReferralInvite", rateLimitSubjectForRequest(request));
+
+  const codeSnap = await db.doc(`referralCodes/${code}`).get();
+  if (!codeSnap.exists || !codeSnap.data().ownerUid) {
+    throw new HttpsError("not-found", "Referral code was not found.");
+  }
+
+  const ownerUid = codeSnap.data().ownerUid;
+  const [profileSnap, playerSnap, referralSnap] = await Promise.all([
+    db.doc(`players/${ownerUid}/profile/current`).get(),
+    db.doc(`players/${ownerUid}`).get(),
+    db.doc(`players/${ownerUid}/referral/current`).get()
+  ]);
+  const profile = profileSnap.exists ? profileSnap.data() : {};
+  const player = playerSnap.exists ? playerSnap.data() : {};
+  const referral = referralSnap.exists ? referralSnap.data() : {};
+  const spaceName = publicPlayerName(profile, publicPlayerName(player));
+  const companyName = publicCompanyName(profile, publicCompanyName(player, "Mining LSLC pending"));
+
+  return {
+    ok: true,
+    privacyClass: "abstract",
+    referral: {
+      code,
+      inviteUrl: `${ACCOUNT_DASHBOARD_URL}/portal?ref=${encodeURIComponent(code)}`,
+      spaceName,
+      companyName,
+      avatarDataUrl: publicAvatarDataUrl(profile) || publicAvatarDataUrl(player),
+      rewardLabel: referral.rewardLabel || "Crew recruitment bonuses"
+    }
+  };
 });
 
 exports.redeemReferralCode = onCall({ region: "us-central1" }, async (request) => {

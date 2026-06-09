@@ -226,6 +226,7 @@ async function main() {
   const digest = await callFunction("getWeeklyDigest", owner.idToken, {});
   const cosmetics = await callFunction("getCosmeticCatalog", owner.idToken, {});
   const ownerAccount = await callFunction("getAccountStatus", owner.idToken, {});
+  const referralInvite = await callFunction("getReferralInvite", null, { code: ownerAccount.result.referral.code });
   const referralJoin = await callFunction("redeemReferralCode", other.idToken, { code: ownerAccount.result.referral.code });
   const ownerAccountAfterReferral = await callFunction("getAccountStatus", owner.idToken, {});
   await getDoc(`players/${owner.localId}/gameState/current`, owner.idToken);
@@ -275,6 +276,9 @@ async function main() {
   if (!referralJoin.result || referralJoin.result.referral.referredByCode !== ownerAccount.result.referral.code) {
     throw new Error("referral code redeem did not mark referred account");
   }
+  if (!referralInvite.result || referralInvite.result.referral.spaceName !== "Smoke Miner" || referralInvite.result.referral.companyName !== "Smoke Belt LSLC") {
+    throw new Error("referral invite did not expose inviter public profile");
+  }
   if (referralJoin.result.referral.referredByCompanyName !== "Smoke Belt LSLC") {
     throw new Error("referral code redeem did not expose inviter company name");
   }
@@ -304,6 +308,7 @@ async function main() {
       "dashboard_analytics_read",
       "weekly_digest_read",
       "cosmetic_catalog_read",
+      "referral_invite_public_profile_loaded",
       "referral_code_redeemed",
       "referral_recruit_name_listed",
       "hosting_dashboard_served"

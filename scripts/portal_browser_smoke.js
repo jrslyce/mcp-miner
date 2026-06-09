@@ -155,6 +155,37 @@ async function assertPortalLayoutRoutes(page, baseUrl) {
   if (!overview.hasQuickCharter || !overview.hasQuickCompany || !overview.hasQuickReferral || !overview.hasQuickInstall || !overview.hasQuickLink) {
     failures.push("quick start five-step controls missing");
   }
+  await page.goto(`${baseUrl}/portal?ref=FAKE-BUSY`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(500);
+  const referral = await page.evaluate(() => ({
+    path: window.location.pathname,
+    referralMode: document.body.dataset.referralMode,
+    authState: document.body.dataset.authState,
+    welcomeHidden: document.querySelector("#referral-welcome")?.hidden,
+    title: document.querySelector("#referral-welcome-title")?.textContent?.trim(),
+    code: document.querySelector("#referral-welcome-code")?.textContent?.trim(),
+    hasGoogle: Boolean(document.querySelector("#referral-google-sign-in")),
+    hasAuthForm: Boolean(document.querySelector("#referral-auth-form")),
+    quickStartHidden: getComputedStyle(document.querySelector("#quick-start")).display === "none",
+    tabsHidden: getComputedStyle(document.querySelector(".dashboard-tabs")).display === "none",
+    mainHidden: getComputedStyle(document.querySelector(".main-board")).display === "none",
+    railHidden: getComputedStyle(document.querySelector(".side-rail")).display === "none",
+    bodyWidth: document.body.scrollWidth,
+    viewportWidth: window.innerWidth
+  }));
+  if (referral.path !== "/portal" || referral.referralMode !== "pending" || referral.authState !== "signed-out") {
+    failures.push(`referral route ${referral.path}/${referral.referralMode}/${referral.authState}`);
+  }
+  if (referral.welcomeHidden || !referral.hasGoogle || !referral.hasAuthForm) {
+    failures.push("referral welcome auth controls missing");
+  }
+  if (!referral.title || referral.code !== "FAKE-BUSY") {
+    failures.push(`referral welcome content ${referral.title}/${referral.code}`);
+  }
+  if (!referral.quickStartHidden || !referral.tabsHidden || !referral.mainHidden || !referral.railHidden) {
+    failures.push("referral route should hide normal portal dashboard while signed out");
+  }
+  if (referral.bodyWidth > referral.viewportWidth + 2) failures.push(`referral horizontal overflow ${referral.bodyWidth}/${referral.viewportWidth}`);
   if (orders.path !== "/portal/orders" || orders.tab !== "orders") failures.push(`orders route ${orders.path}/${orders.tab}`);
   if (!orders.modeHidden || orders.ordersHidden) failures.push("orders should hide overview summary and show orders");
   if (profile.path !== "/portal/profile" || profile.view !== "account" || profile.tab !== "profile") failures.push(`profile route ${profile.path}/${profile.view}/${profile.tab}`);

@@ -163,10 +163,20 @@ assert("portal should include collapsible Quick Start before the stats dashboard
     auth_js.include?("function setupDashboardTabs()") &&
     auth_js.include?("function setDashboardTab(tab, options = {})") &&
     auth_js.include?("const QUICK_START_STORAGE_KEY = \"mcp-miner-quick-start-open\"") &&
+    portal.include?(%(id="referral-welcome")) &&
+    portal.include?(%(id="referral-welcome-avatar-image")) &&
+    portal.include?(%(id="referral-google-sign-in")) &&
+    portal.include?(%(id="referral-auth-form")) &&
+    portal.include?(%(id="referral-create-account")) &&
+    auth_js.include?("httpsCallable(functions, \"getReferralInvite\")") &&
+    auth_js.include?("function renderReferralWelcome(invite = activeReferralInvite)") &&
+    auth_js.include?("function loadReferralInvite()") &&
+    auth_js.include?("function handleReferralAuth(fn)") &&
     styles.include?(".portal-onboarding-grid") &&
     styles.include?("grid-template-columns: repeat(5, minmax(0, 1fr))") &&
     styles.include?(".quick-referral-card") &&
-    !styles.include?("body[data-referral-mode=\"pending\"] .portal-onboarding") &&
+    styles.include?(".referral-welcome-card") &&
+    styles.include?("body[data-referral-mode=\"pending\"][data-auth-state=\"signed-out\"] .portal-onboarding") &&
     styles.include?(".quick-start-summary") &&
     styles.include?(".dashboard-tabs") &&
     styles.include?("@keyframes asteroid-card-sheen")
@@ -259,6 +269,9 @@ assert("referral crew status should include public recruit names") do
   functions_js.include?("function publicPlayerName(data = {}, fallback = \"Space charter pending\")") &&
     functions_js.include?("function publicCompanyName(data = {}, fallback = \"\")") &&
     functions_js.include?("async function publicPlayerCompanyName(uid)") &&
+    functions_js.include?("function publicAvatarDataUrl(data = {})") &&
+    functions_js.include?("exports.getReferralInvite") &&
+    functions_js.include?("avatarDataUrl: publicAvatarDataUrl(profile) || publicAvatarDataUrl(player)") &&
     functions_js.include?("referredByCompanyName") &&
     functions_js.include?("const savedCode = referral.code ? cleanReferralCode(referral.code) : null") &&
     functions_js.include?("let ensuredCode = generatedReferralCode(uid)") &&
