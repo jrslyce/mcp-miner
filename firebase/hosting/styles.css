@@ -1414,7 +1414,6 @@ body[data-link-mode="pending"] .link-panel {
 }
 
 body[data-link-mode="pending"] .portal-onboarding,
-body[data-referral-mode="pending"] .portal-onboarding,
 body[data-login-mode="pending"] .portal-onboarding {
   display: none;
 }

@@ -166,6 +166,7 @@ assert("portal should include collapsible Quick Start before the stats dashboard
     styles.include?(".portal-onboarding-grid") &&
     styles.include?("grid-template-columns: repeat(5, minmax(0, 1fr))") &&
     styles.include?(".quick-referral-card") &&
+    !styles.include?("body[data-referral-mode=\"pending\"] .portal-onboarding") &&
     styles.include?(".quick-start-summary") &&
     styles.include?(".dashboard-tabs") &&
     styles.include?("@keyframes asteroid-card-sheen")
