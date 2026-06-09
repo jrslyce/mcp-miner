@@ -278,19 +278,25 @@ function publicPlayerName(data = {}, fallback = "Space charter pending") {
 
 async function ensureReferralCode(uid, now = new Date().toISOString()) {
   const referralRef = db.doc(`players/${uid}/referral/current`);
-  const code = generatedReferralCode(uid);
-  const codeRef = db.doc(`referralCodes/${code}`);
+  let ensuredCode = generatedReferralCode(uid);
   await db.runTransaction(async (transaction) => {
-    const [referralSnap, codeSnap] = await Promise.all([
-      transaction.get(referralRef),
-      transaction.get(codeRef)
-    ]);
+    const referralSnap = await transaction.get(referralRef);
     const referral = referralSnap.exists ? referralSnap.data() : {};
-    if (referral.code && referral.code !== code) {
-      return;
-    }
+    const savedCode = referral.code ? cleanReferralCode(referral.code) : null;
+    const code = savedCode || generatedReferralCode(uid);
+    ensuredCode = code;
+    const codeRef = db.doc(`referralCodes/${code}`);
+    const codeSnap = await transaction.get(codeRef);
     if (codeSnap.exists && codeSnap.data().ownerUid && codeSnap.data().ownerUid !== uid) {
       throw new HttpsError("already-exists", "Referral code collision. Try again shortly.");
+    }
+    const generatedCode = generatedReferralCode(uid);
+    if (savedCode && savedCode !== generatedCode) {
+      const generatedCodeRef = db.doc(`referralCodes/${generatedCode}`);
+      const generatedCodeSnap = await transaction.get(generatedCodeRef);
+      if (generatedCodeSnap.exists && generatedCodeSnap.data().ownerUid === uid) {
+        transaction.delete(generatedCodeRef);
+      }
     }
     transaction.set(referralRef, {
       ownerUid: uid,
@@ -299,7 +305,7 @@ async function ensureReferralCode(uid, now = new Date().toISOString()) {
       code,
       crewSize: referral.crewSize || 0,
       recruitedCount: referral.recruitedCount || 0,
-      rewardLabel: "Crew recruitment bonuses",
+      rewardLabel: referral.rewardLabel || "Crew recruitment bonuses",
       createdAt: referral.createdAt || now,
       updatedAt: now
     }, { merge: true });
@@ -312,7 +318,7 @@ async function ensureReferralCode(uid, now = new Date().toISOString()) {
       updatedAt: now
     }, { merge: true });
   });
-  return code;
+  return ensuredCode;
 }
 
 async function publicAccountStatus(uid, now = new Date().toISOString()) {
