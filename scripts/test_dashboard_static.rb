@@ -252,6 +252,10 @@ assert("login route should render only the login card with referral support") do
     auth_js.include?("function setupLoginReferralCode()") &&
     auth_js.include?("function redeemLoginReferralIfReady()") &&
     auth_js.include?("function clearLoginRouteAfterSignIn()") &&
+    auth_js.include?("function shouldFallbackToGoogleRedirect(error)") &&
+    auth_js.include?("function signInWithGoogle()") &&
+    auth_js.include?("const credential = await signInWithPopup(auth, googleProvider);") &&
+    auth_js.include?("await signInWithRedirect(auth, googleProvider);") &&
     auth_js.include?("let googleRedirectSettled = false;") &&
     auth_js.include?("renderSignedOutState(previousUser);") &&
     auth_js.include?("Completing Google sign-in.") &&
@@ -319,6 +323,7 @@ assert("dashboard JavaScript should support Auth, Firestore, Functions, and empt
     getAuth
     GoogleAuthProvider
     getRedirectResult
+    signInWithPopup
     signInWithRedirect
     signInWithEmailAndPassword
     createUserWithEmailAndPassword

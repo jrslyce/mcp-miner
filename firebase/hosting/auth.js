@@ -9,6 +9,7 @@ import {
   reload,
   sendEmailVerification,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   signOut
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
@@ -347,6 +348,7 @@ const AUTH_ERROR_MESSAGES = {
   "auth/missing-email": "Enter your email address.",
   "auth/missing-password": "Enter your password.",
   "auth/network-request-failed": "Network connection failed. Try again in a moment.",
+  "auth/operation-not-supported-in-this-environment": "Google popup sign-in is not supported in this browser. Retrying with redirect.",
   "auth/too-many-requests": "Too many attempts. Wait a moment, then try again.",
   "auth/unauthorized-domain": "This domain is not authorized for MCP Miner sign-in yet.",
   "auth/user-not-found": "Email or password did not match an MCP Miner account.",
@@ -1981,6 +1983,32 @@ async function handleGoogleRedirectResult() {
   }
 }
 
+function shouldFallbackToGoogleRedirect(error) {
+  return [
+    "auth/cancelled-popup-request",
+    "auth/operation-not-supported-in-this-environment",
+    "auth/popup-blocked"
+  ].includes(error && error.code);
+}
+
+async function signInWithGoogle() {
+  try {
+    const credential = await signInWithPopup(auth, googleProvider);
+    if (credential && credential.user) {
+      currentUser = credential.user;
+      updateAuthControls(credential.user);
+      clearLoginRouteAfterSignIn();
+    }
+  } catch (error) {
+    if (shouldFallbackToGoogleRedirect(error)) {
+      setMessage("Opening Google sign-in.");
+      await signInWithRedirect(auth, googleProvider);
+      return;
+    }
+    throw error;
+  }
+}
+
 function validateAuthForm() {
   if (form.reportValidity()) {
     return true;
@@ -3599,7 +3627,7 @@ createAccount.addEventListener("click", () => {
 });
 
 googleSignInButton.addEventListener("click", () => {
-  handleAuth(() => signInWithRedirect(auth, googleProvider));
+  handleAuth(() => signInWithGoogle());
 });
 
 sendVerificationEmailButton.addEventListener("click", () => {
