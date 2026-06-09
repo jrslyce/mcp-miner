@@ -9,6 +9,7 @@ const RATE_LIMITS = Object.freeze({
   restoreCloudBackup: { limit: 12, windowSeconds: 60 * 60 },
   createCheckoutSession: { limit: 8, windowSeconds: 60 * 60 },
   createCustomerPortalSession: { limit: 12, windowSeconds: 60 * 60 },
+  getReferralInvite: { limit: 120, windowSeconds: 60 },
   createLinkSession: { limit: 20, windowSeconds: 60 * 60 },
   approveLinkSession: { limit: 30, windowSeconds: 60 * 60 },
   exchangeLinkSession: { limit: 30, windowSeconds: 60 * 60 }

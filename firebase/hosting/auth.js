@@ -610,6 +610,20 @@ const redeemReferralButton = document.querySelector("#redeem-referral");
 const referralStatus = document.querySelector("#referral-status");
 const loginReferralCode = document.querySelector("#login-referral-code");
 const loginReferralStatus = document.querySelector("#login-referral-status");
+const referralWelcome = document.querySelector("#referral-welcome");
+const referralWelcomeTitle = document.querySelector("#referral-welcome-title");
+const referralWelcomeMessage = document.querySelector("#referral-welcome-message");
+const referralWelcomeAvatarImage = document.querySelector("#referral-welcome-avatar-image");
+const referralWelcomeAvatarFallback = document.querySelector("#referral-welcome-avatar-fallback");
+const referralWelcomeSpaceName = document.querySelector("#referral-welcome-space-name");
+const referralWelcomeCompanyName = document.querySelector("#referral-welcome-company-name");
+const referralWelcomeCode = document.querySelector("#referral-welcome-code");
+const referralGoogleSignIn = document.querySelector("#referral-google-sign-in");
+const referralAuthForm = document.querySelector("#referral-auth-form");
+const referralEmail = document.querySelector("#referral-email");
+const referralPassword = document.querySelector("#referral-password");
+const referralCreateAccount = document.querySelector("#referral-create-account");
+const referralAuthMessage = document.querySelector("#referral-auth-message");
 const promoCodeForm = document.querySelector("#promo-code-form");
 const promoCodeInput = document.querySelector("#promo-code");
 const redeemPromoButton = document.querySelector("#redeem-promo");
@@ -723,6 +737,7 @@ let deviceLinkState = "waiting";
 let verificationEmailSentAt = 0;
 let portalRefreshTimer = null;
 let portalRefreshInFlight = false;
+let activeReferralInvite = null;
 let planCatalog = {
   currency: "usd",
   annualMonthsCharged: 11,
@@ -1014,6 +1029,73 @@ function setupLoginReferralCode() {
   }
 }
 
+function setReferralAuthMessage(text, tone = "") {
+  if (!referralAuthMessage) {
+    return;
+  }
+  referralAuthMessage.textContent = text;
+  referralAuthMessage.dataset.tone = tone;
+}
+
+function fallbackReferralInvite() {
+  return {
+    code: pendingReferralCode || currentLoginReferralCode(),
+    spaceName: "A MCP Miner crew",
+    companyName: "a mining LSLC",
+    avatarDataUrl: "",
+    rewardLabel: "Crew recruitment bonuses"
+  };
+}
+
+function renderReferralWelcome(invite = activeReferralInvite) {
+  if (!referralWelcome) {
+    return;
+  }
+  const visible = Boolean(pendingReferralCode && !currentUser);
+  referralWelcome.hidden = !visible;
+  if (!visible) {
+    return;
+  }
+
+  const referral = invite || fallbackReferralInvite();
+  const code = normalizeReferralCodeParam(referral.code) || pendingReferralCode || "";
+  const spaceName = cleanSpaceUserName(referral.spaceName) || "A MCP Miner crew";
+  const companyName = cleanCompanyName(referral.companyName) || "a mining LSLC";
+  if (referralWelcomeTitle) {
+    referralWelcomeTitle.textContent = `Join ${companyName}`;
+  }
+  if (referralWelcomeMessage) {
+    referralWelcomeMessage.textContent = `${spaceName} invited you to contract your mining outfit with ${companyName}.`;
+  }
+  if (referralWelcomeSpaceName) {
+    referralWelcomeSpaceName.textContent = spaceName;
+  }
+  if (referralWelcomeCompanyName) {
+    referralWelcomeCompanyName.textContent = companyName;
+  }
+  if (referralWelcomeCode) {
+    referralWelcomeCode.textContent = code || "-";
+  }
+  renderAvatarImage(referralWelcomeAvatarImage, referralWelcomeAvatarFallback, safeAvatarDataUrl(referral.avatarDataUrl));
+}
+
+async function loadReferralInvite() {
+  if (!pendingReferralCode || !referralWelcome) {
+    return;
+  }
+  activeReferralInvite = fallbackReferralInvite();
+  renderReferralWelcome(activeReferralInvite);
+  setReferralAuthMessage("Sign in or create an account to accept this crew invite.");
+  try {
+    const callable = httpsCallable(functions, "getReferralInvite");
+    const result = await callable({ code: pendingReferralCode });
+    activeReferralInvite = result.data && result.data.referral ? result.data.referral : activeReferralInvite;
+    renderReferralWelcome(activeReferralInvite);
+  } catch (error) {
+    setReferralAuthMessage("Referral details could not load yet. You can still sign in and the team code will be applied.", "error");
+  }
+}
+
 function storedPendingLink() {
   try {
     const raw = sessionStorage.getItem(LINK_SESSION_STORAGE_KEY);
@@ -1224,6 +1306,18 @@ function updateAuthControls(user) {
   googleSignInButton.disabled = signedIn;
   signInButton.disabled = signedIn;
   createAccount.disabled = signedIn;
+  if (referralEmail) {
+    referralEmail.disabled = signedIn;
+  }
+  if (referralPassword) {
+    referralPassword.disabled = signedIn;
+  }
+  if (referralGoogleSignIn) {
+    referralGoogleSignIn.disabled = signedIn;
+  }
+  if (referralCreateAccount) {
+    referralCreateAccount.disabled = signedIn;
+  }
   if (signOutButton) {
     signOutButton.disabled = !signedIn;
   }
@@ -1234,6 +1328,7 @@ function updateAuthControls(user) {
     closeUserMenu();
   }
   updateVerificationControls(user);
+  renderReferralWelcome(activeReferralInvite);
 }
 
 function planLabel(plan) {
@@ -1824,6 +1919,9 @@ function hasPendingLink() {
 }
 
 function setLinkMode() {
+  if (!document.body.dataset.authState) {
+    document.body.dataset.authState = "signed-out";
+  }
   document.body.dataset.linkMode = hasPendingLink() ? "pending" : "dashboard";
   document.body.dataset.referralMode = pendingReferralCode ? "pending" : "none";
   document.body.dataset.loginMode = pendingLogin ? "pending" : "none";
@@ -2015,8 +2113,8 @@ async function sendVerificationEmailFor(user = currentUser) {
   setMessage(EMAIL_VERIFICATION_SENT);
 }
 
-async function createPasswordAccount() {
-  const credential = await createUserWithEmailAndPassword(auth, email.value, password.value);
+async function createPasswordAccount(emailValue = email.value, passwordValue = password.value) {
+  const credential = await createUserWithEmailAndPassword(auth, emailValue, passwordValue);
   try {
     await sendVerificationEmailFor(credential.user);
   } catch (error) {
@@ -2120,6 +2218,22 @@ async function handleAuth(fn) {
   }
 }
 
+async function handleReferralAuth(fn) {
+  try {
+    setMessage("");
+    setReferralAuthMessage("");
+    await fn();
+  } catch (error) {
+    const text = friendlyAuthMessage(error);
+    setReferralAuthMessage(text, "error");
+    setMessage(text, true);
+  } finally {
+    if (referralPassword) {
+      referralPassword.value = "";
+    }
+  }
+}
+
 async function handleGoogleRedirectResult() {
   try {
     const redirectResult = await getRedirectResult(auth);
@@ -2172,6 +2286,14 @@ function validateAuthForm() {
     return true;
   }
   setMessage(FORM_VALIDATION_MESSAGE, true);
+  return false;
+}
+
+function validateReferralAuthForm() {
+  if (referralAuthForm && referralAuthForm.reportValidity()) {
+    return true;
+  }
+  setReferralAuthMessage(FORM_VALIDATION_MESSAGE, "error");
   return false;
 }
 
@@ -3798,6 +3920,29 @@ googleSignInButton.addEventListener("click", () => {
   handleAuth(() => signInWithGoogle());
 });
 
+referralAuthForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!validateReferralAuthForm()) {
+    return;
+  }
+  handleReferralAuth(() => signInWithEmailAndPassword(auth, referralEmail.value, referralPassword.value));
+});
+
+referralAuthForm?.addEventListener("invalid", () => {
+  setReferralAuthMessage(FORM_VALIDATION_MESSAGE, "error");
+}, true);
+
+referralCreateAccount?.addEventListener("click", () => {
+  if (!validateReferralAuthForm()) {
+    return;
+  }
+  handleReferralAuth(() => createPasswordAccount(referralEmail.value, referralPassword.value));
+});
+
+referralGoogleSignIn?.addEventListener("click", () => {
+  handleReferralAuth(() => signInWithGoogle());
+});
+
 sendVerificationEmailButton.addEventListener("click", () => {
   handleAuth(() => sendVerificationEmailFor(currentUser));
 });
@@ -4063,6 +4208,7 @@ setupCompanyClaim();
 setupQuickStartToggle();
 setupPortalInstallSelector();
 setupLoginReferralCode();
+loadReferralInvite();
 handleGoogleRedirectResult();
 if (pendingReferralCode) {
   syncLoginReferralCode(pendingReferralCode, { quiet: true });
