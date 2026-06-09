@@ -234,6 +234,9 @@ end
 
 assert("referral crew status should include public recruit names") do
   functions_js.include?("function publicPlayerName(data = {}, fallback = \"Space charter pending\")") &&
+    functions_js.include?("const savedCode = referral.code ? cleanReferralCode(referral.code) : null") &&
+    functions_js.include?("let ensuredCode = generatedReferralCode(uid)") &&
+    functions_js.include?("return ensuredCode") &&
     functions_js.include?("db.collection(`players/${uid}/referralRecruits`).limit(50).get()") &&
     functions_js.include?("const recruitProfileRefs = recruitsSnap.docs.map") &&
     functions_js.include?("displayName: publicPlayerName(data, publicPlayerName(profile))") &&
