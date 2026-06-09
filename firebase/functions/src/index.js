@@ -276,6 +276,23 @@ function publicPlayerName(data = {}, fallback = "Space charter pending") {
   return clean || fallback;
 }
 
+function publicCompanyName(data = {}, fallback = "") {
+  const raw = data.miningCompanyName || data.mining_company_name || data.companyName || data.company_name;
+  const clean = String(raw || "").replace(/[\r\n\t]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 72);
+  return clean || fallback;
+}
+
+async function publicPlayerCompanyName(uid) {
+  if (!uid) {
+    return "";
+  }
+  const [profileSnap, playerSnap] = await Promise.all([
+    db.doc(`players/${uid}/profile/current`).get(),
+    db.doc(`players/${uid}`).get()
+  ]);
+  return publicCompanyName(profileSnap.exists ? profileSnap.data() : {}, publicCompanyName(playerSnap.exists ? playerSnap.data() : {}));
+}
+
 async function ensureReferralCode(uid, now = new Date().toISOString()) {
   const referralRef = db.doc(`players/${uid}/referral/current`);
   let ensuredCode = generatedReferralCode(uid);
@@ -331,6 +348,7 @@ async function publicAccountStatus(uid, now = new Date().toISOString()) {
   const recruitProfileRefs = recruitsSnap.docs.map((docSnap) => db.doc(`players/${docSnap.id}/profile/current`));
   const recruitProfileSnaps = recruitProfileRefs.length ? await db.getAll(...recruitProfileRefs) : [];
   const referral = referralSnap.exists ? referralSnap.data() : {};
+  const referredByCompanyName = referral.referredByUid ? await publicPlayerCompanyName(referral.referredByUid) : null;
   const recruits = recruitsSnap.docs.map((docSnap, index) => {
     const data = docSnap.data() || {};
     const profile = recruitProfileSnaps[index] && recruitProfileSnaps[index].exists ? recruitProfileSnaps[index].data() : {};
@@ -359,6 +377,7 @@ async function publicAccountStatus(uid, now = new Date().toISOString()) {
       crewSize: Number(referral.crewSize || recruits.length || 0),
       recruitedCount: Number(referral.recruitedCount || recruits.length || 0),
       referredByCode: referral.referredByCode || null,
+      referredByCompanyName,
       rewardLabel: referral.rewardLabel || "Crew recruitment bonuses",
       recruits
     },

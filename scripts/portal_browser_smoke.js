@@ -105,6 +105,12 @@ async function assertPortalLayoutRoutes(page, baseUrl) {
     view: document.body.dataset.dashboardView,
     tab: document.body.dataset.dashboardTab,
     quickStartLabel: document.querySelector("#quick-start-toggle-label")?.textContent?.trim(),
+    quickTitle: document.querySelector("#portal-onboarding-title")?.textContent?.trim(),
+    hasQuickCharter: Boolean(document.querySelector("#quick-space-user-name")),
+    hasQuickCompany: Boolean(document.querySelector("#company-name")),
+    hasQuickReferral: Boolean(document.querySelector("#quick-referral-code")),
+    hasQuickInstall: Boolean(document.querySelector("#portal-install-prompt")),
+    hasQuickLink: Boolean(document.querySelector("#portal-link-prompt")),
     hasDevicesMainTab: Boolean(document.querySelector("[data-dashboard-tab='devices']")),
     hasDevicesMenuLink: Boolean(document.querySelector("[data-menu-page='devices']")),
     mainHidden: getComputedStyle(document.querySelector(".main-board")).display === "none",
@@ -145,6 +151,10 @@ async function assertPortalLayoutRoutes(page, baseUrl) {
   if (overview.modeHidden) failures.push("overview mode strip should be visible");
   if (overview.shellWidth && overview.mainWidth && overview.mainWidth < overview.shellWidth * 0.9) failures.push(`main board too narrow ${overview.mainWidth}/${overview.shellWidth}`);
   if (overview.quickStartLabel !== "Hide") failures.push(`quick start label=${overview.quickStartLabel}`);
+  if (overview.quickTitle !== "Launch your mining outfit in five steps.") failures.push(`quick start title=${overview.quickTitle}`);
+  if (!overview.hasQuickCharter || !overview.hasQuickCompany || !overview.hasQuickReferral || !overview.hasQuickInstall || !overview.hasQuickLink) {
+    failures.push("quick start five-step controls missing");
+  }
   if (orders.path !== "/portal/orders" || orders.tab !== "orders") failures.push(`orders route ${orders.path}/${orders.tab}`);
   if (!orders.modeHidden || orders.ordersHidden) failures.push("orders should hide overview summary and show orders");
   if (profile.path !== "/portal/profile" || profile.view !== "account" || profile.tab !== "profile") failures.push(`profile route ${profile.path}/${profile.view}/${profile.tab}`);

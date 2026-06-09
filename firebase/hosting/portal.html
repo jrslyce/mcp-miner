@@ -54,26 +54,41 @@
         <summary class="quick-start-summary">
           <span>
             <span class="eyebrow">Quick Start</span>
-            <strong id="portal-onboarding-title">Set up your account in four steps.</strong>
+            <strong id="portal-onboarding-title">Launch your mining outfit in five steps.</strong>
           </span>
           <span id="quick-start-toggle-label" class="quick-start-toggle">Hide</span>
         </summary>
         <div class="portal-onboarding-grid">
-          <article class="portal-step-card">
+          <article class="portal-step-card quick-charter-card">
             <span class="step-number">01</span>
-            <h3>Login</h3>
-            <p>Use the account panel to sign in or create an account. Password accounts need email verification before cloud sync or device approval.</p>
+            <h3>Name your character</h3>
+            <p>Use exactly two words, like a first and last name. Make it sound like someone who belongs in a strange little mining belt.</p>
+            <label for="quick-space-user-name">Space charter name</label>
+            <input id="quick-space-user-name" type="text" maxlength="80" autocomplete="nickname" placeholder="Buck Manwood">
           </article>
-          <article class="portal-step-card company-claim-card">
+          <article class="portal-step-card company-claim-card quick-company-card">
             <span class="step-number">02</span>
-            <h3>Name your charter</h3>
-            <p>Pick a creative two-word space charter name, then choose a Limited Space Liability Company for your mining outfit.</p>
-            <label for="company-name">Mining LSLC preview</label>
+            <h3>Name your LSLC</h3>
+            <p>Choose a Limited Space Liability Company for your mining contracts. LSLC is added automatically if you leave it off.</p>
+            <label for="company-name">Mining LSLC</label>
             <input id="company-name" name="company-name" type="text" maxlength="72" autocomplete="organization" placeholder="Quartz & Circuit LSLC">
+            <button id="quick-save-charter" type="button" class="copy-prompt-button">Save charter</button>
             <p>Your current claim: <strong id="claimed-asteroid-name">Unclaimed Starter Rubble</strong></p>
+            <p id="quick-charter-status" class="message" role="status" aria-live="polite"></p>
+          </article>
+          <article class="portal-step-card quick-referral-card">
+            <span class="step-number">03</span>
+            <h3>Join a team</h3>
+            <p>Enter a referral code to contract your LSLC under a crew. Team codes are case-insensitive.</p>
+            <label for="quick-referral-code">Referral code</label>
+            <div class="copy-row">
+              <input id="quick-referral-code" type="text" maxlength="9" autocomplete="off" placeholder="FAKE-BUSY">
+              <button id="quick-redeem-referral" type="button">Join</button>
+            </div>
+            <p id="quick-referral-status" class="message" role="status" aria-live="polite">Optional team code.</p>
           </article>
           <article class="portal-step-card portal-install-card">
-            <span class="step-number">03</span>
+            <span class="step-number">04</span>
             <h3>Install for your OS</h3>
             <div class="portal-os-selector" role="tablist" aria-label="Choose portal install prompt by operating system">
               <button type="button" class="os-option" data-portal-os="mac-silicon" aria-selected="true">Mac Silicon</button>
@@ -85,7 +100,7 @@
             <pre id="portal-install-prompt" class="copy-code">Install MCP Miner on this Apple Silicon Mac. Clone https://github.com/jrslyce/mcp-miner into ~/Code/mcp-miner if needed, then from the repo root make sure the Go plugin binary exists. If plugins/mcp-miner/bin/mcp-miner is missing, run go run ./cmd/mcp-miner build-plugin. Then run sh scripts/install_codex_plugin.sh. Do not use Ruby. After installation, tell me to restart Codex, trust all 6 MCP Miner hooks, and verify with @mcp-miner status.</pre>
           </article>
           <article class="portal-step-card portal-link-card">
-            <span class="step-number">04</span>
+            <span class="step-number">05</span>
             <h3>Link and sync</h3>
             <p>Start an account link in Codex, approve the short-lived code here, return to Codex, complete the account link, then sync. Only abstract game progress is sent.</p>
             <button type="button" class="copy-prompt-button" data-copy-target="portal-link-prompt">Copy link prompt</button>
