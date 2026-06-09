@@ -628,7 +628,7 @@ const LINK_SESSION_STORAGE_KEY = "mcp-miner-pending-link";
 const LINK_SESSION_STORAGE_TTL_MS = 15 * 60 * 1000;
 const pendingLink = pendingLinkFromLocation();
 const pendingReferralCode = normalizeReferralCodeParam(linkParams.get("ref") || linkParams.get("referral"));
-const pendingLogin = linkParams.has("login") || window.location.hash === "#login" || window.location.hash === "#account";
+let pendingLogin = linkParams.has("login") || window.location.hash === "#login" || window.location.hash === "#account";
 const COMPANY_STORAGE_KEY = "mcp-miner-company-name";
 const LOGIN_REFERRAL_STORAGE_KEY = "mcp-miner-login-referral-code";
 const QUICK_START_STORAGE_KEY = "mcp-miner-quick-start-open";
@@ -1670,6 +1670,7 @@ function clearLoginRouteAfterSignIn() {
   if (!pendingLogin || hasPendingLink() || !currentUser || requiresEmailVerification(currentUser)) {
     return;
   }
+  pendingLogin = false;
   document.body.dataset.loginMode = "none";
   const nextParams = new URLSearchParams(window.location.search);
   nextParams.delete("login");
