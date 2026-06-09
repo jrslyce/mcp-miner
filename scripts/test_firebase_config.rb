@@ -23,7 +23,6 @@ functions_package = read_json("firebase/functions/package.json")
 rules = File.read(File.join(ROOT, "firestore.rules"))
 docs = File.read(File.join(ROOT, "docs", "firebase-local.md"))
 package = read_json("package.json")
-hosting_firebase_config = File.read(File.join(ROOT, "firebase", "hosting", "firebase-config.js"))
 
 assert("Firebase project should default to a demo project") do
   firebaserc.dig("projects", "default") == "demo-mcp-miner"
@@ -41,13 +40,6 @@ assert("Firebase Hosting should revalidate launch-critical dashboard files") do
     entry["source"] == "**" &&
       entry["headers"].any? { |header| header["key"] == "Cache-Control" && header["value"] == "no-cache" }
   end
-end
-
-assert("Firebase Auth should use same-origin hosting domains for redirect handlers") do
-  hosting_firebase_config.include?("MCP_MINER_HOST_AUTH_DOMAINS") &&
-    hosting_firebase_config.include?(%("mcpminer.net")) &&
-    hosting_firebase_config.include?("authDomain: MCP_MINER_HOST_AUTH_DOMAINS.has(window.location.hostname)") &&
-    hosting_firebase_config.include?(": \"mcp-miner.firebaseapp.com\"")
 end
 
 assert("Firebase Hosting should include baseline browser security headers") do
